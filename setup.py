@@ -2,7 +2,6 @@
 import io
 import os
 from setuptools import find_packages, setup
-asdk.nadl
 
 def read(*paths, **kwargs):
     """Read the contents of a text file safely.

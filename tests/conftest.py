@@ -1,7 +1,6 @@
 import sys
 import pytest
 
-# EDIT TO TEST 
 # each test runs on cwd to its temp dir
 @pytest.fixture(autouse=True)
 def go_to_tmpdir(request):

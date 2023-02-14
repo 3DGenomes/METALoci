@@ -3,6 +3,7 @@ import io
 import os
 from setuptools import find_packages, setup
 
+
 def read(*paths, **kwargs):
     """Read the contents of a text file safely.
     >>> read("metaloci", "VERSION")
@@ -36,6 +37,7 @@ setup(
     long_description=read("README.md"),
     long_description_content_type="text/markdown",
     author="3DGenomes",
+    # package_dir  = {'metaloci': PATH + '/metaloci'},
     packages=find_packages(exclude=["tests", ".github"]),
     install_requires=read_requirements("requirements.txt"),
     entry_points={

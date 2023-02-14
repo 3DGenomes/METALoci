@@ -1,5 +1,3 @@
-# pylint: disable=invalid-name, wrong-import-position, wrong-import-order
-
 """
 This script parses a bed file into the proper pickle file needed for METALoci
 """
@@ -10,13 +8,9 @@ import pathlib
 import re
 import sys
 from argparse import SUPPRESS, ArgumentParser, RawDescriptionHelpFormatter
-from collections import defaultdict
 from datetime import timedelta
 from time import time
-
-import numpy as np
-import pandas as pd
-from tqdm.auto import tqdm
+from metaloci.misc import misc
 
 
 description = """
@@ -95,114 +89,20 @@ if debug:
     print(table)
     sys.exit()
 
-
-def bed_to_metaloci(boundaries_dictionary):
-
-    for chrm, chrm_value in boundaries_dictionary.items():
-
-        start_timer_chrm = time()
-
-        print(f"chromosome {chrm.rsplit('r', 1)[1]} in progress.")
-
-        pbar = tqdm(total = int(chrm_value["end"] / resolution ) + 1)
-
-        if chrm not in file_info["chrom"].unique():
-
-            print(f"chromosome {chrm.rsplit('r', 1)[1]} not found in the signal file(s), skipping...")
-            continue
-
-        bin_start = 0
-        bin_end = bin_start + resolution
-
-        info = defaultdict(list)
-
-        while bin_start <= chrm_value['end']:
-
-            pbar.update()
-
-            info["Chr"].append(chrm)
-            info["St"].append(bin_start)
-            info["Sp"].append(bin_end)
-
-            tmp_bin = file_info[(file_info['start'] >= int(bin_start)) &
-                            (file_info['end'] <= int(bin_end)) &
-                            (file_info['chrom'] == chrm)]
-
-            # Go over the columns to get all the signals.
-            for j in range(3, tmp_bin.shape[1]):
-
-                if tmp_bin.shape[0] == 0:
-
-                    info[col_names[j]].append(np.nan)
-
-                else:
-
-                    info[col_names[j]].append(np.nanmedian(tmp_bin.iloc[:, j].tolist()))
-
-            # If the end of the current bin is the start of the terminal telomere, stop
-            if bin_end == boundaries_dictionary[f"{chrm}"]['end']:
-
-                break
-
-            # Creating tmp variables for an easier check of overlap with centromeres and telomeres.
-            bin_start = bin_end
-            bin_end = bin_start + resolution
-
-        pbar.close()
-
-        # Create a folder to store the pickle file.
-        out_path = os.path.join(work_dir, "signal", f"chr{chrm.rsplit('r', 1)[1]}")  
-        pathlib.Path(out_path).mkdir(parents=True, exist_ok=True)  
-
-        # Creating a pandas DataFrame based on the dictionary created before and save it as pickle.
-        # df_info = pd.DataFrame(info)  
-        pickle_path = os.path.join(work_dir, "signal", f"chr{chrm.rsplit('r', 1)[1]}", f"{out_name}_chr{chrm.rsplit('r', 1)[1]}")
-        pd.DataFrame(info).to_pickle(f"{pickle_path}_signal.pkl")
-
-        # print(f"chromosome {chrm.rsplit('r', 1)[1]} done in {timedelta(seconds=round(time() - start_timer_chrm))}.")
-
-boundaries_dictionary = defaultdict(dict)
-
-# Open centromeres and telomeres coordinates file and assign the corresponding values to variables.
-with open(file=coords, mode='r', encoding="utf-8") as chrom:
-
-    for l in chrom:
-
-        line = l.rstrip().split("\t")
-        boundaries_dictionary[line[0]]['end'] = int(line[1])  # tl_st: end of the initial telomere
-
-file_info = pd.read_table(data[0])
-
-for i in range(1, len(data)):
-
-    temp = pd.read_table(data[i])
-    file_info = pd.merge(file_info, temp, on=["chrom", "start", "end"], how='inner')
-
-col_names = file_info.columns.tolist()
-
-bad_col_names = []
-
-for i in range(3, len(col_names)):
-
-    if len(re.findall("_", col_names[i])) != 1:
-
-        bad_col_names.append(col_names[i])
-
-if len(bad_col_names) > 0:
-
-    print("Problems with the following signal names:")
-    print(', '.join(str(x) for x in bad_col_names))
-    print("Names for signal must be in the following format: CLASS_NAME.")
-    print("Class refers to data that can be potentially merged in downstream analysis.")
-    
-    sys.exit("Exiting due to improper signal names.")
+# Computing
 
 start_timer = time()
 
+info = misc.bed_to_metaloci(data, coords, resolution)
 
-# Computing
+# Create a folder to store the pickle file.
+out_path = os.path.join(work_dir, "signal", f"chr{chrm.rsplit('r', 1)[1]}")  
+pathlib.Path(out_path).mkdir(parents=True, exist_ok=True)  
 
-bed_to_metaloci(boundaries_dictionary)
+# Creating a pandas DataFrame based on the dictionary created before and save it as pickle.
+# df_info = pd.DataFrame(info)  
+pickle_path = os.path.join(work_dir, "signal", f"chr{chrm.rsplit('r', 1)[1]}", f"{out_name}_chr{chrm.rsplit('r', 1)[1]}")
+info.to_pickle(f"{pickle_path}_signal.pkl")
 
 print(f"execution time: {timedelta(seconds=round(time() - start_timer))}")
 print("all done.")

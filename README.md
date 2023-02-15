@@ -16,7 +16,6 @@ pip install metaloci
 
 ```py
 from metaloci import BaseClass
-from metaloci import base_function
 
 BaseClass().base_method()
 base_function()

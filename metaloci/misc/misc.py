@@ -8,6 +8,21 @@ from collections import defaultdict
 from time import time
 
 
+
+def delete_folder(path) :
+
+    for subdirectory in path.iterdir() :
+
+        if subdirectory.is_dir() :
+
+            delete_folder(subdirectory)
+
+        else :
+
+            subdirectory.unlink()
+    path.rmdir()
+
+
 def bed_to_metaloci(data, coords, resolution):
 
     """_summary_

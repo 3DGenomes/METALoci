@@ -1,16 +1,19 @@
 """
-This script parses a bed file into the proper pickle file needed for METALoci
+This script parses a bed file into the proper parquet files needed for METALoci.
 """
-__author__ = "Iago Maceda Porto and Leo Zuber Ponce"
 
 import os.path
-import pathlib
 import re
 import sys
 from argparse import SUPPRESS, ArgumentParser, RawDescriptionHelpFormatter
 from datetime import timedelta
 from time import time
 from metaloci.misc import misc
+import subprocess as sp
+import glob
+import pandas as pd
+import cooler
+import pathlib
 
 
 description = """
@@ -20,55 +23,78 @@ Signal names must be in the format CLASS.ID_IND.ID.\n"
 \tClass.ID can be the name of the signal mark.\n"
 \tInd.ID can be the name of the patient/cell line/experiment.\n"""
 
-parser = ArgumentParser(formatter_class=RawDescriptionHelpFormatter,
-                        description=description,
-                        add_help=False)
+parser = ArgumentParser(
+    formatter_class=RawDescriptionHelpFormatter, description=description, add_help=False
+)
 
 input_arg = parser.add_argument_group(title="Input arguments")
 
-input_arg.add_argument('-w', '--work-dir', dest='work_dir', required=True,
-                       metavar='PATH', type=str,
-                       help='Path to working directory.')
+input_arg.add_argument(
+    "-w",
+    "--work-dir",
+    dest="work_dir",
+    required=True,
+    metavar="PATH",
+    type=str,
+    help="Path to working directory.",
+)
 
-input_arg.add_argument('-d', '--data', dest='data', required=True,
-                       metavar='PATH', type=str,
-                       nargs="*", action="extend",
-                       help='Path to file to process. The file must contain titles for the columns,'
-                            ' being the first 3 columns coded as chrom, start, end. The following '
-                            'columns should contain the name of the signal coded as: id1_id2.\n'
-                            'Names of the chromosomes must be the same as the coords_file '
-                            'described below. '
-                            '(More than one file can be specified, space separated)')
+input_arg.add_argument(
+    "-d",
+    "--data",
+    dest="data",
+    required=True,
+    metavar="PATH",
+    type=str,
+    nargs="*",
+    action="extend",
+    help="Path to file to process. The file must contain titles for the columns,"
+    " being the first 3 columns coded as chrom, start, end. The following "
+    "columns should contain the name of the signal coded as: id1_id2.\n"
+    "Names of the chromosomes must be the same as the coords_file "
+    "described below. "
+    "(More than one file can be specified, space separated)",
+)
 
-input_arg.add_argument('-o', '--name', dest='output', required=True,
-                       metavar='STR', type=str,
-                       help='Output file name.')
+input_arg.add_argument(
+    "-o", "--name", dest="output", required=True, metavar="STR", type=str, help="Output file name."
+)
 
-input_arg.add_argument('-r', '--resolution', dest='reso', required=True,
-                       metavar='INT', type=int,
-                       help="Resolution of the bins to calculate the signal")
+input_arg.add_argument(
+    "-r",
+    "--resolution",
+    dest="reso",
+    required=True,
+    metavar="INT",
+    type=int,
+    help="Resolution of the bins to calculate the signal (in kb).",
+)
 
 region_arg = parser.add_argument_group(title="Region arguments")
 
-region_arg.add_argument('-c', '--coords', dest='coords', required=True,
-                        metavar='PATH', type=str,
-                        help='Full path to a file that contains the name of the chromosomes in the '
-                             'first column and the ending coordinate of the chromosome in the '
-                              'second column.')
+region_arg.add_argument(
+    "-c",
+    "--coords",
+    dest="coords",
+    required=True,
+    metavar="PATH",
+    type=str,
+    help="Full path to a file that contains the name of the chromosomes in the "
+    "first column and the ending coordinate of the chromosome in the "
+    "second column.",
+)
 
 optional_arg = parser.add_argument_group(title="Optional arguments")
 
-optional_arg.add_argument('-h', '--help', action="help",
-                          help="Show this help message and exit.")
+optional_arg.add_argument("-h", "--help", action="help", help="Show this help message and exit.")
 
-optional_arg.add_argument('-u', '--debug', dest='debug',
-                          action='store_true', help=SUPPRESS)
+optional_arg.add_argument("-u", "--debug", dest="debug", action="store_true", help=SUPPRESS)
 
-args = parser.parse_args(None if sys.argv[1:] else ['-h'])
+args = parser.parse_args(None if sys.argv[1:] else ["-h"])
 
-if not args.work_dir.endswith('/'):
+if not args.work_dir.endswith("/"):
 
-    args.work_dir += '/'
+    args.work_dir += "/"
 
 work_dir = args.work_dir
 data = args.data
@@ -79,30 +105,109 @@ debug = args.debug
 
 if debug:
 
-    table = [["work_dir", work_dir],
-             ["data", data],
-             ["out_name", out_name],
-             ["centro_and_telo_file", coords],
-             ["binSize", resolution]
-             ]
-    
+    table = [
+        ["work_dir", work_dir],
+        ["data", data],
+        ["out_name", out_name],
+        ["centro_and_telo_file", coords],
+        ["binSize", resolution],
+    ]
+
     print(table)
     sys.exit()
 
-# Computing
+tmp_dir = f"{work_dir}tmp"
+pathlib.Path(tmp_dir).mkdir(parents=True, exist_ok=True)
 
-start_timer = time()
+column_dict = {}
 
-info = misc.bed_to_metaloci(data, coords, resolution)
+# Create a bed file that contains regions of a given resolution.
+sp.call(
+    f"bedtools makewindows -g {coords} -w {resolution} > {tmp_dir}/hg38_{resolution}bp_bin.bed",
+    shell=True,
+)
 
-# Create a folder to store the pickle file.
-out_path = os.path.join(work_dir, "signal", f"chr{chrm.rsplit('r', 1)[1]}")  
-pathlib.Path(out_path).mkdir(parents=True, exist_ok=True)  
+# Check if the given bed file has a header and sort the file. If there is a header, save column
+# names to a dictionary to put it in the next step, then sort the file.
+for f in data:
 
-# Creating a pandas DataFrame based on the dictionary created before and save it as pickle.
-# df_info = pd.DataFrame(info)  
-pickle_path = os.path.join(work_dir, "signal", f"chr{chrm.rsplit('r', 1)[1]}", f"{out_name}_chr{chrm.rsplit('r', 1)[1]}")
-info.to_pickle(f"{pickle_path}_signal.pkl")
+    if isinstance(sp.getoutput(f"head -n 1 {f} | cut -f 4"), float):
 
-print(f"execution time: {timedelta(seconds=round(time() - start_timer))}")
-print("all done.")
+        sp.call(
+            f"sort {f} -k1,1V -k2,2n -k3,3n > {tmp_dir}/sorted_{f.rsplit('/', 1)[1]}", shell=True
+        )
+
+    else:
+
+        column_dict[f.rsplit("/", 1)[1]] = sp.getoutput(f"head -n 1 {f}").split(
+            sep="\t"
+        )  # Saving the corresponding column names in a dict, with only the file name as a key.
+        sp.call(
+            f"tail -n +2 {f} | sort -k1,1V -k2,2n -k3,3n > {tmp_dir}/sorted_{f.rsplit('/', 1)[1]}",
+            shell=True,
+        )
+        sp.getoutput(f"head -n")
+
+    # Intersect the sorted files and the binnarized file.
+    sp.call(
+        f"bedtools intersect -a /{tmp_dir}/hg38_{resolution}bp_bin.bed -b {tmp_dir}/sorted_{f.rsplit('/', 1)[1]} -wo -sorted > {tmp_dir}/intersected_{f.rsplit('/', 1)[1]}",
+        shell=True,
+    )
+
+# Create a list of paths to the intersected files.
+intersected_files_paths = [(f"{tmp_dir}/intersected_" + i.rsplit("/", 1)[1]) for i in data]
+
+
+final_intersect = pd.read_csv(
+    intersected_files_paths[0], sep="\t", header=None
+)  # Read the first intersected file,
+final_intersect = final_intersect.drop(
+    [3, 4, 5, len(final_intersect.columns) - 1], axis=1
+)  # Drop unnecesary columns,
+final_intersect.columns = column_dict[
+    intersected_files_paths[0].rsplit("/", 1)[1].split("_", 1)[1]
+]  # Input the corresponding column names
+final_intersect = (
+    final_intersect.groupby(["chrom", "start", "end"])[
+        final_intersect.columns[3 : len(final_intersect.columns)]
+    ]
+    .median()
+    .reset_index()
+)  # Calculate the median of all signals of the same bin.
+
+# Process the rest of the files the same way and merge with next one, until all files are merged.
+for i in range(1, len(intersected_files_paths)):
+
+    tmp_intersect = pd.read_csv(intersected_files_paths[i], sep="\t", header=None)
+    tmp_intersect = tmp_intersect.drop([3, 4, 5, len(tmp_intersect.columns) - 1], axis=1)
+    tmp_intersect.columns = column_dict[
+        intersected_files_paths[i].rsplit("/", 1)[1].split("_", 1)[1]
+    ]
+    tmp_intersect = (
+        tmp_intersect.groupby(["chrom", "start", "end"])[
+            tmp_intersect.columns[3 : len(tmp_intersect.columns)]
+        ]
+        .median()
+        .reset_index()
+    )
+
+    final_intersect = pd.merge(
+        final_intersect, tmp_intersect, on=["chrom", "start", "end"], how="inner"
+    )
+
+# For each chromosome, create a directory and save the information for that chromosome in .csv and
+# .parquet.
+for chrom in sorted(final_intersect["chrom"].unique()):
+
+    pathlib.Path(f"{work_dir}signal/{chrom}").mkdir(parents=True, exist_ok=True)
+    final_intersect[final_intersect.chrom == f"{chrom}"].to_parquet(
+        f"{work_dir}signal/{chrom}/{out_name}_{chrom}.parquet"
+    )
+    final_intersect[final_intersect.chrom == f"{chrom}"].to_csv(
+        f"{work_dir}signal/{chrom}/{out_name}_{chrom}.csv", sep="\t", index=False
+    )
+
+misc.remove_folder(pathlib.Path(tmp_dir))  # Remove tmp folder (not empty).
+sp.call(f"tree -h {work_dir}", shell=True)  # Show directory tree.
+
+print("done.")

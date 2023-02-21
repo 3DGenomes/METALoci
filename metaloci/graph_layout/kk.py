@@ -4,7 +4,7 @@ import seaborn as sns
 import os
 
 
-def get_restraints_matrix(mlo, persistance_lenght, cutoff, plot_bool):
+def get_restraints_matrix(mlo, cutoff, persistance_lenght, plot_bool):
 
     """
     Calculate top interaction, plot matrix and get restraints.
@@ -31,16 +31,14 @@ def get_restraints_matrix(mlo, persistance_lenght, cutoff, plot_bool):
     top = int(len(matrix_copy[matrix_copy > np.nanmin(matrix_copy)]) * cutoff)
     top_indexes = np.argpartition(matrix_copy, -top)[-top:]
 
-    # Subset to cutoff percentil SQUARE MATRIX
+    # Subset to cutoff percentil
     restraints_matrix = mlo.matrix.copy()
     restraints_matrix = np.where(restraints_matrix == 1.0, 0, restraints_matrix)
     restraints_matrix[restraints_matrix < np.nanmin(matrix_copy[top_indexes])] = 0
 
-    # TO-DO change perlen formula to use quantile 99?
-
     if persistance_lenght is None:
 
-        persistance_lenght = np.nanmax(restraints_matrix[restraints_matrix > 0]) ** 2
+        persistance_lenght = np.nanquantile(restraints_matrix[restraints_matrix > 0], 0.99) ** 2
 
     rng = np.arange(  # rng = range of integers until size of matrix to locate the diagonal
         len(restraints_matrix) - 1

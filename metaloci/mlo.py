@@ -1,3 +1,6 @@
+import dill as pickle
+
+
 class mlo:
     def __init__(
         self,
@@ -17,3 +20,7 @@ class mlo:
         self.mixed_matrices = mixed_matrices
         self.persistance_length = persistance_length
         self.kk_nodes = kk_nodes
+
+    def save(self, file_handler):
+
+        pickle.dump(self, file_handler)

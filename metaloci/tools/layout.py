@@ -30,6 +30,7 @@ from metaloci.graph_layout import kk
 from metaloci import mlo
 from metaloci.plot import plot
 import numpy as np
+import dill as pickle
 
 description = """
 This script adds signal data to a Kamada-Kawai layout and calculates Local Moran's I for every 
@@ -66,7 +67,7 @@ input_arg.add_argument(
     metavar="PATH",
     type=str,
     required=True,
-    help="Path to working directory.",
+    help="path to working directory.",
 )
 input_arg.add_argument(
     "-c",
@@ -75,7 +76,7 @@ input_arg.add_argument(
     metavar="PATH",
     type=str,
     required=True,
-    help="Complete path to the cooler file.",
+    help="complete path to the cooler file.",
 )
 input_arg.add_argument(
     "-r",
@@ -84,18 +85,18 @@ input_arg.add_argument(
     metavar="INT",
     type=int,
     required=True,
-    help="Resolution of the cooler files.",
+    help="resolution of the cooler files.",
 )
 region_arg = parser.add_argument_group(
-    title="Region arguments", description="Choose one of the following options."
+    title="region arguments", description="Choose one of the following options."
 )
 region_arg.add_argument(
     "-g",
     "--region",
     dest="regions",
-    metavar="PATH",
+    metavar="STR",
     type=str,
-    help="Path to the file with the regions of interest.",
+    help="region to be computed in chr:start-end format.",
 )
 region_arg.add_argument(
     "-G",
@@ -103,7 +104,7 @@ region_arg.add_argument(
     dest="regions",
     metavar="PATH",
     type=str,
-    help="Path to the file with the regions of interest.",
+    help="path to the file with the regions of interest.",
 )
 
 optional_arg = parser.add_argument_group(title="Optional arguments")
@@ -115,7 +116,7 @@ optional_arg.add_argument(
     nargs="*",
     type=float,
     action="extend",
-    help="Percentage of top interactions to keep, space separated (default: " "0.2)",
+    help="percentage of top interactions to keep, space separated (default: " "0.2)",
 )
 optional_arg.add_argument(
     "-n",
@@ -123,17 +124,17 @@ optional_arg.add_argument(
     dest="dataset_name",
     metavar="STR",
     default="",
-    help="Name of the dataset. By default corresponds to: " "COOLER.NAME_RESOLUTION",
+    help="name of the dataset. By default corresponds to: " "COOLER.NAME_RESOLUTION",
 )
 optional_arg.add_argument(
-    "-f", "--force", dest="force", action="store_true", help="Force rewriting existing data."
+    "-f", "--force", dest="force", action="store_true", help="force rewriting existing data."
 )
 optional_arg.add_argument(
     "-p",
     "--plot",
     dest="save_plots",
     action="store_true",
-    help="Plot the matrix, density and Kamada-Kawai plots, even when a "
+    help="plot the matrix, density and Kamada-Kawai plots, even when a "
     "single cutoff is selected.",
 )
 # TODO add sort of silent argument?
@@ -213,25 +214,27 @@ for i, row in genes.iterrows():
 
     # chr1:36031800-40052000	POU3F1	ENSG00000185668.8
 
-    region_chr, region_start, region_end, mlo.midpoint = re.split(":|-|_", row.coords)
+    mlobject = mlo.mlo(None, None, None, None, None, None, None)
+
+    region_chr, region_start, region_end, mlobject.midpoint = re.split(":|-|_", row.coords)
 
     region_start = int(region_start)
     region_end = int(region_end)
 
-    mlo.midpoint = int(mlo.midpoint)
-    mlo.region = f"{region_chr}:{region_start}-{region_end}"
-    mlo.resolution = resolution  # check if I can define this outside the loop
+    mlobject.midpoint = int(mlobject.midpoint)
+    mlobject.region = f"{region_chr}:{region_start}-{region_end}"
+    mlobject.resolution = resolution  # check if I can define this outside the loop
 
-    filename = f"{mlo.region}_{mlo.midpoint}_{int(mlo.resolution/1000)}kb"
+    filename = f"{mlobject.region}_{mlobject.midpoint}_{int(mlobject.resolution/1000)}kb"
 
     pathlib.Path(os.path.join(work_dir, dataset_name, region_chr), "plots").mkdir(
         parents=True, exist_ok=True
     )
 
     coordsfile = f"{os.path.join(work_dir, dataset_name, region_chr, filename)}_KK.pkl"
-    cooler_file = cooler_file + "::/resolutions/" + str(mlo.resolution)
+    cooler_file = cooler_file + "::/resolutions/" + str(mlobject.resolution)
 
-    print(f"\n---> Working on region {mlo.region}.\n")
+    print(f"\n------> Working on region: {mlobject.region}\n")
 
     # This part has been modified. In some datasets (NeuS) the matrix was completely empty,
     # so the pkl file was not created (gave an error in the MatTransform function:
@@ -242,7 +245,7 @@ for i, row in genes.iterrows():
     # the region).
     if os.path.isfile(coordsfile):
 
-        print(f"\t{mlo.region} already done.")
+        print(f"\t{mlobject.region} already done.")
 
         if force:
 
@@ -256,19 +259,22 @@ for i, row in genes.iterrows():
             continue
 
     elif (
-        mlo.region in bad_regions["region"]
-        and bad_regions["reason"][bad_regions["region"].index(mlo.region)] == "empty"
+        mlobject.region in bad_regions["region"]
+        and bad_regions["reason"][bad_regions["region"].index(mlobject.region)] == "empty"
     ):
 
         print("\t<--- already done (no data)!")
+
         continue
 
-    mlo.matrix = cooler.Cooler(cooler_file).matrix(sparse=True).fetch(mlo.region).toarray()
-    mlo.matrix = misc.clean_matrix(mlo, bad_regions)
+    mlobject.matrix = (
+        cooler.Cooler(cooler_file).matrix(sparse=True).fetch(mlobject.region).toarray()
+    )
+    mlobject.matrix = misc.clean_matrix(mlobject, bad_regions)
 
     # This if statement is for detecting empty arrays. If the array is too empty,
     # clean_matrix() returns mlo as None.
-    if mlo.matrix is None:
+    if mlobject.matrix is None:
 
         continue
 
@@ -279,10 +285,10 @@ for i, row in genes.iterrows():
         print(f"\tCutoff to be used is: {int(cutoff * 100)} %")
 
         # Get submatrix of restraints
-        restraints_matrix, mlo.mixed_matrices, mixed_matrices_plot = kk.get_restraints_matrix(
-            mlo,
-            None,
+        restraints_matrix, mlobject.mixed_matrices, mixed_matrices_plot = kk.get_restraints_matrix(
+            mlobject,
             cutoff,
+            None,
             plot_bool=True,
         )
 
@@ -301,28 +307,30 @@ for i, row in genes.iterrows():
             plt.close()
 
         print("\tLayouting Kamada-Kawai...")
-        mlo.kk_graph = nx.from_scipy_sparse_array(csr_matrix(restraints_matrix))
-        mlo.kk_nodes = nx.kamada_kawai_layout(mlo.kk_graph)
+        mlobject.kk_graph = nx.from_scipy_sparse_array(csr_matrix(restraints_matrix))
+        mlobject.kk_nodes = nx.kamada_kawai_layout(mlobject.kk_graph)
 
-        # Get distance matrix  TO CALCULATE IN LMI, NOT HERE
-        # coords = list(mlo.kk_nodes.values())
+        # Get distance matrix <----- CALCULATE IN LMI, NOT HERE
+        # coords = list(mlobject.kk_nodes.values())
         # dists = distance.cdist(coords, coords, "euclidean")
 
         if len(cutoffs) == 1:
 
-            # Save mlo.
-            mlo_name = os.path.join(work_dir, dataset_name, region_chr, f"{filename}.mlo")
-            with open(mlo_name, "wb") as mlo_file:
+            # Save mlobject.
+            with open(
+                os.path.join(work_dir, dataset_name, region_chr, f"{filename}.mlo"), "wb"
+            ) as hamlo_namendle:
 
-                pickle.dump(mlo_name, mlo_file)
+                mlobject.save(hamlo_namendle)
 
             print(
-                f"\tKamada-Kawai layout of region {mlo.region} saved at {int(cutoff * 100)} % cutoff to file: {mlo_name} "
+                f"\tKamada-Kawai layout of region {mlobject.region} saved"
+                " at {int(cutoff * 100)} % cutoff to file: {mlo_name}"
             )
 
         if len(cutoffs) > 1 or save_plots:
 
-            plt = plot.plot_kk(mlo)
+            plt = plot.plot_kk(mlobject)
 
             fig_name = os.path.join(
                 work_dir,

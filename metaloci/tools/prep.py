@@ -4,7 +4,6 @@ This script parses a bed file into the proper parquet files needed for METALoci.
 
 import sys
 from argparse import SUPPRESS, ArgumentParser, RawDescriptionHelpFormatter
-from datetime import timedelta
 from metaloci.misc import misc
 import subprocess as sp
 import pandas as pd
@@ -125,7 +124,9 @@ for f in data:
 
     try:
 
-        float(sp.getoutput(f"head -n 1 {f} | cut -f 4"))
+        float(  # If first row fourth column is convertible to float, it is a signal, so the first row is not a header.
+            sp.getoutput(f"head -n 1 {f} | cut -f 4")
+        )
 
         sp.call(
             f"sort {f} -k1,1V -k2,2n -k3,3n | grep -v random | grep -v chrUn > {tmp_dir}/sorted_{f.rsplit('/', 1)[1]}",
@@ -174,7 +175,7 @@ else:
         "chrom",
         "start",
         "end",
-        f"{intersected_files_paths[0].rsplit('/', 1)[1]}",
+        f"{intersected_files_paths[0].rsplit('/', 1)[1].split('_', 1)[1]}",
     ]
 
 final_intersect = (  # Calculate the median of all signals of the same bin.
@@ -205,7 +206,7 @@ if len(intersected_files_paths) > 1:
                 "chrom",
                 "start",
                 "end",
-                f"{intersected_files_paths[i].rsplit('/', 1)[1]}",
+                f"{intersected_files_paths[i].rsplit('/', 1)[1].split('_', 1)[1]}",
             ]
 
         tmp_intersect = (

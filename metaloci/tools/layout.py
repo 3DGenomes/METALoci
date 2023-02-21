@@ -27,6 +27,8 @@ from scipy.sparse import csr_matrix
 import pyarrow.parquet as pq
 from metaloci.misc import misc
 from metaloci.graph_layout import kk
+from metaloci import mlo
+from metaloci.plot import plot
 import numpy as np
 
 description = """
@@ -129,7 +131,7 @@ optional_arg.add_argument(
 optional_arg.add_argument(
     "-p",
     "--plot",
-    dest="plot_matKK",
+    dest="save_plots",
     action="store_true",
     help="Plot the matrix, density and Kamada-Kawai plots, even when a "
     "single cutoff is selected.",
@@ -147,7 +149,7 @@ resolution = args.reso * 1000
 cutoffs = args.cutoff
 dataset_name = args.dataset_name
 force = args.force
-plot_matKK = args.plot_matKK
+save_plots = args.save_plots
 debug = args.debug
 
 if not work_dir.endswith("/"):
@@ -200,8 +202,6 @@ else:
 
     genes = pd.read_table(regions)
 
-print(genes)
-
 pathlib.Path(os.path.join(work_dir, dataset_name)).mkdir(parents=True, exist_ok=True)
 
 bad_regions = {"region": [], "reason": []}
@@ -213,25 +213,27 @@ for i, row in genes.iterrows():
 
     # chr1:36031800-40052000	POU3F1	ENSG00000185668.8
 
-    region_chr, region_start, region_end, midpoint = re.split(":|-|_", row.coords)
+    region_chr, region_start, region_end, mlo.midpoint = re.split(":|-|_", row.coords)
 
     region_start = int(region_start)
     region_end = int(region_end)
-    midpoint = int(midpoint)
 
-    region_name = f"{region_chr}:{region_start}-{region_end}"
-    filename = f"{region_name}_{midpoint}_{resolution}bp"
+    mlo.midpoint = int(mlo.midpoint)
+    mlo.region = f"{region_chr}:{region_start}-{region_end}"
+    mlo.resolution = resolution  # check if I can define this outside the loop
 
-    pathlib.Path(os.path.join(work_dir, dataset_name, region_chr)).mkdir(
+    filename = f"{mlo.region}_{mlo.midpoint}_{int(mlo.resolution/1000)}kb"
+
+    pathlib.Path(os.path.join(work_dir, dataset_name, region_chr), "plots").mkdir(
         parents=True, exist_ok=True
     )
 
     coordsfile = f"{os.path.join(work_dir, dataset_name, region_chr, filename)}_KK.pkl"
-    cooler_file = cooler_file + "::/resolutions/" + str(resolution)
+    cooler_file = cooler_file + "::/resolutions/" + str(mlo.resolution)
 
-    print(f"---> Working on region {region_name}.")
+    print(f"\n---> Working on region {mlo.region}.\n")
 
-    # This part is modified. In some datasets (NeuS) the matrix was completely empty,
+    # This part has been modified. In some datasets (NeuS) the matrix was completely empty,
     # so the pkl file was not created (gave an error in the MatTransform function:
     # pc = np.min(mat[mat>0]))
     # To bypass this part, the script checks the bad_regions.txt; if the regions
@@ -240,13 +242,13 @@ for i, row in genes.iterrows():
     # the region).
     if os.path.isfile(coordsfile):
 
-        print(f"\t{region_name} already done!")
+        print(f"\t{mlo.region} already done.")
 
         if force:
 
             print(
                 "\tForce option (-f) selected, recalculating "
-                "the Kamada-Kawai layout (files will be overwritten)"
+                "the Kamada-Kawai layout (files will be overwritten)\n"
             )
 
         else:
@@ -254,172 +256,99 @@ for i, row in genes.iterrows():
             continue
 
     elif (
-        region_name in bad_regions["region"]
-        and bad_regions["reason"][bad_regions["region"].index(region_name)] == "empty"
+        mlo.region in bad_regions["region"]
+        and bad_regions["reason"][bad_regions["region"].index(mlo.region)] == "empty"
     ):
 
         print("\t<--- already done (no data)!")
         continue
 
-    # Run the code...
-    # See the matrix
-    print("\tReading the cooler file and transforming into a matrix...")
+    mlo.matrix = cooler.Cooler(cooler_file).matrix(sparse=True).fetch(mlo.region).toarray()
+    mlo.matrix = misc.clean_matrix(mlo, bad_regions)
 
-    matrix = cooler.Cooler(cooler_file).matrix(sparse=True).fetch(region_name).toarray()
-    diagonal = np.array(matrix.diagonal())
-    total_zeroes, max_stretch, percentage_zeroes, zero_loc = misc.check_diagonal(diagonal)
-
-    print(f"\tLength of the diagonal is: {len(diagonal)}")
-    print(f"\tTotal of 0 in diagonal is: {total_zeroes}")
-    print(f"\tMax strech of 0 in diagonal is: {max_stretch}")
-    print(f"\t% of 0s in diagonal is: {percentage_zeroes}")
-
-    if total_zeroes == len(diagonal):
-
-        print("\t\tMatrix is empty; passing to the next region")
-        bad_regions["region"].append(region_name)
-        bad_regions["reason"].append("empty")
+    # This if statement is for detecting empty arrays. If the array is too empty,
+    # clean_matrix() returns mlo as None.
+    if mlo.matrix is None:
 
         continue
 
-    if int(percentage_zeroes) >= 50:
-
-        bad_regions["region"].append(region_name)
-        bad_regions["reason"].append("perc")
-
-    elif int(max_stretch) >= 50:
-
-        bad_regions["region"].append(region_name)
-        bad_regions["reason"].append("stretch")
-
-    matrix[zero_loc] = 0
-    matrix[:, zero_loc] = 0
-
-    # Pseudocounts if min is zero
-    print(np.nanmin(matrix))
-    if np.nanmin(matrix) == 0:
-
-        pc = np.min(matrix[matrix > 0])
-        print(f"\t\tPseudocounts: {pc}")
-        matrix = matrix + pc
-
-    # Scale if all below 1
-    print(np.nanmax(matrix))
-    if np.nanmax(matrix) <= 1 or np.nanmin(matrix) <= 1:
-
-        sf = 1 / np.nanmin(matrix)
-        print(f"\t\tScaling factor: {sf}")
-        matrix = matrix * sf
-
-    if np.nanmin(matrix) < 1:
-
-        matrix[matrix < 1] = 1
-
-    matrix = np.log10(matrix)
-    pickle_name = os.path.join(work_dir, dataset_name, region_chr, f"{filename}_mat.pkl")
-
-    print(f"\tSaving full log10 matrix of {region_name} to file: ")
-    print(f"\t\t{pickle_name}")
-
-    with open(pickle_name, "wb") as output:
-
-        pickle.dump(matrix, output)
-
     for j, cutoff in enumerate(cutoffs):
 
-        mini_time = time()
+        time_per_kk = time()
 
-        print(f"\tCutoff % to be used is: {int(cutoff * 100)}")
+        print(f"\tCutoff to be used is: {int(cutoff * 100)} %")
 
         # Get submatrix of restraints
-        plot_save_file = os.path.join(work_dir, dataset_name, region_chr)
-        restaints_matrix = kk.get_restraints_matrix(
-            plot_save_file,
-            matrix,
+        restraints_matrix, mlo.mixed_matrices, mixed_matrices_plot = kk.get_restraints_matrix(
+            mlo,
             None,
             cutoff,
             plot_bool=True,
         )
 
-        # Kamada Kawai Layout
-        # Create sparse matrix
-        sparse_matrix = csr_matrix(restaints_matrix)
-        print(
-            f"\t\tSparse matrix contains {np.count_nonzero(sparse_matrix.toarray()):,} restraints"
-        )
+        if save_plots:
 
-        # Get the KK layout
-        print("\t\tLayouting KK...")
-        G = nx.from_scipy_sparse_array(sparse_matrix)
-        pos = nx.kamada_kawai_layout(G)
-
-        # Get distance matrix
-        coords = list(pos.values())
-        dists = distance.cdist(coords, coords, "euclidean")
-
-        if len(cutoffs) == 1:
-            # Save KK data
-            pickle_name = os.path.join(work_dir, dataset_name, region_chr, f"{filename}_KK.pkl")
-            print(
-                f"\tSaving KK layout of {region_name} to file with {int(cutoff * 100)}% cutoff: \n\t\t{pickle_name}"
+            mixed_matrices_plot.savefig(
+                os.path.join(
+                    work_dir,
+                    dataset_name,
+                    region_chr,
+                    f"plots/{filename}_" f"{cutoff}_mixed-matrices.pdf",
+                ),
+                dpi=300,
             )
 
-            with open(pickle_name, "wb") as pickle_file:
-
-                pickle.dump(sparse_matrix, pickle_file)
-                pickle.dump(pos, pickle_file)
-                pickle.dump(dists, pickle_file)
-                pickle.dump(coords, pickle_file)
-                pickle.dump(G, pickle_file)
-
-            print("\tSaved!")
-
-        if len(cutoffs) > 1 or plot_matKK:
-
-            print("\t\tPlotting KK...\n")
-
-            plt.figure(figsize=(10, 10))
-            options = {"node_size": 50, "edge_color": "black", "linewidths": 0.1, "width": 0.05}
-
-            nx.draw(G, pos, node_color=range(len(pos)), cmap=plt.cm.coolwarm, **options)
-
-            if midpoint:
-
-                plt.scatter(
-                    pos[midpoint][0], pos[midpoint][1], s=80, facecolors="none", edgecolors="r"
-                )
-
-            xs = []
-            ys = []
-
-            for _, val in pos.items():
-
-                xs.append(val[0])
-                ys.append(val[1])
-
-            sns.lineplot(x=xs, y=ys, sort=False, lw=2, color="black", legend=False, zorder=1)
-
-            fig_name = os.path.join(
-                work_dir, dataset_name, region_chr, f"{filename}_" f"{cutoff}_KK.pdf"
-            )
-
-            plt.savefig(fig_name, bbox_incehs="tight", dpi=300)
             plt.close()
 
-        elapsed_time_secs = time() - mini_time
+        print("\tLayouting Kamada-Kawai...")
+        mlo.kk_graph = nx.from_scipy_sparse_array(csr_matrix(restraints_matrix))
+        mlo.kk_nodes = nx.kamada_kawai_layout(mlo.kk_graph)
 
-        print(f"\tThis KK took {timedelta(seconds=round(elapsed_time_secs))}\n")
+        # Get distance matrix  TO CALCULATE IN LMI, NOT HERE
+        # coords = list(mlo.kk_nodes.values())
+        # dists = distance.cdist(coords, coords, "euclidean")
 
-    print("done.")
+        if len(cutoffs) == 1:
+
+            # Save mlo.
+            mlo_name = os.path.join(work_dir, dataset_name, region_chr, f"{filename}.mlo")
+            with open(mlo_name, "wb") as mlo_file:
+
+                pickle.dump(mlo_name, mlo_file)
+
+            print(
+                f"\tKamada-Kawai layout of region {mlo.region} saved at {int(cutoff * 100)} % cutoff to file: {mlo_name} "
+            )
+
+        if len(cutoffs) > 1 or save_plots:
+
+            plt = plot.plot_kk(mlo)
+
+            fig_name = os.path.join(
+                work_dir,
+                dataset_name,
+                region_chr,
+                f"plots/{filename}_" f"{cutoff}_KK.pdf",
+            )
+
+            plt.savefig(fig_name, dpi=300)
+            plt.close()
+
+        elapsed_time_secs = time() - time_per_kk
+
+        print(f"\tdone in {timedelta(seconds=round(elapsed_time_secs))}.\n")
 
 bad_regions = pd.DataFrame(bad_regions)
 
 if bad_regions.shape[0] > 0:
 
-    bad_regions_file = f"{os.path.join(work_dir, dataset_name)}/bad_regions.txt"
+    bad_regions.to_csv(
+        f"{os.path.join(work_dir, dataset_name)}/bad_regions.txt",
+        sep="\t",
+        index=False,
+        header=False,
+        mode="a",
+    )
 
-    bad_regions.to_csv(bad_regions_file, sep="\t", index=False, header=False, mode="a")
-
-elapsed_time_secs = time() - start_timer
-
-print(f"Execution time: {timedelta(seconds=round(elapsed_time_secs))}")
+print(f"Total time spent: {timedelta(seconds=round(time() - start_timer))}.")
+print("\nall done.")

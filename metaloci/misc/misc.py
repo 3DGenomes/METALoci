@@ -30,6 +30,106 @@ def remove_folder(path):
     path.rmdir()
 
 
+def check_diagonal(diag_mat):
+
+    """
+    This function checks the 0s on the diagonal.
+
+    :param diag_mat: The diagonal of the HiC matrix
+    :type diag_mat: ndarray
+    :return: total = total number of zeroes, max_stretch = max stretch of zeroes,
+    percentage_zeroes = percentage of zeroes, zero_loc = localization of 0 in the
+    diagonal.
+    :rtype: _type_
+    """
+
+    total = 0
+    stretch = 0
+    max_stretch = 0
+    zero_loc = []
+
+    for i_diag, element in enumerate(diag_mat):
+
+        if element == 0:
+
+            total += 1
+            stretch += 1
+            zero_loc.append(i_diag)
+
+            max_stretch = max(max_stretch, stretch)
+
+        else:
+
+            stretch = 0
+
+    percentage_zeroes = np.round(total / len(diag_mat) * 100, decimals=2)
+
+    return total, max_stretch, percentage_zeroes, zero_loc
+
+
+def clean_matrix(mlo, bad_regions):
+    """
+    Clean a given HiC matrix. It checks if the matrix has too many zeroes at
+    he diagonal, removes values that are zero at the diagonal but are not in
+    the resto of the matrix, adds pseudocounts to zeroes depending on the min
+    value, scales all values depending on the min value and computes the log10
+    off all values.
+
+    :param mlo: METALoci object with a matrix in it.
+    :type mlo: np.array
+    :param bad_regions: Dictionay {"region": [], "reason": []} in which to append bad regions.
+    :type bad_regions: dict
+    :return: Clean matrix.
+    :rtype: np.array
+    """
+
+    diagonal = np.array(mlo.matrix.diagonal())
+    total_zeroes, max_stretch, percentage_zeroes, zero_loc = check_diagonal(diagonal)
+
+    if total_zeroes == len(diagonal):
+
+        print("\tMatrix is empty; passing to the next region")
+        bad_regions["region"].append(mlo.region)
+        bad_regions["reason"].append("empty")
+
+        return None
+
+    if int(percentage_zeroes) >= 50:
+
+        bad_regions["region"].append(mlo.region)
+        bad_regions["reason"].append("perc")
+
+    elif int(max_stretch) >= 50:
+
+        bad_regions["region"].append(mlo.region)
+        bad_regions["reason"].append("stretch")
+
+    mlo.matrix[zero_loc] = 0
+    mlo.matrix[:, zero_loc] = 0
+
+    # Pseudocounts if min is zero
+    if np.nanmin(mlo.matrix) == 0:
+
+        pc = np.nanmin(mlo.matrix[mlo.matrix > 0])
+        # print(f"\t\tPseudocounts: {pc}")
+        mlo.matrix = mlo.matrix + pc
+
+    # Scale if all below 1
+    if np.nanmax(mlo.matrix) <= 1 or np.nanmin(mlo.matrix) <= 1:
+
+        sf = 1 / np.nanmin(mlo.matrix)
+        # print(f"\t\tScaling factor: {sf}")
+        mlo.matrix = mlo.matrix * sf
+
+    if np.nanmin(mlo.matrix) < 1:
+
+        mlo.matrix[mlo.matrix < 1] = 1
+
+    mlo.matrix = np.log10(mlo.matrix)
+
+    return mlo.matrix
+
+
 def bed_to_metaloci(data, coords, resolution):
     """
     _summary_

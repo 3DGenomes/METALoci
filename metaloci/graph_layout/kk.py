@@ -4,7 +4,7 @@ import seaborn as sns
 import os
 
 
-def get_restraints_matrix(file_name, matrix, persistance_lenght, cutoff, plot_bool):
+def get_restraints_matrix(mlo, persistance_lenght, cutoff, plot_bool):
 
     """
     Calculate top interaction, plot matrix and get restraints.
@@ -24,7 +24,7 @@ def get_restraints_matrix(file_name, matrix, persistance_lenght, cutoff, plot_bo
     :rtype: np.array
     """
 
-    matrix_copy = matrix.copy().flatten()
+    matrix_copy = mlo.matrix.copy().flatten()
 
     # Calculating the top interactions of and subsetting the matrix to get those.
     # We do not use pseudocounts to calculate the top interactions.
@@ -32,9 +32,9 @@ def get_restraints_matrix(file_name, matrix, persistance_lenght, cutoff, plot_bo
     top_indexes = np.argpartition(matrix_copy, -top)[-top:]
 
     # Subset to cutoff percentil SQUARE MATRIX
-    restraints_matrix = matrix.copy()
+    restraints_matrix = mlo.matrix.copy()
     restraints_matrix = np.where(restraints_matrix == 1.0, 0, restraints_matrix)
-    restraints_matrix[restraints_matrix < np.min(matrix_copy[top_indexes])] = 0
+    restraints_matrix[restraints_matrix < np.nanmin(matrix_copy[top_indexes])] = 0
 
     # TO-DO change perlen formula to use quantile 99?
 
@@ -51,7 +51,7 @@ def get_restraints_matrix(file_name, matrix, persistance_lenght, cutoff, plot_bo
     if plot_bool == True:
 
         # Mix matrices to plot:
-        upper_triangle = np.triu(matrix.copy() + 1, k=1)  # Original matrix
+        upper_triangle = np.triu(mlo.matrix.copy() + 1, k=1)  # Original matrix
         lower_triangle = np.tril(restraints_matrix, k=-1)  # Top interactions matrix
         mixed_matrices = upper_triangle + lower_triangle
 
@@ -76,14 +76,7 @@ def get_restraints_matrix(file_name, matrix, persistance_lenght, cutoff, plot_bo
         )
 
         fig_matrix.tight_layout()
-        fig_matrix.suptitle(f"Matrix for {file_name} (cutoff: {cutoff})")
-
-        plt.savefig(
-            os.path.join(file_name, f"_{cutoff}_matrix.pdf"),
-            bbox_incehs="tight",
-            dpi=300,
-        )
-        plt.close()  # Check if its needed
+        fig_matrix.suptitle(f"Matrix for {mlo.region} (cutoff: {cutoff})")
 
     # Modify the matrix and transform to restraints
     restraints_matrix = np.where(restraints_matrix == 0, np.nan, restraints_matrix)  # Remove zeroes
@@ -111,4 +104,4 @@ def get_restraints_matrix(file_name, matrix, persistance_lenght, cutoff, plot_bo
     # )
     # print(f"\t\tSize of the submatrix with the top interations: {len(top_indexes)}\n")
 
-    return restraints_matrix
+    return restraints_matrix, mixed_matrices, fig_matrix

@@ -130,6 +130,48 @@ def clean_matrix(mlo, bad_regions):
     return mlo.matrix
 
 
+def signal_normalization(sig_ind, pc, norm="01"):
+    """
+    Get the signal profile given a region
+    :param sig_ind: Signal for a given individual
+    :param pc: Pseudocounts
+    :param norm: Normalization methods
+    :return: Numpy array of the parsed signal
+    """
+    signal = []
+
+    for index in sig_ind:
+
+        if np.isnan(index):
+
+            asum = pc
+
+        else:
+
+            asum = index
+
+        asum = max(asum, pc)
+        signal.append(asum)
+
+    if isinstance(norm, (int, float)):
+
+        signal = [float(num) / int(norm) for num in signal]
+
+    elif norm == "max":
+
+        signal = [float(num) / max(signal) for num in signal]
+
+    elif norm == "sum":
+
+        signal = [float(num) / sum(signal) for num in signal]
+
+    elif norm == "01":
+
+        signal = [(float(num) - min(signal)) / (max(signal) - min(signal) + 0.01) for num in signal]
+
+    return np.array(signal)
+
+
 def bed_to_metaloci(data, coords, resolution):
     """
     _summary_

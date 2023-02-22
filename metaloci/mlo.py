@@ -2,24 +2,23 @@ import dill as pickle
 
 
 class mlo:
-    def __init__(
-        self,
-        region,
-        midpoint,
-        resolution,
-        matrix,
-        mixed_matrices,
-        persistance_length,
-        kk_nodes,
-    ):
+    def __init__(self, region, chrom, start, end, resolution):
 
         self.region = region
-        self.midpoint = midpoint
+        self.chrom = chrom
+        self.start = start
+        self.end = end
         self.resolution = resolution
-        self.matrix = matrix
-        self.mixed_matrices = mixed_matrices
-        self.persistance_length = persistance_length
-        self.kk_nodes = kk_nodes
+        self.midpoint = None
+        self.matrix = None
+        self.mixed_matrices = None
+        self.persistance_length = None
+        self.kk_nodes = None
+        self.kk_coords = None
+        self.kk_distances = None
+        self.lmi_geometry = None
+        self.lmi_info = None
+        self.save_path = None
 
     def save(self, file_handler):
 

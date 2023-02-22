@@ -22,7 +22,6 @@ import seaborn as sns
 import pandas as pd
 import networkx as nx
 import cooler
-from scipy.spatial import distance
 from scipy.sparse import csr_matrix
 import pyarrow.parquet as pq
 from metaloci.misc import misc
@@ -194,7 +193,7 @@ if debug:
 
 start_timer = time()
 
-# Fancy way of parsing the one-line region into a pandas data-frame
+# Parsing the one-line region into a pandas data-frame
 if re.compile("chr").search(regions):
 
     genes = pd.DataFrame({"coords": [regions], "symbol": ["symbol"], "id": ["id"]})
@@ -214,24 +213,27 @@ for i, row in genes.iterrows():
 
     # chr1:36031800-40052000	POU3F1	ENSG00000185668.8
 
-    mlobject = mlo.mlo(None, None, None, None, None, None, None)
+    region_chrom, region_start, region_end = re.split(":|-", row.coords)
 
-    region_chr, region_start, region_end, mlobject.midpoint = re.split(":|-|_", row.coords)
+    mlobject = mlo.mlo(
+        f"{region_chrom}:{region_start}-{region_end}",
+        region_chrom,
+        int(region_start),
+        int(region_end),
+        resolution,
+    )
 
-    region_start = int(region_start)
-    region_end = int(region_end)
+    filename = f"{mlobject.region}_{int(mlobject.resolution/1000)}kb"
 
-    mlobject.midpoint = int(mlobject.midpoint)
-    mlobject.region = f"{region_chr}:{region_start}-{region_end}"
-    mlobject.resolution = resolution  # check if I can define this outside the loop
+    pathlib.Path(
+        os.path.join(work_dir, dataset_name, region_chrom), "plots", "mixed_matrices"
+    ).mkdir(parents=True, exist_ok=True)
 
-    filename = f"{mlobject.region}_{mlobject.midpoint}_{int(mlobject.resolution/1000)}kb"
-
-    pathlib.Path(os.path.join(work_dir, dataset_name, region_chr), "plots").mkdir(
+    pathlib.Path(os.path.join(work_dir, dataset_name, region_chrom), "plots", "KK").mkdir(
         parents=True, exist_ok=True
     )
 
-    coordsfile = f"{os.path.join(work_dir, dataset_name, region_chr, filename)}_KK.pkl"
+    coordsfile = f"{os.path.join(work_dir, dataset_name, region_chrom, filename)}_KK.pkl"
     cooler_file = cooler_file + "::/resolutions/" + str(mlobject.resolution)
 
     print(f"\n------> Working on region: {mlobject.region}\n")
@@ -298,8 +300,8 @@ for i, row in genes.iterrows():
                 os.path.join(
                     work_dir,
                     dataset_name,
-                    region_chr,
-                    f"plots/{filename}_" f"{cutoff}_mixed-matrices.pdf",
+                    region_chrom,
+                    f"plots/mixed_matrices/{filename}_" f"{cutoff}_mixed-matrices.pdf",
                 ),
                 dpi=300,
             )
@@ -310,16 +312,14 @@ for i, row in genes.iterrows():
         mlobject.kk_graph = nx.from_scipy_sparse_array(csr_matrix(restraints_matrix))
         mlobject.kk_nodes = nx.kamada_kawai_layout(mlobject.kk_graph)
 
-        # Get distance matrix <----- CALCULATE IN LMI, NOT HERE
-        # coords = list(mlobject.kk_nodes.values())
-        # dists = distance.cdist(coords, coords, "euclidean")
-
         if len(cutoffs) == 1:
 
+            mlobject.save_path = os.path.join(
+                work_dir, dataset_name, region_chrom, f"{filename}.mlo"
+            )
+
             # Save mlobject.
-            with open(
-                os.path.join(work_dir, dataset_name, region_chr, f"{filename}.mlo"), "wb"
-            ) as hamlo_namendle:
+            with open(mlobject.save_path, "wb") as hamlo_namendle:
 
                 mlobject.save(hamlo_namendle)
 
@@ -335,8 +335,8 @@ for i, row in genes.iterrows():
             fig_name = os.path.join(
                 work_dir,
                 dataset_name,
-                region_chr,
-                f"plots/{filename}_" f"{cutoff}_KK.pdf",
+                region_chrom,
+                f"plots/KK/{filename}_" f"{cutoff}_KK.pdf",
             )
 
             plt.savefig(fig_name, dpi=300)

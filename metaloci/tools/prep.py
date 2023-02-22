@@ -226,13 +226,12 @@ if len(intersected_files_paths) > 1:
 for chrom in sorted(final_intersect["chrom"].unique()):
 
     pathlib.Path(f"{work_dir}signal/{chrom}").mkdir(parents=True, exist_ok=True)
-    final_intersect[final_intersect.chrom == f"{chrom}"].to_parquet(
-        f"{work_dir}signal/{chrom}/{out_name}_{chrom}.parquet"
+    final_intersect[final_intersect.chrom == f"{chrom}"].to_pickle(
+        f"{work_dir}signal/{chrom}/{out_name}_{chrom}_signal.pkl"
     )
     final_intersect[final_intersect.chrom == f"{chrom}"].to_csv(
         f"{work_dir}signal/{chrom}/{out_name}_{chrom}.csv", sep="\t", index=False
     )
-
 
 # sp.call(f"tree -h {work_dir}", shell=True)  # Show directory tree.
 

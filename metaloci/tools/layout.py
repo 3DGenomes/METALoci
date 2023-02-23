@@ -30,6 +30,7 @@ from metaloci import mlo
 from metaloci.plot import plot
 import numpy as np
 import dill as pickle
+from scipy.spatial import distance
 
 description = """
 This script adds signal data to a Kamada-Kawai layout and calculates Local Moran's I for every 
@@ -314,6 +315,9 @@ for i, row in genes.iterrows():
         print("\tLayouting Kamada-Kawai...")
         mlobject.kk_graph = nx.from_scipy_sparse_array(csr_matrix(restraints_matrix))
         mlobject.kk_nodes = nx.kamada_kawai_layout(mlobject.kk_graph)
+
+        mlobject.kk_coords = list(mlobject.kk_nodes.values())
+        mlobject.kk_distances = distance.cdist(mlobject.kk_coords, mlobject.kk_coords, "euclidean")
 
         if len(cutoffs) == 1:
 

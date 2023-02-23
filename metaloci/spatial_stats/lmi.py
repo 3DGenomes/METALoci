@@ -13,29 +13,29 @@ import os
 import libpysal as lp
 from esda.moran import Moran_Local
 import time
+from metaloci import mlo
+from pathlib import Path
 
 
-def coord_to_id(mlobject, poly_from_lines):
+def construct_voronoi(mlobject: mlo.mlo, buffer: float, LIMITS=2):
+    """
+    Takes a Kamada-Kawai layout in a METALoci object and calculates the geometry of each voronoi
+    around each point of the Kamada-Kawai, in order the make a gaudi plot.
+    Parameters
+    ----------
+    mlobject : mlo.mlo
+        METALoci object with kk_coords in it.
+    buffer : float
+        Distance to buffer around the point to be painted in the gaudi plot.
+    LIMITS : int, optional
+        Integer that defines a box around each point of the Kamada-Kawai layout, by default 2.
 
-    coord_to_id = {}
-
-    for i, poly in enumerate(poly_from_lines):
-
-        for j, coords in enumerate(mlobject.kk_coords):
-
-            if poly.contains(Point(coords)):
-
-                coord_to_id[i] = j
-
-                break
-
-    return coord_to_id
-
-
-def construct_voronoi(mlobject, LIMITS, buffer):
-
-    mlobject.kk_coords = list(mlobject.kk_nodes.values())
-    mlobject.kk_distances = distance.cdist(mlobject.kk_coords, mlobject.kk_coords, "euclidean")
+    Returns
+    -------
+    df_geometry : DataFrame
+        Dataframe containing the information about the geometry of each point of the gaudi plot,
+        for each bin. Needed for plotting the gaudi plot.
+    """
 
     points = mlobject.kk_coords.copy()
 
@@ -60,7 +60,6 @@ def construct_voronoi(mlobject, LIMITS, buffer):
     # order to construct a dictionary that relates the bin_order and the polygon_order,
     # as they tend to be different.
     poly_from_lines = list(polygonize(voronoid_lines))
-
     coord_id = coord_to_id(mlobject, poly_from_lines)
 
     # Constructing a GeoPandas DataFrame to work properly with the LMI function
@@ -92,7 +91,57 @@ def construct_voronoi(mlobject, LIMITS, buffer):
     return df_geometry
 
 
-def load_signals(df_regions, work_dir):
+def coord_to_id(mlobject: mlo.mlo, poly_from_lines: list):
+    """
+    coord_to_id _summary_
+
+    Parameters
+    ----------
+    mlobject : mlo.mlo
+        METALoci object with kk_coords in it.
+    poly_from_lines : list
+        List of polygon information for gaudi plots. It is calculated in construct_voronoi().
+
+    Returns
+    -------
+    coord_to_id : dict
+        Dictionary containing the correspondance between bin index and moran index, as they tend to be different.
+    """
+
+    coord_to_id = {}
+
+    for i, poly in enumerate(poly_from_lines):
+
+        for j, coords in enumerate(mlobject.kk_coords):
+
+            if poly.contains(Point(coords)):
+
+                coord_to_id[i] = j
+
+                break
+
+    return coord_to_id
+
+
+def load_signals(df_regions: pd.DataFrame, work_dir: Path):
+    """
+    Loads signal data for each chromosome that contains a region to be processed. This is done
+    in order not to load useless data.
+
+    Parameters
+    ----------
+    df_regions : pd.DataFrame
+        Dataframe containing region, symbol and ENSEMBLE ID of each region to be processed.
+    work_dir : Path
+        Path to working directory with pre-calculated signals
+
+    Returns
+    -------
+    signal_data : dict
+        Dictionary with chrN as a key and a signal dataframe as a value.
+
+
+    """
 
     chrom_to_do = list(
         dict.fromkeys(
@@ -113,7 +162,27 @@ def load_signals(df_regions, work_dir):
     return signal_data
 
 
-def load_region_signals(mlobject, signal_data, signal_file):
+def load_region_signals(mlobject: mlo.mlo, signal_data: dict, signal_file: Path):
+    """
+    Does a subset of the signal file to contain only the signal corresponding to the region being processed.
+
+    Parameters
+    ----------
+    mlobject : mlo.mlo
+        METALoci object with kk_coords in it.
+    signal_data : dict
+        Dictionary with signal for each chromosome. Each key is chrN, each value is a dataframe
+        with its corresponding signal.
+    signal_file : Path
+        Path to text file with all the signal types to compute, one per line.
+
+    Returns
+    -------
+    signals_dict : dict
+        Dictionary containing signal information, but only for the region being processed.
+    signal_types : list(str)
+        List containing the signal types to compute for this region.
+    """
 
     # Read signal file. Will only process the signals present in this list.
     with open(signal_file) as signals_handler:
@@ -146,12 +215,35 @@ def load_region_signals(mlobject, signal_data, signal_file):
 
 
 def compute_lmi(
-    mlobject,
-    signal_type,
-    neighbourhood,
+    mlobject: mlo.mlo,
+    signal_type: str,
+    neighbourhood: float,
     n_permutations=9999,
     signipval=0.05,
 ):
+    """
+    Computes Local Moran's Index for a signal type and outputs information of the LMI value and its p-value
+    for each bin for a given signal, as well as some other information.
+
+    Parameters
+    ----------
+    mlobject : mlo.mlo
+        METALoci with signals for that region and lmi_geometry calculated with lmi.construct_voronoi()
+    signal_type : str
+        Name of the type of the signal to use for the computation.
+    neighbourhood : float
+        buffer * BFACT, to determine the neighbourhood.
+    n_permutations : int, optional
+        Number of permutations to do in the randomization, by default 9999.
+    signipval : float, optional
+        Significancy threshold for p-value, by default 0.05.
+
+    Returns
+    -------
+    pd.DataFrame
+        Dataframe with ID, bin index, chromosome, start, end, value of signal, moran index, moran quadrant,
+    LMI score, LMI p-value and LMI inverse of p-value for this signal.
+    """
 
     signal = []
 

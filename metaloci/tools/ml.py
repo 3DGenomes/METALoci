@@ -214,7 +214,7 @@ INFLUENCE = 1.5
 BFACT = 2
 LIMITS = 2  # Create a "box" around the points of the Kamada-Kawai layout.
 
-start_timer = time()
+timer = time()
 
 # Read region list. If its a region as parameter, create a dataframe.
 # If its a path to a file, read that dataframe.
@@ -232,6 +232,8 @@ signal_data = lmi.load_signals(df_regions, work_dir=work_dir)
 
 # Iterating through all the genes of the regions file (regions to process).
 for i, region_iter in df_regions.iterrows():
+
+    region_timer = time()
 
     region = region_iter.coords
 
@@ -262,14 +264,11 @@ for i, region_iter in df_regions.iterrows():
 
         continue
 
-    mlobject.kk_coords = list(mlobject.kk_nodes.values())
-    mlobject.kk_distances = distance.cdist(mlobject.kk_coords, mlobject.kk_coords, "euclidean")
-
     # Get average distance between consecutive points to define influence,
     # which should be ~2 particles of radius.
     mean_distance = mlobject.kk_distances.diagonal(1).mean()
     buffer = mean_distance * INFLUENCE
-    mlobject.lmi_geometry = lmi.construct_voronoi(mlobject, LIMITS, buffer)
+    mlobject.lmi_geometry = lmi.construct_voronoi(mlobject, buffer, LIMITS)
 
     print(f"\tAverage distance between consecutive particles: {mean_distance:6.4f} [{buffer:6.4f}]")
     print(f"\tGeometry information for region {mlobject.region} saved in: {mlobject.save_path}")
@@ -286,16 +285,12 @@ for i, region_iter in df_regions.iterrows():
     for signal_type in signal_types:
 
         all_lmi[signal_type] = lmi.compute_lmi(
-            mlobject,
-            signal_type,
-            buffer * BFACT,
-            n_permutations,
-            signipval,
+            mlobject, signal_type, buffer * BFACT, n_permutations, signipval
         )
 
     mlobject.lmi_info = all_lmi
 
-    print(f"\n\tRegion done in {timedelta(seconds=round(time() - start_timer))}")
+    print(f"\n\tRegion done in {timedelta(seconds=round(time() - region_timer))}")
     print(
         f"\tLMI information for region {mlobject.region} will be saved in: {mlobject.save_path}\n"
     )
@@ -304,5 +299,5 @@ for i, region_iter in df_regions.iterrows():
 
         mlobject.save(hamlo_namendle)
 
-print(f"Total time spent: {timedelta(seconds=round(time() - start_timer))}.")
+print(f"Total time spent: {timedelta(seconds=round(time() - timer))}.")
 print("\nall done.")

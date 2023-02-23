@@ -216,11 +216,6 @@ LIMITS = 2  # Create a "box" around the points of the Kamada-Kawai layout.
 
 start_timer = time()
 
-# Read signal file. Will only process the signals present in this list.
-with open(signal_file) as signals_handler:
-
-    signal_types = [line.rstrip() for line in signals_handler]
-
 # Read region list. If its a region as parameter, create a dataframe.
 # If its a path to a file, read that dataframe.
 if re.compile("chr").search(regions):
@@ -231,25 +226,9 @@ else:
 
     df_regions = pd.read_table(regions)
 
-# Read the chromosomes corresponding to the regions of interest, not to load useless data.
-chrom_to_do = list(
-    dict.fromkeys(
-        re.compile("chr[0-9]*").findall(
-            "\n".join([x for y in df_regions["coords"] for x in y.split(":")])
-        )
-    )
-)
-
-# Store in a dictionary the signal data
-# Strata
-#     CHROMOSOME : pandas.DataFrame(signal)
-signal_data = {}
-
-for chrom in chrom_to_do:
-
-    signal_data[chrom] = pd.read_pickle(
-        glob.glob(f"{os.path.join(work_dir, 'signal', chrom)}/*_signal.pkl")[0]
-    )
+# Read the signal of the chromosomes corresponding to the regions of interest,
+# not to load useless data.
+signal_data = lmi.load_signals(df_regions, work_dir=work_dir)
 
 # Iterating through all the genes of the regions file (regions to process).
 for i, region_iter in df_regions.iterrows():
@@ -290,7 +269,7 @@ for i, region_iter in df_regions.iterrows():
     # which should be ~2 particles of radius.
     mean_distance = mlobject.kk_distances.diagonal(1).mean()
     buffer = mean_distance * INFLUENCE
-    mlobject.lmi_geometry, coord_id, geometry_data = lmi.construct_voronoi(mlobject, LIMITS, buffer)
+    mlobject.lmi_geometry = lmi.construct_voronoi(mlobject, LIMITS, buffer)
 
     print(f"\tAverage distance between consecutive particles: {mean_distance:6.4f} [{buffer:6.4f}]")
     print(f"\tGeometry information for region {mlobject.region} saved in: {mlobject.save_path}")
@@ -298,111 +277,23 @@ for i, region_iter in df_regions.iterrows():
     ########################################################################################################################
 
     # Load only signal for this specific region.
-    region_signal = signal_data[mlobject.chrom][
-        (signal_data[mlobject.chrom]["start"] >= int(mlobject.start))
-        & (signal_data[mlobject.chrom]["end"] <= int(mlobject.end))
-    ]
-
-    if len(region_signal) != len(mlobject.kk_coords):
-
-        tmp = len(mlobject.kk_coords) - len(region_signal)
-        tmp = np.empty((tmp, len(region_signal.columns)))
-        tmp[:] = np.nan
-
-        region_signal = region_signal.append(
-            pd.DataFrame(tmp, columns=list(region_signal)), ignore_index=True
-        )
-
-    signals_dict = defaultdict(list)
-
-    for i, signal_type in enumerate(signal_types):
-
-        signal_values = region_signal[signal_type]
-        signals_dict[signal_type] = misc.signal_normalization(signal_values, 0.01, "01")
+    mlobject.signals_dict, signal_types = lmi.load_region_signals(
+        mlobject, signal_data, signal_file
+    )
 
     all_lmi = {}
 
     for signal_type in signal_types:
 
-        signal = []
-
-        res = dict(filter(lambda item: signal_type in item[0], signals_dict.items()))
-
-        for _, x in sorted(coord_id.items(), key=lambda item: item[1]):
-
-            signal.append(np.nanmedian([res[key][x] for key in res]))
-
-        signal_geometry = {"v": [], "geometry": []}
-
-        for i, poly in geometry_data.iterrows():
-
-            signal_geometry["v"].append(signal[coord_id[i]])
-            signal_geometry["geometry"].append(poly.geometry)
-
-        gpd_signal = gpd.GeoDataFrame(signal_geometry)  # Stored in Geopandas DataFrame to do LMI
-
-        # Get weights for geometric distance
-        # print("\tGetting weights and geometric distance for LM")
-        y = gpd_signal["v"].values
-        weights = lp.weights.DistanceBand.from_dataframe(gpd_signal, buffer * BFACT)
-        weights.transform = "r"
-
-        # Calculate Local Moran's I
-        moran_local = Moran_Local(y, weights, permutations=n_permutations, n_jobs=n_cores)
-        print(
-            f"\tThere are a total of {len(moran_local.p_sim[(moran_local.p_sim < signipval)])} "
-            f"significant points in Local Moran's I for signal {signal_type}"
+        all_lmi[signal_type] = lmi.compute_lmi(
+            mlobject,
+            signal_type,
+            buffer * BFACT,
+            n_permutations,
+            signipval,
         )
-        chrom_number = mlobject.chrom[3:]
-
-        df_lmi = defaultdict(list)
-
-        for i, x in sorted(coord_id.items(), key=lambda item: item[1]):
-
-            bin_start = int(mlobject.start) + (resolution * x) + x
-            bin_end = bin_start + resolution
-
-            df_lmi["Class"].append(signal_type)
-            df_lmi["ID"].append(signal_type)
-
-            df_lmi["bin_index"].append(x)
-            df_lmi["bin_chr"].append(chrom_number)
-            df_lmi["bin_start"].append(bin_start)
-            df_lmi["bin_end"].append(bin_end)
-
-            df_lmi["signal"].append(signal[x])
-
-            df_lmi["moran_index"].append(i)
-            df_lmi["moran_quadrant"].append(moran_local.q[i])
-            df_lmi["LMI_score"].append(round(moran_local.Is[i], 9))
-            df_lmi["LMI_pvalue"].append(round(moran_local.p_sim[i], 9))
-            df_lmi["LMI_inv_pval"].append(round((1 - moran_local.p_sim[i]), 9))
-
-        df_lmi = pd.DataFrame(df_lmi)
-
-        # Changing the data types to the proper ones so the pickle file has a smaller size.
-        df_lmi["Class"] = df_lmi["Class"].astype(str)
-        df_lmi["ID"] = df_lmi["ID"].astype(str)
-
-        df_lmi["bin_index"] = df_lmi["bin_index"].astype(np.uintc)
-        df_lmi["bin_chr"] = df_lmi["bin_chr"].astype(str)
-        df_lmi["bin_start"] = df_lmi["bin_start"].astype(np.uintc)
-        df_lmi["bin_end"] = df_lmi["bin_end"].astype(np.uintc)
-
-        df_lmi["signal"] = df_lmi["signal"].astype(np.half)
-
-        df_lmi["moran_index"] = df_lmi["moran_index"].astype(np.uintc)
-        df_lmi["moran_quadrant"] = df_lmi["moran_quadrant"].astype(np.uintc)
-        df_lmi["LMI_score"] = df_lmi["LMI_score"].astype(np.half)
-        df_lmi["LMI_pvalue"] = df_lmi["LMI_pvalue"].astype(np.half)
-        df_lmi["LMI_inv_pval"] = df_lmi["LMI_inv_pval"].astype(np.half)
-        # zSig y Zlag
-
-        all_lmi[signal_type] = df_lmi
 
     mlobject.lmi_info = all_lmi
-
-    # print(all_lmi)
 
     print(f"\n\tRegion done in {timedelta(seconds=round(time() - start_timer))}")
     print(

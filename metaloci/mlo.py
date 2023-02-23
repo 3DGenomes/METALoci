@@ -13,6 +13,7 @@ class mlo:
         self.matrix = None
         self.mixed_matrices = None
         self.persistance_length = None
+        self.signals_dict = None
         self.flat_matrix = None
         self.kk_top_indexes = None
         self.kk_cutoff = None

@@ -2,9 +2,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import os
+import time
+from metaloci.plot import plot
 
 
-def get_restraints_matrix(mlo, cutoff, persistance_lenght, plot_bool):
+def get_restraints_matrix(mlobject, persistance_lenght, plot_bool):
 
     """
     Calculate top interaction, plot matrix and get restraints.
@@ -24,60 +26,16 @@ def get_restraints_matrix(mlo, cutoff, persistance_lenght, plot_bool):
     :rtype: np.array
     """
 
-    matrix_copy = mlo.matrix.copy().flatten()
+    # Get subset matrix
+    subset_matrix = get_subset_matrix(mlobject)
 
-    # Calculating the top interactions of and subsetting the matrix to get those.
-    # We do not use pseudocounts to calculate the top interactions.
-    top = int(len(matrix_copy[matrix_copy > np.nanmin(matrix_copy)]) * cutoff)
-    top_indexes = np.argpartition(matrix_copy, -top)[-top:]
-
-    # Subset to cutoff percentil
-    restraints_matrix = mlo.matrix.copy()
-    restraints_matrix = np.where(restraints_matrix == 1.0, 0, restraints_matrix)
-    restraints_matrix[restraints_matrix < np.nanmin(matrix_copy[top_indexes])] = 0
-
-    if persistance_lenght is None:
-
-        persistance_lenght = np.nanquantile(restraints_matrix[restraints_matrix > 0], 0.99) ** 2
-
-    rng = np.arange(  # rng = range of integers until size of matrix to locate the diagonal
-        len(restraints_matrix) - 1
-    )
-    restraints_matrix[rng, rng + 1] = persistance_lenght
-    restraints_matrix[rng, rng] = 0  # Remove diagonal
-
-    if plot_bool == True:
-
-        # Mix matrices to plot:
-        upper_triangle = np.triu(mlo.matrix.copy() + 1, k=1)  # Original matrix
-        lower_triangle = np.tril(restraints_matrix, k=-1)  # Top interactions matrix
-        mixed_matrices = upper_triangle + lower_triangle
-
-        fig_matrix, (ax1, _) = plt.subplots(1, 2, figsize=(20, 5))
-
-        # Plot of the mixed matrix (top triangle is the original matrix,
-        # lower triange is the subsetted matrix)
-        ax1.imshow(
-            mixed_matrices, cmap="YlOrRd", vmax=np.nanquantile(matrix_copy[top_indexes], 0.99)
-        )
-        ax1.patch.set_facecolor("black")
-
-        # Density plot of the subsetted matrix
-        sns.histplot(
-            data=matrix_copy[top_indexes].flatten(),
-            stat="density",
-            alpha=0.4,
-            kde=True,
-            legend=False,
-            kde_kws={"cut": 3},
-            **{"linewidth": 0},
-        )
-
-        fig_matrix.tight_layout()
-        fig_matrix.suptitle(f"Matrix for {mlo.region} (cutoff: {cutoff})")
+    # Mix matrices to plot:
+    upper_triangle = np.triu(mlobject.matrix.copy() + 1, k=1)  # Original matrix
+    lower_triangle = np.tril(subset_matrix, k=-1)  # Top interactions matrix
+    mlobject.mixed_matrices = upper_triangle + lower_triangle
 
     # Modify the matrix and transform to restraints
-    restraints_matrix = np.where(restraints_matrix == 0, np.nan, restraints_matrix)  # Remove zeroes
+    restraints_matrix = np.where(subset_matrix == 0, np.nan, subset_matrix)  # Remove zeroes
     restraints_matrix = (  # Convert to distance Matrix instead of similarity matrix
         1 / restraints_matrix
     )
@@ -102,4 +60,41 @@ def get_restraints_matrix(mlo, cutoff, persistance_lenght, plot_bool):
     # )
     # print(f"\t\tSize of the submatrix with the top interations: {len(top_indexes)}\n")
 
-    return restraints_matrix, mixed_matrices, fig_matrix
+    return restraints_matrix, mlobject
+
+
+def get_subset_matrix(mlobject):
+
+    if mlobject.kk_cutoff is None:
+
+        print(
+            f"METALoci object {mlobject.region} does not have a cutoff. Set the cutoff with mlobject.kk_cutoff' first."
+        )
+        exit()
+
+    mlobject.flat_matrix = mlobject.matrix.copy().flatten()
+
+    # Calculating the top interactions of and subsetting the matrix to get those.
+    # We do not use pseudocounts to calculate the top interactions.
+    top = int(
+        len(mlobject.flat_matrix[mlobject.flat_matrix > np.nanmin(mlobject.flat_matrix)])
+        * mlobject.kk_cutoff
+    )
+    mlobject.kk_top_indexes = np.argpartition(mlobject.flat_matrix, -top)[-top:]
+
+    # Subset to cutoff percentil
+    subset_matrix = mlobject.matrix.copy()
+    subset_matrix = np.where(subset_matrix == 1.0, 0, subset_matrix)
+    subset_matrix[subset_matrix < np.nanmin(mlobject.flat_matrix[mlobject.kk_top_indexes])] = 0
+
+    if mlobject.persistance_length is None:
+
+        mlobject.persistance_length = np.nanquantile(subset_matrix[subset_matrix > 0], 0.99) ** 2
+
+    rng = np.arange(  # rng = range of integers until size of matrix to locate the diagonal
+        len(subset_matrix) - 1
+    )
+    subset_matrix[rng, rng + 1] = mlobject.persistance_length
+    subset_matrix[rng, rng] = 0  # Remove diagonal
+
+    return subset_matrix

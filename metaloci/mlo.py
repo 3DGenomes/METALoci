@@ -13,6 +13,9 @@ class mlo:
         self.matrix = None
         self.mixed_matrices = None
         self.persistance_length = None
+        self.flat_matrix = None
+        self.kk_top_indexes = None
+        self.kk_cutoff = None
         self.kk_nodes = None
         self.kk_coords = None
         self.kk_distances = None

@@ -130,3 +130,6 @@ dmypy.json
 
 # templates
 .github/templates/*
+
+# ignore Marcs code
+metaloci/tools/from_Marc/

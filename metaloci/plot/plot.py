@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import networkx as nx
 import seaborn as sns
-import os
+import numpy as np
 
 
 def plot_kk(mlo):
@@ -38,3 +38,38 @@ def plot_kk(mlo):
     sns.lineplot(x=xs, y=ys, sort=False, lw=2, color="black", legend=False, zorder=1)
 
     return plt
+
+
+def mixed_matrices_plot(mlobject):
+
+    if mlobject.flat_matrix is None:
+
+        print("Flat matrix not found in metaloci object. Run get_subset_matrix() first.")
+        exit()
+
+    fig_matrix, (ax1, _) = plt.subplots(1, 2, figsize=(20, 5))
+
+    # Plot of the mixed matrix (top triangle is the original matrix,
+    # lower triange is the subsetted matrix)
+    ax1.imshow(
+        mlobject.mixed_matrices,
+        cmap="YlOrRd",
+        vmax=np.nanquantile(mlobject.flat_matrix[mlobject.kk_top_indexes], 0.99),
+    )
+    ax1.patch.set_facecolor("black")
+
+    # Density plot of the subsetted matrix
+    sns.histplot(
+        data=mlobject.flat_matrix[mlobject.kk_top_indexes].flatten(),
+        stat="density",
+        alpha=0.4,
+        kde=True,
+        legend=False,
+        kde_kws={"cut": 3},
+        **{"linewidth": 0},
+    )
+
+    fig_matrix.tight_layout()
+    fig_matrix.suptitle(f"Matrix for {mlobject.region} (cutoff: {mlobject.kk_cutoff})")
+
+    return mlobject, fig_matrix

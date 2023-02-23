@@ -225,10 +225,6 @@ for i, row in genes.iterrows():
 
     filename = f"{mlobject.region}_{int(mlobject.resolution/1000)}kb"
 
-    pathlib.Path(
-        os.path.join(work_dir, dataset_name, region_chrom), "plots", "mixed_matrices"
-    ).mkdir(parents=True, exist_ok=True)
-
     pathlib.Path(os.path.join(work_dir, dataset_name, region_chrom), "plots", "KK").mkdir(
         parents=True, exist_ok=True
     )
@@ -284,24 +280,31 @@ for i, row in genes.iterrows():
 
         time_per_kk = time()
 
-        print(f"\tCutoff to be used is: {int(cutoff * 100)} %")
+        mlobject.kk_cutoff = cutoff
+
+        print(f"\tCutoff to be used is: {int(mlobject.kk_cutoff * 100)} %")
 
         # Get submatrix of restraints
-        restraints_matrix, mlobject.mixed_matrices, mixed_matrices_plot = kk.get_restraints_matrix(
+        restraints_matrix, mlobject = kk.get_restraints_matrix(
             mlobject,
-            cutoff,
             None,
             plot_bool=True,
         )
 
         if save_plots:
 
+            mlobject, mixed_matrices_plot = plot.mixed_matrices_plot(mlobject)
+
+            pathlib.Path(
+                os.path.join(work_dir, dataset_name, region_chrom), "plots", "mixed_matrices"
+            ).mkdir(parents=True, exist_ok=True)
+
             mixed_matrices_plot.savefig(
                 os.path.join(
                     work_dir,
                     dataset_name,
                     region_chrom,
-                    f"plots/mixed_matrices/{filename}_" f"{cutoff}_mixed-matrices.pdf",
+                    f"plots/mixed_matrices/{filename}_" f"{mlobject.kk_cutoff}_mixed-matrices.pdf",
                 ),
                 dpi=300,
             )
@@ -325,7 +328,7 @@ for i, row in genes.iterrows():
 
             print(
                 f"\tKamada-Kawai layout of region {mlobject.region} saved"
-                " at {int(cutoff * 100)} % cutoff to file: {mlo_name}"
+                f" at {int(cutoff * 100)} % cutoff to file: {mlobject.save_path}"
             )
 
         if len(cutoffs) > 1 or save_plots:
@@ -336,7 +339,7 @@ for i, row in genes.iterrows():
                 work_dir,
                 dataset_name,
                 region_chrom,
-                f"plots/KK/{filename}_" f"{cutoff}_KK.pdf",
+                f"plots/KK/{filename}_" f"{mlobject.kk_cutoff}_KK.pdf",
             )
 
             plt.savefig(fig_name, dpi=300)

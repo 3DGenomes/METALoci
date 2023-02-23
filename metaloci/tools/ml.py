@@ -5,28 +5,25 @@ Script to "paint" the Kamada-Kawai layaouts using a signal, grouping individuals
 
 # pylint: disable=invalid-name, wrong-import-position, wrong-import-order
 
-import sys
-from argparse import RawDescriptionHelpFormatter, ArgumentParser, SUPPRESS
+import glob
 import os
-import pathlib
 import pickle
 import re
-import subprocess as sp
-import warnings
+import sys
+from argparse import SUPPRESS, ArgumentParser, RawDescriptionHelpFormatter
 from collections import defaultdict
-from time import time
 from datetime import timedelta
+from time import time
+
 import geopandas as gpd
 import libpysal as lp
 import numpy as np
 import pandas as pd
-from shapely.ops import polygonize
-from shapely.geometry import LineString, Point
-from shapely.errors import ShapelyDeprecationWarning
 from esda.moran import Moran_Local
-from scipy.spatial import Voronoi
-from metaloci.misc import misc
 from scipy.spatial import distance
+
+from metaloci.misc import misc
+from metaloci.spatial_stats import lmi
 
 description = (
     "This script adds signal data to a Kamada-Kawai layout and calculates Local Moran's I "
@@ -193,10 +190,6 @@ if dataset_name == "":
 
     dataset_name = "WT_G2_20000"
 
-INFLUENCE = 1.5
-BFACT = 2
-LIMITS = 2  # Create a "box" around the points of the Kamada-Kawai layout.
-
 if debug:
 
     table = [
@@ -210,8 +203,6 @@ if debug:
         ["dataset_name", dataset_name],
         ["debug", debug],
         ["signipval", signipval],
-        ["influence", INFLUENCE],
-        ["bfact", BFACT],
     ]
 
     print(table)
@@ -219,13 +210,19 @@ if debug:
 
 # warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
 
+INFLUENCE = 1.5
+BFACT = 2
+LIMITS = 2  # Create a "box" around the points of the Kamada-Kawai layout.
+
 start_timer = time()
 
+# Read signal file. Will only process the signals present in this list.
 with open(signal_file) as signals_handler:
 
     signal_types = [line.rstrip() for line in signals_handler]
 
-# Read region list
+# Read region list. If its a region as parameter, create a dataframe.
+# If its a path to a file, read that dataframe.
 if re.compile("chr").search(regions):
 
     df_regions = pd.DataFrame({"coords": [regions], "symbol": ["symbol"], "id": ["id"]})
@@ -234,6 +231,7 @@ else:
 
     df_regions = pd.read_table(regions)
 
+# Read the chromosomes corresponding to the regions of interest, not to load useless data.
 chrom_to_do = list(
     dict.fromkeys(
         re.compile("chr[0-9]*").findall(
@@ -249,35 +247,42 @@ signal_data = {}
 
 for chrom in chrom_to_do:
 
-    temp_com = f"ls {os.path.join(work_dir, 'signal', chrom)} | grep _signal.pkl"
     signal_data[chrom] = pd.read_pickle(
-        os.path.join(work_dir, "signal", chrom, sp.getoutput(temp_com))
+        glob.glob(f"{os.path.join(work_dir, 'signal', chrom)}/*_signal.pkl")[0]
     )
 
-# Iterating through all the genes of the gene file
-for i, region in df_regions.iterrows():
+# Iterating through all the genes of the regions file (regions to process).
+for i, region_iter in df_regions.iterrows():
 
-    symbol = region.symbol
-    region = region.coords
+    region = region_iter.coords
 
-    print(f"------> Working on region {region} [{i}/{len(df_regions)}]\n")
+    print(f"------> Working on region {region} [{i + 1}/{len(df_regions)}]\n")
 
-    with open(
-        f"{work_dir}{dataset_name}/{region.split(':', 1)[0]}/{region}_{args.reso}kb.mlo", "rb"
-    ) as mlobject_handler:
+    try:
 
-        mlobject = pickle.load(mlobject_handler)
+        with open(
+            f"{work_dir}{dataset_name}/{region.split(':', 1)[0]}/{region}_{args.reso}kb.mlo", "rb"
+        ) as mlobject_handler:
+
+            mlobject = pickle.load(mlobject_handler)
+
+    except FileNotFoundError:
+
+        print(
+            ".mlo file not found for this region. Check dataset name and resolution. \nSkipping to next region."
+        )
+
+        continue
 
     # If the pickle file contains the
     if mlobject.kk_nodes is None:
 
         print(
-            "Kamada-Kawai layout has not been calculated for this region. \n Skipping to next region."
+            "Kamada-Kawai layout has not been calculated for this region. \nSkipping to next region."
         )
 
         continue
 
-    # Get distance matrix <----- CALCULATE IN LMI, NOT HERE
     mlobject.kk_coords = list(mlobject.kk_nodes.values())
     mlobject.kk_distances = distance.cdist(mlobject.kk_coords, mlobject.kk_coords, "euclidean")
 
@@ -285,76 +290,12 @@ for i, region in df_regions.iterrows():
     # which should be ~2 particles of radius.
     mean_distance = mlobject.kk_distances.diagonal(1).mean()
     buffer = mean_distance * INFLUENCE
+    mlobject.lmi_geometry, coord_id, geometry_data = lmi.construct_voronoi(mlobject, LIMITS, buffer)
 
-    print(f"\tAverage distance between consecutive particles {mean_distance:6.4f} [{buffer:6.4f}]")
-    # From points to Voronoi polygons.
-    print("\tCalculating geometries for the voronoing of the Kamada-Kawai layout...")
+    print(f"\tAverage distance between consecutive particles: {mean_distance:6.4f} [{buffer:6.4f}]")
+    print(f"\tGeometry information for region {mlobject.region} saved in: {mlobject.save_path}")
 
-    points = mlobject.kk_coords.copy()
-
-    points.append(np.array([-LIMITS, LIMITS]))
-    points.append(np.array([LIMITS, LIMITS]))
-    points.append(np.array([LIMITS, -LIMITS]))
-    points.append(np.array([-LIMITS, -LIMITS]))
-    points.append(np.array([0, -LIMITS]))
-    points.append(np.array([LIMITS, 0]))
-    points.append(np.array([0, LIMITS]))
-    points.append(np.array([-LIMITS, 0]))
-
-    # Construct the voronoi polygon around the Kamada-Kawai points.
-    vor = Voronoi(points)
-
-    # Lines that construct the voronoi polygon.
-    voronoid_lines = [
-        LineString(vor.vertices[line]) for line in vor.ridge_vertices if -1 not in line
-    ]
-
-    # Iteratable of the sub-polygons composing the voronoi figure. This is done here in
-    # order to construct a dictionary that relates the bin_order and the polygon_order,
-    # as they tend to be different.
-    poly_from_lines = list(polygonize(voronoid_lines))
-
-    del (points, voronoid_lines)
-
-    coord_to_id = {}
-
-    for i, poly in enumerate(poly_from_lines):
-
-        for j, coords in enumerate(mlobject.kk_coords):
-
-            if poly.contains(Point(coords)):
-
-                coord_to_id[i] = j
-
-                break
-
-    # Constructing a GeoPandas DataFrame to work properly with the LMI function
-    geometry_data = gpd.GeoDataFrame({"geometry": [poly for poly in poly_from_lines]})
-
-    # Voronoi shaped & closed
-    shape = LineString(mlobject.kk_coords).buffer(buffer)
-    close = geometry_data.convex_hull.union(
-        geometry_data.buffer(0.1, resolution=1)
-    ).geometry.unary_union
-
-    for i, q in enumerate(geometry_data.geometry):
-
-        geometry_data.geometry[i] = q.intersection(close)
-        geometry_data.geometry[i] = shape.intersection(q)
-
-    df_geometry = defaultdict(list)
-
-    for i, x in sorted(coord_to_id.items(), key=lambda item: item[1]):
-
-        df_geometry["bin_index"].append(x)
-        df_geometry["moran_index"].append(i)
-        df_geometry["X"].append(mlobject.kk_coords[i][0])
-        df_geometry["Y"].append(mlobject.kk_coords[i][1])
-        df_geometry["geometry"].append(geometry_data.loc[i, "geometry"])
-
-    mlobject.lmi_geometry = pd.DataFrame(df_geometry)
-
-    # print(f"Geometry information for gene {symbol} will be saved in file {geometry_file}")
+    ########################################################################################################################
 
     # Load only signal for this specific region.
     region_signal = signal_data[mlobject.chrom][
@@ -387,7 +328,7 @@ for i, region in df_regions.iterrows():
 
         res = dict(filter(lambda item: signal_type in item[0], signals_dict.items()))
 
-        for _, x in sorted(coord_to_id.items(), key=lambda item: item[1]):
+        for _, x in sorted(coord_id.items(), key=lambda item: item[1]):
 
             signal.append(np.nanmedian([res[key][x] for key in res]))
 
@@ -395,7 +336,7 @@ for i, region in df_regions.iterrows():
 
         for i, poly in geometry_data.iterrows():
 
-            signal_geometry["v"].append(signal[coord_to_id[i]])
+            signal_geometry["v"].append(signal[coord_id[i]])
             signal_geometry["geometry"].append(poly.geometry)
 
         gpd_signal = gpd.GeoDataFrame(signal_geometry)  # Stored in Geopandas DataFrame to do LMI
@@ -416,7 +357,7 @@ for i, region in df_regions.iterrows():
 
         df_lmi = defaultdict(list)
 
-        for i, x in sorted(coord_to_id.items(), key=lambda item: item[1]):
+        for i, x in sorted(coord_id.items(), key=lambda item: item[1]):
 
             bin_start = int(mlobject.start) + (resolution * x) + x
             bin_end = bin_start + resolution
@@ -442,20 +383,26 @@ for i, region in df_regions.iterrows():
         # Changing the data types to the proper ones so the pickle file has a smaller size.
         df_lmi["Class"] = df_lmi["Class"].astype(str)
         df_lmi["ID"] = df_lmi["ID"].astype(str)
+
         df_lmi["bin_index"] = df_lmi["bin_index"].astype(np.uintc)
         df_lmi["bin_chr"] = df_lmi["bin_chr"].astype(str)
         df_lmi["bin_start"] = df_lmi["bin_start"].astype(np.uintc)
         df_lmi["bin_end"] = df_lmi["bin_end"].astype(np.uintc)
+
         df_lmi["signal"] = df_lmi["signal"].astype(np.half)
+
         df_lmi["moran_index"] = df_lmi["moran_index"].astype(np.uintc)
         df_lmi["moran_quadrant"] = df_lmi["moran_quadrant"].astype(np.uintc)
         df_lmi["LMI_score"] = df_lmi["LMI_score"].astype(np.half)
         df_lmi["LMI_pvalue"] = df_lmi["LMI_pvalue"].astype(np.half)
         df_lmi["LMI_inv_pval"] = df_lmi["LMI_inv_pval"].astype(np.half)
+        # zSig y Zlag
 
         all_lmi[signal_type] = df_lmi
 
     mlobject.lmi_info = all_lmi
+
+    # print(all_lmi)
 
     print(f"\n\tRegion done in {timedelta(seconds=round(time() - start_timer))}")
     print(

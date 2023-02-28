@@ -1,15 +1,15 @@
 import dill as pickle
 
 
-class mlo:
-    def __init__(self, region, chrom, start, end, resolution):
+class MetalociObject:
+    def __init__(self, region, chrom, start, end, resolution, poi):
 
         self.region = region
         self.chrom = chrom
         self.start = start
         self.end = end
         self.resolution = resolution
-        self.midpoint = None
+        self.poi = poi
         self.matrix = None
         self.mixed_matrices = None
         self.persistance_length = None

@@ -54,9 +54,7 @@ From the different plots choose the one you think fits better with your data.
 If the script runs with only one cutoff, it will save the Kamada-Kawai layout data  to a pickle 
 file"""
 
-parser = ArgumentParser(
-    formatter_class=RawDescriptionHelpFormatter, description=description, add_help=False
-)
+parser = ArgumentParser(formatter_class=RawDescriptionHelpFormatter, description=description, add_help=False)
 
 input_arg = parser.add_argument_group(title="Input arguments")
 
@@ -87,9 +85,7 @@ input_arg.add_argument(
     required=True,
     help="resolution of the cooler files.",
 )
-region_arg = parser.add_argument_group(
-    title="region arguments", description="Choose one of the following options."
-)
+region_arg = parser.add_argument_group(title="region arguments", description="Choose one of the following options.")
 region_arg.add_argument(
     "-g",
     "--region",
@@ -126,16 +122,13 @@ optional_arg.add_argument(
     default="",
     help="name of the dataset. By default corresponds to: " "COOLER.NAME_RESOLUTION",
 )
-optional_arg.add_argument(
-    "-f", "--force", dest="force", action="store_true", help="force rewriting existing data."
-)
+optional_arg.add_argument("-f", "--force", dest="force", action="store_true", help="force rewriting existing data.")
 optional_arg.add_argument(
     "-p",
     "--plot",
     dest="save_plots",
     action="store_true",
-    help="plot the matrix, density and Kamada-Kawai plots, even when a "
-    "single cutoff is selected.",
+    help="plot the matrix, density and Kamada-Kawai plots, even when a " "single cutoff is selected.",
 )
 # TODO add sort of silent argument?
 
@@ -214,21 +207,20 @@ for i, row in genes.iterrows():
 
     # chr1:36031800-40052000	POU3F1	ENSG00000185668.8
 
-    region_chrom, region_start, region_end = re.split(":|-", row.coords)
+    region_chrom, region_start, region_end, poi = re.split(":|-|_", row.coords)
 
-    mlobject = mlo.mlo(
+    mlobject = mlo.MetalociObject(
         f"{region_chrom}:{region_start}-{region_end}",
         region_chrom,
         int(region_start),
         int(region_end),
         resolution,
+        int(poi),
     )
 
-    filename = f"{mlobject.region}_{int(mlobject.resolution/1000)}kb"
+    filename = f"{mlobject.chrom}_{mlobject.start}_{mlobject.end}_{mlobject.poi}"
 
-    pathlib.Path(os.path.join(work_dir, dataset_name, region_chrom), "plots", "KK").mkdir(
-        parents=True, exist_ok=True
-    )
+    pathlib.Path(os.path.join(work_dir, dataset_name, region_chrom), "plots", "KK").mkdir(parents=True, exist_ok=True)
 
     coordsfile = f"{os.path.join(work_dir, dataset_name, region_chrom, filename)}_KK.pkl"
     cooler_file = cooler_file + "::/resolutions/" + str(mlobject.resolution)
@@ -249,8 +241,7 @@ for i, row in genes.iterrows():
         if force:
 
             print(
-                "\tForce option (-f) selected, recalculating "
-                "the Kamada-Kawai layout (files will be overwritten)\n"
+                "\tForce option (-f) selected, recalculating " "the Kamada-Kawai layout (files will be overwritten)\n"
             )
 
         else:
@@ -266,9 +257,7 @@ for i, row in genes.iterrows():
 
         continue
 
-    mlobject.matrix = (
-        cooler.Cooler(cooler_file).matrix(sparse=True).fetch(mlobject.region).toarray()
-    )
+    mlobject.matrix = cooler.Cooler(cooler_file).matrix(sparse=True).fetch(mlobject.region).toarray()
     mlobject.matrix = misc.clean_matrix(mlobject, bad_regions)
 
     # This if statement is for detecting empty arrays. If the array is too empty,
@@ -296,9 +285,9 @@ for i, row in genes.iterrows():
 
             mlobject, mixed_matrices_plot = plot.mixed_matrices_plot(mlobject)
 
-            pathlib.Path(
-                os.path.join(work_dir, dataset_name, region_chrom), "plots", "mixed_matrices"
-            ).mkdir(parents=True, exist_ok=True)
+            pathlib.Path(os.path.join(work_dir, dataset_name, region_chrom), "plots", "mixed_matrices").mkdir(
+                parents=True, exist_ok=True
+            )
 
             mixed_matrices_plot.savefig(
                 os.path.join(
@@ -321,9 +310,7 @@ for i, row in genes.iterrows():
 
         if len(cutoffs) == 1:
 
-            mlobject.save_path = os.path.join(
-                work_dir, dataset_name, region_chrom, f"{filename}.mlo"
-            )
+            mlobject.save_path = os.path.join(work_dir, dataset_name, region_chrom, f"{filename}.mlo")
 
             # Save mlobject.
             with open(mlobject.save_path, "wb") as hamlo_namendle:
@@ -337,7 +324,7 @@ for i, row in genes.iterrows():
 
         if len(cutoffs) > 1 or save_plots:
 
-            plt = plot.plot_kk(mlobject)
+            plt = plot.get_kk_plot(mlobject)
 
             fig_name = os.path.join(
                 work_dir,

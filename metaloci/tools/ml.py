@@ -5,24 +5,15 @@ Script to "paint" the Kamada-Kawai layaouts using a signal, grouping individuals
 
 # pylint: disable=invalid-name, wrong-import-position, wrong-import-order
 
-import glob
-import os
 import pickle
 import re
 import sys
 from argparse import SUPPRESS, ArgumentParser, RawDescriptionHelpFormatter
-from collections import defaultdict
 from datetime import timedelta
 from time import time
 
-import geopandas as gpd
-import libpysal as lp
-import numpy as np
 import pandas as pd
-from esda.moran import Moran_Local
-from scipy.spatial import distance
 
-from metaloci.misc import misc
 from metaloci.spatial_stats import lmi
 
 description = (
@@ -37,9 +28,7 @@ description += "    |-DATASET_NAME\n"
 description += "       |-CHROMOSOME\n"
 description += "          |-output_file\n"
 
-parser = ArgumentParser(
-    formatter_class=RawDescriptionHelpFormatter, description=description, add_help=False
-)
+parser = ArgumentParser(formatter_class=RawDescriptionHelpFormatter, description=description, add_help=False)
 
 input_arg = parser.add_argument_group(title="Input arguments")
 
@@ -75,9 +64,7 @@ input_arg.add_argument(
     help="Path to the file with the samples/signals to use.",
 )
 
-region_input = parser.add_argument_group(
-    title="Region arguments", description="Choose one of the following options."
-)
+region_input = parser.add_argument_group(title="Region arguments", description="Choose one of the following options.")
 
 region_input.add_argument(
     "-g",
@@ -97,9 +84,7 @@ region_input.add_argument(
     help="Path to the file with the regions of interest.",
 )
 
-signal_arg = parser.add_argument_group(
-    title="Signal arguments", description="Choose one of the following options:"
-)
+signal_arg = parser.add_argument_group(title="Signal arguments", description="Choose one of the following options:")
 
 signal_arg.add_argument(
     "-y",
@@ -142,8 +127,7 @@ optional_arg.add_argument(
     default=9999,
     metavar="INT",
     type=int,
-    help="Number of permutations to calculate the Local Moran's I p-value "
-    "(default: %(default)d).",
+    help="Number of permutations to calculate the Local Moran's I p-value " "(default: %(default)d).",
 )
 
 optional_arg.add_argument(
@@ -153,8 +137,7 @@ optional_arg.add_argument(
     default="",
     metavar="STR",
     type=str,
-    help="Name of the dataset. By default corresponds to the name of the "
-    "folder where coolers are stored.",
+    help="Name of the dataset. By default corresponds to the name of the " "folder where coolers are stored.",
 )
 
 optional_arg.add_argument(
@@ -237,30 +220,27 @@ for i, region_iter in df_regions.iterrows():
 
     region = region_iter.coords
 
-    print(f"------> Working on region {region} [{i + 1}/{len(df_regions)}]\n")
+    print(f"\n------> Working on region {region} [{i + 1}/{len(df_regions)}]\n")
 
     try:
 
         with open(
-            f"{work_dir}{dataset_name}/{region.split(':', 1)[0]}/{region}_{args.reso}kb.mlo", "rb"
+            f"{work_dir}{dataset_name}/{region.split(':', 1)[0]}/{re.sub(':|-', '_', region)}.mlo",
+            "rb",
         ) as mlobject_handler:
 
             mlobject = pickle.load(mlobject_handler)
 
     except FileNotFoundError:
 
-        print(
-            ".mlo file not found for this region. Check dataset name and resolution. \nSkipping to next region."
-        )
+        print(".mlo file not found for this region. Check dataset name and resolution. \nSkipping to next region.")
 
         continue
 
     # If the pickle file contains the
     if mlobject.kk_nodes is None:
 
-        print(
-            "Kamada-Kawai layout has not been calculated for this region. \nSkipping to next region."
-        )
+        print("Kamada-Kawai layout has not been calculated for this region. \nSkipping to next region.")
 
         continue
 
@@ -276,24 +256,18 @@ for i, region_iter in df_regions.iterrows():
     ########################################################################################################################
 
     # Load only signal for this specific region.
-    mlobject.signals_dict, signal_types = lmi.load_region_signals(
-        mlobject, signal_data, signal_file
-    )
+    mlobject.signals_dict, signal_types = lmi.load_region_signals(mlobject, signal_data, signal_file)
 
     all_lmi = {}
 
     for signal_type in signal_types:
 
-        all_lmi[signal_type] = lmi.compute_lmi(
-            mlobject, signal_type, buffer * BFACT, n_permutations, signipval
-        )
+        all_lmi[signal_type] = lmi.compute_lmi(mlobject, signal_type, buffer * BFACT, n_permutations, signipval)
 
     mlobject.lmi_info = all_lmi
 
     print(f"\n\tRegion done in {timedelta(seconds=round(time() - region_timer))}")
-    print(
-        f"\tLMI information for region {mlobject.region} will be saved in: {mlobject.save_path}\n"
-    )
+    print(f"\tLMI information for region {mlobject.region} will be saved in: {mlobject.save_path}\n")
 
     with open(mlobject.save_path, "wb") as hamlo_namendle:
 

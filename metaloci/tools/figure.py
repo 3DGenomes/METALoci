@@ -313,7 +313,6 @@ for i, region_iter in df_regions.iterrows():
 
         merged_lmi_geometry = gpd.GeoDataFrame(merged_lmi_geometry, geometry=merged_lmi_geometry.geometry)
 
-        poi_gaudi = merged_lmi_geometry.loc[merged_lmi_geometry["moran_index"] == mlobject.poi, "bin_index"].iloc[0]
         poi_factor = mlobject.poi / merged_lmi_geometry["bin_index"].shape[0]
 
         print("\t\tHiC plot", end="\r")
@@ -324,21 +323,21 @@ for i, region_iter in df_regions.iterrows():
         print("\t\tHiC plot -> done.")
 
         print("\t\tKamada-Kawai plot", end="\r")
-        kk_plt = plot.get_kk_plot2(mlobject.kk_nodes, mlobject.poi)
+        kk_plt = plot.get_kk_plot2(mlobject)
         kk_plt.savefig(f"{plot_filename}_kk.pdf", **plot_opt)
         kk_plt.savefig(f"{plot_filename}_kk.png", **plot_opt)
         kk_plt.close()
         print("\t\tKamada-Kawai plot -> done.")
 
         print("\t\tGaudi Signal plot", end="\r")
-        gs_plt = plot.get_gaudi_signal_plot(merged_lmi_geometry, poi_gaudi)
+        gs_plt = plot.get_gaudi_signal_plot(mlobject, merged_lmi_geometry)
         gs_plt.savefig(f"{plot_filename}_gsp.pdf", **plot_opt)
         gs_plt.savefig(f"{plot_filename}_gsp.png", **plot_opt)
         gs_plt.close()
         print("\t\tGaudi Signal plot -> done.")
 
         print("\t\tGaudi Type plot", end="\r")
-        gt_plt = plot.get_gaudi_type_plot(merged_lmi_geometry, signipval, poi_gaudi, colors, legend_elements)
+        gt_plt = plot.get_gaudi_type_plot(mlobject, merged_lmi_geometry, signipval, colors)
         gt_plt.savefig(f"{plot_filename}_gtp.pdf", **plot_opt)
         gt_plt.savefig(f"{plot_filename}_gtp.png", **plot_opt)
         gt_plt.close()
@@ -346,7 +345,7 @@ for i, region_iter in df_regions.iterrows():
 
         print("\t\tLMI Scatter plot", end="\r")
         lmi_plt, r_value, p_value = plot.get_lmi_scatterplot(
-            merged_lmi_geometry, buffer * BFACT, mlobject.poi, signipval, colors
+            mlobject, merged_lmi_geometry, buffer * BFACT, signipval, colors
         )
         lmi_plt.savefig(f"{plot_filename}_lmi.pdf", **plot_opt)
         lmi_plt.savefig(f"{plot_filename}_lmi.png", **plot_opt)

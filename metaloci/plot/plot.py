@@ -15,6 +15,7 @@ from scipy.stats import linregress, zscore
 from shapely.geometry import Point
 from shapely.geometry.multipolygon import MultiPolygon
 
+from matplotlib.lines import Line2D
 from metaloci import mlo
 
 
@@ -41,44 +42,37 @@ def get_kk_plot(mlobject):
             edgecolors="r",
         )
 
-    xs = []
-    ys = []
-
-    for _, val in mlobject.kk_nodes.items():
-
-        xs.append(val[0])
-        ys.append(val[1])
+    xs = [mlobject.kk_nodes[n][0] for n in mlobject.kk_nodes]
+    ys = [mlobject.kk_nodes[n][1] for n in mlobject.kk_nodes]
 
     sns.lineplot(x=xs, y=ys, sort=False, lw=2, color="black", legend=False, zorder=1)
 
     return plt
 
 
-def get_kk_plot2(pos_kk, poi_kk):
+def get_kk_plot2(mlobject):
 
     PLOTSIZE = 10
-    pointsize = PLOTSIZE * 5
+    POINTSIZE = PLOTSIZE * 5
 
-    xs = [pos_kk[n][0] for n in pos_kk]
-    ys = [pos_kk[n][1] for n in pos_kk]
+    xs = [mlobject.kk_nodes[n][0] for n in mlobject.kk_nodes]
+    ys = [mlobject.kk_nodes[n][1] for n in mlobject.kk_nodes]
 
     plt.figure(figsize=(PLOTSIZE, PLOTSIZE))
-
     plt.axis("off")
 
     g = sns.lineplot(x=xs, y=ys, sort=False, lw=1, color="grey", legend=False, zorder=1)
-
     g.set_aspect("equal", adjustable="box")
     g.set(ylim=(-1.1, 1.1))
     g.set(xlim=(-1.1, 1.1))
     g.tick_params(bottom=False, left=False)
+    g.annotate(f"    {mlobject.chrom}:{mlobject.start}", (xs[0], ys[0]), size=8)
+    g.annotate(f"    {mlobject.chrom}:{mlobject.start}", (xs[len(xs) - 1], ys[len(ys) - 8]), size=8)
 
-    sns.scatterplot(x=xs, y=ys, hue=range(len(xs)), palette="coolwarm", legend=False, s=pointsize, zorder=2)
-
-    # g.annotate('{}:{:}'.format(chrm,cini), (xs[0], ys[0]))
-    # g.annotate('{}:{:}'.format(chrm,cend), (xs[len(xs)-1], ys[len(ys)-1]))
-
-    sns.scatterplot(x=[xs[poi_kk]], y=[ys[poi_kk]], s=pointsize * 1.5, ec="lime", fc="none", zorder=3)
+    sns.scatterplot(x=xs, y=ys, hue=range(len(xs)), palette="coolwarm", legend=False, s=POINTSIZE, zorder=2)
+    sns.scatterplot(
+        x=[xs[mlobject.poi - 1]], y=[ys[mlobject.poi - 1]], s=POINTSIZE * 1.5, ec="lime", fc="none", zorder=3
+    )
 
     return plt
 
@@ -169,7 +163,7 @@ def get_hic_plot(mlobject: mlo.MetalociObject, poi_factor: int):
     return plt
 
 
-def get_gaudi_signal_plot(mlgdata, midp_gs):
+def get_gaudi_signal_plot(mlobject, lmi_geometry):
     """
     'Gaudi' plot of the signal painted over the Kamada-Kawai layout
     :param mlgdata:
@@ -177,18 +171,19 @@ def get_gaudi_signal_plot(mlgdata, midp_gs):
     :return:
     """
     # Gaudi plot Signal
+
+    poi = lmi_geometry.loc[lmi_geometry["moran_index"] == mlobject.poi - 1, "bin_index"].iloc[0]
+
     cmap = "PuOr_r"
-    min_value = mlgdata.signal.min()
-    max_value = mlgdata.signal.max()
+    min_value = lmi_geometry.signal.min()
+    max_value = lmi_geometry.signal.max()
 
     _, ax = plt.subplots(figsize=(12, 10), subplot_kw={"aspect": "equal"})
+    lmi_geometry.plot(column="signal", cmap=cmap, linewidth=2, edgecolor="white", ax=ax)
 
-    mlgdata.plot(column="signal", cmap=cmap, linewidth=2, edgecolor="white", ax=ax)
-
-    sns.scatterplot(x=[mlgdata.X[midp_gs]], y=[mlgdata.Y[midp_gs]], s=50, ec="none", fc="lime")
+    sns.scatterplot(x=[lmi_geometry.X[poi]], y=[lmi_geometry.Y[poi]], s=50, ec="none", fc="lime")
 
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=min_value, vmax=max_value))
-
     sm.set_array([1, 2, 3, 4])
 
     nbar = 11
@@ -200,14 +195,15 @@ def get_gaudi_signal_plot(mlgdata, midp_gs):
         format=FormatStrFormatter("%.2f"),
         ax=ax,
     )
-    # cbar.ax.label_params(labelsize=20)
     cbar.set_label("Signal", rotation=270, size=20, labelpad=35)
     plt.axis("off")
 
     return plt
 
 
-def get_gaudi_type_plot(lmi_geometry, minpv_gt, midp_gt, colors_gt, legend_info):
+def get_gaudi_type_plot(
+    mlobject, lmi_geometry, signipval=0.05, colors={1: "firebrick", 2: "lightskyblue", 3: "steelblue", 4: "orange"}
+):
     """
     'Gaudi' plot of the LMI type over the Kamada-Kawai layout
     :param mlgdata:
@@ -219,28 +215,41 @@ def get_gaudi_type_plot(lmi_geometry, minpv_gt, midp_gt, colors_gt, legend_info)
     """
     # Gaudi plot LMI type
 
-    cmap = LinearSegmentedColormap.from_list("Custom cmap", [colors_gt[nu] for nu in colors_gt], len(colors_gt))
-    alpha = [1.0 if quad <= minpv_gt else 0.3 for quad in lmi_geometry.LMI_pvalue]
+    poi_gaudi = lmi_geometry.loc[lmi_geometry["moran_index"] == mlobject.poi - 1, "bin_index"].iloc[0]
+
+    legend_elements = [
+        Line2D([0], [0], marker="o", color="w", markerfacecolor=colors[1], label="HH", markersize=20),
+        Line2D([0], [0], marker="o", color="w", markerfacecolor=colors[2], label="LH", markersize=20),
+        Line2D([0], [0], marker="o", color="w", markerfacecolor=colors[3], label="LL", markersize=20),
+        Line2D([0], [0], marker="o", color="w", markerfacecolor=colors[4], label="HL", markersize=20),
+    ]
+
+    cmap = LinearSegmentedColormap.from_list("Custom cmap", [colors[nu] for nu in colors], len(colors))
+    alpha = [1.0 if quad <= signipval else 0.3 for quad in lmi_geometry.LMI_pvalue]
 
     _, ax = plt.subplots(figsize=(12, 10), subplot_kw={"aspect": "equal"})
     lmi_geometry.plot(column="moran_quadrant", cmap=cmap, alpha=alpha, linewidth=2, edgecolor="white", ax=ax)
-
-    sns.scatterplot(
-        x=[lmi_geometry.X[midp_gt]], y=[lmi_geometry.Y[midp_gt]], s=50, ec="none", fc="lime", zorder=len(lmi_geometry)
-    )
-
     plt.axis("off")
 
-    ax.legend(handles=legend_info, frameon=False, fontsize=20, loc="center left", bbox_to_anchor=(1, 0.5))
+    sns.scatterplot(
+        x=[lmi_geometry.X[poi_gaudi]],
+        y=[lmi_geometry.Y[poi_gaudi]],
+        s=50,
+        ec="none",
+        fc="lime",
+        zorder=len(lmi_geometry),
+    )
+
+    ax.legend(handles=legend_elements, frameon=False, fontsize=20, loc="center left", bbox_to_anchor=(1, 0.5))
 
     return plt
 
 
 def get_lmi_scatterplot(
+    mlobject,
     lmi_geometry,
-    bbfact_lmi,
-    poi_lmi,
-    minpv_lmi=0.05,
+    neighbourhood,
+    signipval=0.05,
     colors_lmi={1: "firebrick", 2: "lightskyblue", 3: "steelblue", 4: "orange"},
 ):
     """
@@ -253,7 +262,7 @@ def get_lmi_scatterplot(
     :return:
     """
 
-    weights = lp.weights.DistanceBand.from_dataframe(lmi_geometry, bbfact_lmi)
+    weights = lp.weights.DistanceBand.from_dataframe(lmi_geometry, neighbourhood)
     weights.transform = "r"
 
     y_lag = lp.weights.lag_spatial(weights, lmi_geometry["signal"])
@@ -261,28 +270,26 @@ def get_lmi_scatterplot(
     x = zscore(lmi_geometry.signal)
     y = zscore(y_lag)
 
-    # print('\tGet spatial slope...')
     _, _, r_value_scat, p_value_scat, _ = linregress(x, y)
-    # print('\tGet spatial plot...')
     _, ax = plt.subplots(figsize=(5, 5))  # , subplot_kw={'aspect':'equal'})
 
-    alpha_sp = [1.0 if val < minpv_lmi else 0.1 for val in lmi_geometry.LMI_pvalue]
+    alpha_sp = [1.0 if val < signipval else 0.1 for val in lmi_geometry.LMI_pvalue]
     colors_sp = [colors_lmi[val] for val in lmi_geometry.moran_quadrant]
 
     plt.scatter(x=x, y=y, s=100, ec="white", fc=colors_sp, alpha=alpha_sp)
 
-    sns.scatterplot(x=[x[poi_lmi]], y=[y[poi_lmi]], s=150, ec="lime", fc="lime", zorder=len(lmi_geometry))
-
+    sns.scatterplot(
+        x=[x[mlobject.poi - 1]], y=[y[mlobject.poi - 1]], s=150, ec="lime", fc="none", zorder=len(lmi_geometry)
+    )
     sns.regplot(x=x, y=y, scatter=False, color="k")
-    plt.title(f"Moran Local Scatterplot\nr: {r_value_scat:4.2f}   p-value: {p_value_scat:.1e}")
+    sns.despine(top=True, right=True, left=False, bottom=False, offset=10, trim=False)
 
+    plt.title(f"Moran Local Scatterplot\nr: {r_value_scat:4.2f}   p-value: {p_value_scat:.1e}")
     plt.axvline(x=0, color="k", linestyle=":")
     plt.axhline(y=0, color="k", linestyle=":")
 
     ax.set_xlabel("Z-score(Signal)")
     ax.set_ylabel("Z-score(Signal Spatial Lag)")
-
-    sns.despine(top=True, right=True, left=False, bottom=False, offset=10, trim=False)
 
     return plt, r_value_scat, p_value_scat
 
@@ -359,23 +366,21 @@ def signal_plot(mlobject, lmi_geometry, selmetaloci_sig, bins_sig, coords_sig):
     # print('Signal profile for the region of interest: {}'.format(region))
 
     plt.figure(figsize=(10, 1.5))
-
     plt.tick_params(axis="both", which="minor", labelsize=24)
 
     g = sns.lineplot(x=lmi_geometry.bin_index, y=lmi_geometry.signal)
 
     for p in selmetaloci_sig:
+
         plt.axvline(x=p, color="red", linestyle=":", lw=1.5)
 
     plt.axvline(x=mlobject.poi, color="lime", linestyle="--", lw=1.5)
-
-    plt.xticks(bins_sig, coords_sig)
 
     g.yaxis.set_major_locator(MaxNLocator(integer=True))
     g.yaxis.set_major_formatter(FormatStrFormatter("%.1f"))
 
     plt.xlabel(f"chromosome {mlobject.chrom}")
-
+    plt.xticks(bins_sig, coords_sig)
     g.margins(x=0)
     g.axhline(y=0, color="k", zorder=0)
 

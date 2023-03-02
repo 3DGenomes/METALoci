@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.lines import Line2D
 from matplotlib.ticker import FormatStrFormatter, MaxNLocator
 from PIL import Image
 from scipy.ndimage import rotate
@@ -15,7 +16,6 @@ from scipy.stats import linregress, zscore
 from shapely.geometry import Point
 from shapely.geometry.multipolygon import MultiPolygon
 
-from matplotlib.lines import Line2D
 from metaloci import mlo
 
 
@@ -323,29 +323,33 @@ def signal_bed(mlobject, lmi_geometry, quartiles, signipval, midds, bbfact):
 
     beddata = defaultdict(list)
 
-    for _, ml in enumerate(mls.geoms):
+    try:
 
-        ml = gpd.GeoSeries(ml)
+        for _, ml in enumerate(mls.geoms):
 
-        if s.within(ml[0]):
+            ml = gpd.GeoSeries(ml)
 
-            for _, row_ml in lmi_geometry.iterrows():
+            if s.within(ml[0]):
 
-                s2 = Point((row_ml.X, row_ml.Y))
-                if s2.within(ml[0]):
-                    selmetaloci_bed.append(row_ml.bin_index)
+                for _, row_ml in lmi_geometry.iterrows():
 
-            # Add close particles
-            selmetaloci_bed.sort()
-            closebins = [nu for nu, val in enumerate(midds) if val <= bbfact]
-            selmetaloci_bed = np.sort(list(set(closebins + selmetaloci_bed)))
+                    s2 = Point((row_ml.X, row_ml.Y))
+                    if s2.within(ml[0]):
+                        selmetaloci_bed.append(row_ml.bin_index)
 
-            for p in selmetaloci_bed:
-                beddata["chr"].append(lmi_geometry.bin_chr[p])
-                beddata["start"].append(lmi_geometry.bin_start[p])
-                beddata["end"].append(lmi_geometry.bin_end[p])
-                beddata["bin"].append(p)
+                # Add close particles
+                selmetaloci_bed.sort()
+                closebins = [nu for nu, val in enumerate(midds) if val <= bbfact]
+                selmetaloci_bed = np.sort(list(set(closebins + selmetaloci_bed)))
 
+                for p in selmetaloci_bed:
+                    beddata["chr"].append(lmi_geometry.bin_chr[p])
+                    beddata["start"].append(lmi_geometry.bin_start[p])
+                    beddata["end"].append(lmi_geometry.bin_end[p])
+                    beddata["bin"].append(p)
+    except:
+
+        pass  # Ask Marc about this.
     beddata = pd.DataFrame(beddata)
 
     return beddata, selmetaloci_bed

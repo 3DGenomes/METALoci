@@ -1,29 +1,21 @@
 """
 Script to prduce the different plots of METAloci
 """
-import sys
 import argparse
-import re
 import os
-import pickle
 import pathlib
-from time import time
+import pickle
+import re
+import sys
 from datetime import timedelta
-from collections import defaultdict
-import matplotlib.pyplot as plt
-import seaborn as sns
-import pandas as pd
+from time import time
+
 import geopandas as gpd
-import libpysal as lp
-import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+from matplotlib.lines import Line2D
 from PIL import Image
 
-from scipy.stats import zscore, linregress
-from matplotlib.lines import Line2D
-from matplotlib.ticker import MaxNLocator, FormatStrFormatter
-from matplotlib.colors import LinearSegmentedColormap
-from shapely.geometry import Point
-from shapely.geometry.multipolygon import MultiPolygon
 from metaloci.plot import plot
 
 description = "This script outputs the different plots to show METALoci.\n"
@@ -53,15 +45,6 @@ input_arg.add_argument(
     "-w", "--work-dir", dest="work_dir", required=True, metavar="PATH", type=str, help="Path to working directory."
 )
 
-input_arg.add_argument(
-    "-n",
-    "--name",
-    dest="dataset_name",
-    default="",
-    metavar="STR",
-    type=str,
-    help="Name of the dataset. By default corresponds to the name of the " "folder where coolers are stored.",
-)
 
 input_arg.add_argument(
     "-r",
@@ -177,7 +160,6 @@ work_dir = args.work_dir
 
 regions = args.region_file
 signals = args.signals
-dataset_name = args.dataset_name
 resolution = args.reso
 quadrants = args.quart
 signipval = args.signipval
@@ -220,7 +202,7 @@ start_timer = time()
 
 if re.compile("chr").search(regions):
 
-    df_regions = pd.DataFrame({"coords": [regions], "symbol": ["symbol"], "id": ["id"]})
+    df_regions = pd.DataFrame({"coords": [regions], "name": ["symbol"], "id": ["id"]})
 
 else:
 
@@ -247,7 +229,7 @@ for i, region_iter in df_regions.iterrows():
     try:
 
         with open(
-            f"{work_dir}{dataset_name}/{region.split(':', 1)[0]}/{re.sub(':|-', '_', region)}.mlo",
+            f"{work_dir}{region.split(':', 1)[0]}/{re.sub(':|-', '_', region)}.mlo",
             "rb",
         ) as mlobject_handler:
 
@@ -255,7 +237,7 @@ for i, region_iter in df_regions.iterrows():
 
     except FileNotFoundError:
 
-        print(".mlo file not found for this region. Check dataset name and resolution. \nSkipping to next region.")
+        print(".mlo file not found for this region. \nSkipping to next region.")
 
         continue
 
@@ -290,7 +272,7 @@ for i, region_iter in df_regions.iterrows():
 
         print(f"\tPlotting signal: {signal}")
 
-        plot_filename = os.path.join(work_dir, dataset_name, mlobject.chrom, "plots", signal, mlobject.region)
+        plot_filename = os.path.join(work_dir, mlobject.chrom, "plots", signal, mlobject.region)
         pathlib.Path(plot_filename).mkdir(parents=True, exist_ok=True)
 
         plot_filename = os.path.join(
@@ -395,7 +377,7 @@ for i, region_iter in df_regions.iterrows():
         print(f"\t\tFinal composite figure for region of interest: {region} and signal: {signal} -> done.")
 
         data_moran["Coords"].append(region)
-        data_moran["Symbol"].append(region_iter.symbol)
+        data_moran["Symbol"].append(region_iter.name)
         data_moran["Gene_id"].append(region_iter.id)
         data_moran["Signal"].append(signal)
         data_moran["R_value"].append(r_value)
@@ -415,11 +397,9 @@ for i, region_iter in df_regions.iterrows():
         print("")
 
 data_moran = pd.DataFrame(data_moran)
-data_moran.to_csv(
-    f"{os.path.join(work_dir, dataset_name, mlobject.chrom, 'moran_info.txt')}", sep="\t", index=False, mode="a"
-)
+data_moran.to_csv(f"{os.path.join(work_dir, mlobject.chrom, 'moran_info.txt')}", sep="\t", index=False, mode="a")
 
-# print(f"Information saved to {os.path.join(work_dir, 'moran_info.txt')}")
+print(f"Information saved to {os.path.join(work_dir, 'moran_info.txt')}")
 
 print(f"\nTotal time spent: {timedelta(seconds=round(time() - start_timer))}")
 

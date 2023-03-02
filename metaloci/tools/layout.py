@@ -5,32 +5,28 @@ __author__ = "Iago Maceda Porto and Leo Zuber Ponce"
 
 # pylint: disable=invalid-name, wrong-import-position, wrong-import-order
 
-import sys
-from argparse import ArgumentParser, RawDescriptionHelpFormatter, SUPPRESS
 import os
-import pickle
 import pathlib
 import re
-import subprocess as sp
+import sys
+import warnings
+from argparse import SUPPRESS, ArgumentParser, RawDescriptionHelpFormatter
 from datetime import timedelta
 from time import time
 
-import matplotlib.pyplot as plt
-import numpy as np
-
-import seaborn as sns
-import pandas as pd
-import networkx as nx
 import cooler
+import matplotlib.pyplot as plt
+import networkx as nx
+import pandas as pd
 from scipy.sparse import csr_matrix
-import pyarrow.parquet as pq
-from metaloci.misc import misc
-from metaloci.graph_layout import kk
-from metaloci import mlo
-from metaloci.plot import plot
-import numpy as np
-import dill as pickle
 from scipy.spatial import distance
+
+from metaloci import mlo
+from metaloci.graph_layout import kk
+from metaloci.misc import misc
+from metaloci.plot import plot
+
+warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 description = """
 This script adds signal data to a Kamada-Kawai layout and calculates Local Moran's I for every 
@@ -114,14 +110,7 @@ optional_arg.add_argument(
     action="extend",
     help="percentage of top interactions to keep, space separated (default: " "0.2)",
 )
-optional_arg.add_argument(
-    "-n",
-    "--name",
-    dest="dataset_name",
-    metavar="STR",
-    default="",
-    help="name of the dataset. By default corresponds to: " "COOLER.NAME_RESOLUTION",
-)
+
 optional_arg.add_argument("-f", "--force", dest="force", action="store_true", help="force rewriting existing data.")
 optional_arg.add_argument(
     "-p",
@@ -141,7 +130,6 @@ cooler_file = args.cooler_file
 regions = args.regions
 resolution = args.reso * 1000
 cutoffs = args.cutoff
-dataset_name = args.dataset_name
 force = args.force
 save_plots = args.save_plots
 debug = args.debug
@@ -150,15 +138,15 @@ if not work_dir.endswith("/"):
 
     work_dir += "/"
 
-if dataset_name == "":
+# if dataset_name == "":
 
-    if cooler_file.endswith(".cool") or cooler_file.endswith(".mcool"):
+#     if cooler_file.endswith(".cool") or cooler_file.endswith(".mcool"):
 
-        dataset_name = cooler_file.rsplit("/", 1)[1].rsplit(".")[0] + "_" + str(resolution)
+#         dataset_name = cooler_file.rsplit("/", 1)[1].rsplit(".")[0] + "_" + str(resolution)
 
-    else:
+#     else:
 
-        dataset_name = cooler_file.rsplit("/", 1)[1] + "_" + str(resolution)
+#         dataset_name = cooler_file.rsplit("/", 1)[1] + "_" + str(resolution)
 
 if cutoffs is None:
 
@@ -175,7 +163,6 @@ if debug:
         ["region_file", regions],
         ["reso", resolution],
         ["cutoffs", cutoffs],
-        ["dataset_name", dataset_name],
         ["force", force],
         ["debug", debug],
     ]
@@ -190,20 +177,20 @@ start_timer = time()
 # Parsing the one-line region into a pandas data-frame
 if re.compile("chr").search(regions):
 
-    genes = pd.DataFrame({"coords": [regions], "symbol": ["symbol"], "id": ["id"]})
+    df_regions = pd.DataFrame({"coords": [regions], "symbol": ["symbol"], "id": ["id"]})
 
 else:
 
-    genes = pd.read_table(regions)
+    df_regions = pd.read_table(regions)
 
-pathlib.Path(os.path.join(work_dir, dataset_name)).mkdir(parents=True, exist_ok=True)
+pathlib.Path(os.path.join(work_dir)).mkdir(parents=True, exist_ok=True)
 
 bad_regions = {"region": [], "reason": []}
 
 # Input file with all regions to KK
 # regions = pd.read_csv(region_file, sep="\t")
 
-for i, row in genes.iterrows():
+for i, row in df_regions.iterrows():
 
     # chr1:36031800-40052000	POU3F1	ENSG00000185668.8
 
@@ -220,10 +207,10 @@ for i, row in genes.iterrows():
 
     filename = f"{mlobject.chrom}_{mlobject.start}_{mlobject.end}_{mlobject.poi}"
 
-    pathlib.Path(os.path.join(work_dir, dataset_name, region_chrom), "plots", "KK").mkdir(parents=True, exist_ok=True)
+    pathlib.Path(os.path.join(work_dir, region_chrom), "plots", "KK").mkdir(parents=True, exist_ok=True)
 
-    coordsfile = f"{os.path.join(work_dir, dataset_name, region_chrom, filename)}_KK.pkl"
-    cooler_file = cooler_file + "::/resolutions/" + str(mlobject.resolution)
+    coordsfile = f"{os.path.join(work_dir, region_chrom, filename)}_KK.pkl"
+    cooler_file_str = cooler_file + "::/resolutions/" + str(mlobject.resolution)
 
     print(f"\n------> Working on region: {mlobject.region}\n")
 
@@ -257,7 +244,7 @@ for i, row in genes.iterrows():
 
         continue
 
-    mlobject.matrix = cooler.Cooler(cooler_file).matrix(sparse=True).fetch(mlobject.region).toarray()
+    mlobject.matrix = cooler.Cooler(cooler_file_str).matrix(sparse=True).fetch(mlobject.region).toarray()
     mlobject.matrix = misc.clean_matrix(mlobject, bad_regions)
 
     # This if statement is for detecting empty arrays. If the array is too empty,
@@ -285,14 +272,13 @@ for i, row in genes.iterrows():
 
             mlobject, mixed_matrices_plot = plot.mixed_matrices_plot(mlobject)
 
-            pathlib.Path(os.path.join(work_dir, dataset_name, region_chrom), "plots", "mixed_matrices").mkdir(
+            pathlib.Path(os.path.join(work_dir, region_chrom), "plots", "mixed_matrices").mkdir(
                 parents=True, exist_ok=True
             )
 
             mixed_matrices_plot.savefig(
                 os.path.join(
                     work_dir,
-                    dataset_name,
                     region_chrom,
                     f"plots/mixed_matrices/{filename}_" f"{mlobject.kk_cutoff}_mixed-matrices.pdf",
                 ),
@@ -310,7 +296,7 @@ for i, row in genes.iterrows():
 
         if len(cutoffs) == 1:
 
-            mlobject.save_path = os.path.join(work_dir, dataset_name, region_chrom, f"{filename}.mlo")
+            mlobject.save_path = os.path.join(work_dir, region_chrom, f"{filename}.mlo")
 
             # Save mlobject.
             with open(mlobject.save_path, "wb") as hamlo_namendle:
@@ -328,7 +314,6 @@ for i, row in genes.iterrows():
 
             fig_name = os.path.join(
                 work_dir,
-                dataset_name,
                 region_chrom,
                 f"plots/KK/{filename}_" f"{mlobject.kk_cutoff}_KK.pdf",
             )
@@ -338,19 +323,21 @@ for i, row in genes.iterrows():
 
         elapsed_time_secs = time() - time_per_kk
 
-        print(f"\tdone in {timedelta(seconds=round(elapsed_time_secs))}.\n")
+        print(f"\tdone in {timedelta(seconds=round(elapsed_time_secs))}.")
 
 bad_regions = pd.DataFrame(bad_regions)
 
+
 if bad_regions.shape[0] > 0:
 
-    bad_regions.to_csv(
-        f"{os.path.join(work_dir, dataset_name)}/bad_regions.txt",
-        sep="\t",
-        index=False,
-        header=False,
-        mode="a",
-    )
+    with open(f"{work_dir}bad_regions.txt", "a+") as handler:
+
+        [
+            handler.write(f"{row.region}\t{row.reason}\n")
+            for _, row in bad_regions.iterrows()
+            if not any(f"{row.region}\t{row.reason}" in line for line in handler)
+        ]
+
 
 print(f"Total time spent: {timedelta(seconds=round(time() - start_timer))}.")
 print("\nall done.")

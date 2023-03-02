@@ -48,13 +48,13 @@ def check_diagonal(diag_mat):
     max_stretch = 0
     zero_loc = []
 
-    for i_diag, element in enumerate(diag_mat):
+    for i, element in enumerate(diag_mat):
 
         if element == 0:
 
             total += 1
             stretch += 1
-            zero_loc.append(i_diag)
+            zero_loc.append(i)
 
             max_stretch = max(max_stretch, stretch)
 
@@ -63,8 +63,9 @@ def check_diagonal(diag_mat):
             stretch = 0
 
     percentage_zeroes = np.round(total / len(diag_mat) * 100, decimals=2)
+    percentage_stretch = np.round(max_stretch / len(diag_mat) * 100, decimals=2)
 
-    return total, max_stretch, percentage_zeroes, zero_loc
+    return total, percentage_stretch, percentage_zeroes, zero_loc
 
 
 def clean_matrix(mlo, bad_regions):
@@ -94,12 +95,12 @@ def clean_matrix(mlo, bad_regions):
 
         return None
 
-    if int(percentage_zeroes) >= 50:
+    if percentage_zeroes >= 50:
 
         bad_regions["region"].append(mlo.region)
-        bad_regions["reason"].append("perc")
+        bad_regions["reason"].append("percentage_of_zeroes")
 
-    elif int(max_stretch) >= 50:
+    if max_stretch >= 20:
 
         bad_regions["region"].append(mlo.region)
         bad_regions["reason"].append("stretch")
@@ -194,9 +195,7 @@ def bed_to_metaloci(data, coords, resolution):
         for l in chrom:
 
             line = l.rstrip().split("\t")
-            boundaries_dictionary[line[0]]["end"] = int(
-                line[1]
-            )  # tl_st: end of the initial telomere
+            boundaries_dictionary[line[0]]["end"] = int(line[1])  # tl_st: end of the initial telomere
 
     file_info = pd.read_table(data[0])
 
@@ -232,9 +231,7 @@ def bed_to_metaloci(data, coords, resolution):
 
         if chrm not in file_info["chrom"].unique():
 
-            print(
-                f"chromosome {chrm.rsplit('r', 1)[1]} not found in the signal file(s), skipping..."
-            )
+            print(f"chromosome {chrm.rsplit('r', 1)[1]} not found in the signal file(s), skipping...")
             continue
 
         bin_start = 0

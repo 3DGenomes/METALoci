@@ -131,16 +131,6 @@ optional_arg.add_argument(
 )
 
 optional_arg.add_argument(
-    "-n",
-    "--name",
-    dest="dataset_name",
-    default="",
-    metavar="STR",
-    type=str,
-    help="Name of the dataset. By default corresponds to the name of the " "folder where coolers are stored.",
-)
-
-optional_arg.add_argument(
     "-v",
     "--pval",
     dest="signipval",
@@ -161,17 +151,12 @@ signals = args.signals
 resolution = args.reso * 1000
 n_cores = args.num_cores
 n_permutations = args.perms
-dataset_name = args.dataset_name
 signipval = args.signipval
 debug = args.debug
 
 if not work_dir.endswith("/"):
 
     work_dir += "/"
-
-if dataset_name == "":
-
-    dataset_name = "WT_G2_20000"
 
 if debug:
 
@@ -183,7 +168,6 @@ if debug:
         ["reso", resolution],
         ["num_cores", n_cores],
         ["perms", n_permutations],
-        ["dataset_name", dataset_name],
         ["debug", debug],
         ["signipval", signipval],
     ]
@@ -225,7 +209,7 @@ for i, region_iter in df_regions.iterrows():
     try:
 
         with open(
-            f"{work_dir}{dataset_name}/{region.split(':', 1)[0]}/{re.sub(':|-', '_', region)}.mlo",
+            f"{work_dir}{region.split(':', 1)[0]}/{re.sub(':|-', '_', region)}.mlo",
             "rb",
         ) as mlobject_handler:
 

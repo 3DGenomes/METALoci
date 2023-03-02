@@ -1,21 +1,25 @@
-from collections import defaultdict
-
-import geopandas as gpd
-import numpy as np
-import pandas as pd
-from scipy.spatial import Voronoi, distance
-from shapely.geometry import LineString, Point
-from shapely.ops import polygonize
-from metaloci.misc import misc
-import re
 import glob
 import os
-import libpysal as lp
-from esda.moran import Moran_Local
-import time
-from metaloci import mlo
+import re
+import warnings
+from collections import defaultdict
 from pathlib import Path
+
+import geopandas as gpd
+import libpysal as lp
+import numpy as np
+import pandas as pd
+from esda.moran import Moran_Local
 from libpysal.weights.spatial_lag import lag_spatial
+from scipy.spatial import Voronoi
+from shapely.errors import ShapelyDeprecationWarning
+from shapely.geometry import LineString, Point
+from shapely.ops import polygonize
+
+from metaloci import mlo
+from metaloci.misc import misc
+
+warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
 
 
 def construct_voronoi(mlobject: mlo.MetalociObject, buffer: float, LIMITS=2):
@@ -144,7 +148,7 @@ def load_signals(df_regions: pd.DataFrame, work_dir: Path):
 
     chrom_to_do = list(
         dict.fromkeys(
-            re.compile("chr[0-9]*").findall("\n".join([x for y in df_regions["coords"] for x in y.split(":")]))
+            re.compile("chr[0-9]*[A-Z]*").findall("\n".join([x for y in df_regions["coords"] for x in y.split(":")]))
         )
     )
 
@@ -267,7 +271,7 @@ def compute_lmi(
     moran_local_object = Moran_Local(y, weights, permutations=n_permutations)
     lags = lag_spatial(moran_local_object.w, moran_local_object.z)
     print(
-        f"\tThere are a total of {len(moran_local_object.p_sim[(moran_local_object.p_sim < signipval)])} "
+        f"\tThere is a total of {len(moran_local_object.p_sim[(moran_local_object.p_sim < signipval)])} "
         f"significant points in Local Moran's I for signal {signal_type}"
     )
     chrom_number = mlobject.chrom[3:]

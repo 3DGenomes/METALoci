@@ -22,14 +22,14 @@ from metaloci.misc import misc
 warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
 
 
-def construct_voronoi(mlobject: mlo.MetalociObject, buffer: float, LIMITS=2):
+def construct_voronoi(mlobject: mlo.MetalociObject, buffer: float):
     """
     Takes a Kamada-Kawai layout in a METALoci object and calculates the geometry of each voronoi
     around each point of the Kamada-Kawai, in order the make a gaudi plot.
     Parameters
     ----------
     mlobject : mlo.MetalociObject
-        METALoci object with kk_coords in it.
+        METALoci object with Kamada-Kawai layout coordinates in it (MetalociObject.kk_coords).
     buffer : float
         Distance to buffer around the point to be painted in the gaudi plot.
     LIMITS : int, optional
@@ -42,16 +42,18 @@ def construct_voronoi(mlobject: mlo.MetalociObject, buffer: float, LIMITS=2):
         for each bin. Needed for plotting the gaudi plot.
     """
 
+    # The number two is a constant to define borders in the construction of the voronoi. Without those limits,
+    # the voronoi could extend to infinity in the areas than do not adjoin with another point of the KK layout 
+    # (and we do not want that for our gaudi plot).
     points = mlobject.kk_coords.copy()
-
-    points.append(np.array([-LIMITS, LIMITS]))
-    points.append(np.array([LIMITS, LIMITS]))
-    points.append(np.array([LIMITS, -LIMITS]))
-    points.append(np.array([-LIMITS, -LIMITS]))
-    points.append(np.array([0, -LIMITS]))
-    points.append(np.array([LIMITS, 0]))
-    points.append(np.array([0, LIMITS]))
-    points.append(np.array([-LIMITS, 0]))
+    points.append(np.array([-2, 2]))
+    points.append(np.array([2, 2]))
+    points.append(np.array([2, -2]))
+    points.append(np.array([-2, -2]))
+    points.append(np.array([0, -2]))
+    points.append(np.array([2, 0]))
+    points.append(np.array([0, 2]))
+    points.append(np.array([-2, 0]))
 
     # Construct the voronoi polygon around the Kamada-Kawai points.
     vor = Voronoi(points)
@@ -91,19 +93,23 @@ def construct_voronoi(mlobject: mlo.MetalociObject, buffer: float, LIMITS=2):
 
     return df_geometry
 
-
 def coord_to_id(mlobject: mlo.MetalociObject, poly_from_lines: list):
     """
     Correlates the bin index, determined by genomic positions, and the LMI index, which is
-    determined by the LMI function. This is called in construct_voronoi() and saved into columns
-    of a dataframe, mostly for plotting purposes.
+    determined by the LMI function. This is called in::
+    
+    construct_voronoi()
+    
+    and saved into columns of a dataframe, mostly for plotting purposes.
 
     Parameters
     ----------
     mlobject : mlo.MetalociObject
-        METALoci object with kk_coords in it.
+        METALoci object with Kamada-Kawai layout coordinates in it (MetalociObject.kk_coords).
     poly_from_lines : list
-        List of polygon information for gaudi plots. It is calculated in construct_voronoi().
+        List of polygon information for gaudi plots, calculated in::
+        
+        construct_voronoi().
 
     Returns
     -------
@@ -143,7 +149,10 @@ def load_signals(df_regions: pd.DataFrame, work_dir: Path):
     signal_data : dict
         Dictionary with chrN as a key and a signal dataframe as a value.
 
-
+    Notes
+    -----
+    The values of df_regions.symbol and df_regions.id can be dummy values, it only affects the 
+    plot and tables labelling at output.
     """
 
     chrom_to_do = list(
@@ -205,19 +214,12 @@ def load_region_signals(mlobject: mlo.MetalociObject, signal_data: dict, signal_
 
     for signal_type in signal_types:
 
-        signal_values = region_signal[signal_type]
-        signals_dict[signal_type] = misc.signal_normalization(signal_values, 0.01, "01")
+        signals_dict[signal_type] = misc.signal_normalization(region_signal[signal_type])
 
     return signals_dict, signal_types
 
 
-def compute_lmi(
-    mlobject: mlo.MetalociObject,
-    signal_type: str,
-    neighbourhood: float,
-    n_permutations=9999,
-    signipval=0.05,
-):
+def compute_lmi(mlobject: mlo.MetalociObject, signal_type: str, neighbourhood: float, n_permutations=9999, signipval=0.05) -> pd.DataFrame:
     """
     Computes Local Moran's Index for a signal type and outputs information of the LMI value and its p-value
     for each bin for a given signal, as well as some other information.
@@ -225,7 +227,11 @@ def compute_lmi(
     Parameters
     ----------
     mlobject : mlo.MetalociObject
-        METALoci with signals for that region and lmi_geometry calculated with lmi.construct_voronoi()
+        METALoci with signals for that region (MetalociObject.signals_dict) and MetalociObject.lmi_geometry
+        calculated with::
+        
+        lmi.construct_voronoi()
+
     signal_type : str
         Name of the type of the signal to use for the computation.
     neighbourhood : float
@@ -239,7 +245,7 @@ def compute_lmi(
     -------
     pd.DataFrame
         Dataframe with ID, bin index, chromosome, start, end, value of signal, moran index, moran quadrant,
-    LMI score, LMI p-value and LMI inverse of p-value for this signal.
+        LMI score, LMI p-value and LMI inverse of p-value for this signal.
     """
 
     signal = []

@@ -63,6 +63,7 @@ input_arg.add_argument(
     required=True,
     help="path to working directory.",
 )
+
 input_arg.add_argument(
     "-c",
     "--cooler",
@@ -72,6 +73,7 @@ input_arg.add_argument(
     required=True,
     help="complete path to the cooler file.",
 )
+
 input_arg.add_argument(
     "-r",
     "--resolution",
@@ -81,6 +83,7 @@ input_arg.add_argument(
     required=True,
     help="resolution of the cooler files.",
 )
+
 region_arg = parser.add_argument_group(title="region arguments", description="Choose one of the following options.")
 region_arg.add_argument(
     "-g",
@@ -90,6 +93,7 @@ region_arg.add_argument(
     type=str,
     help="region to be computed in chr:start-end format.",
 )
+
 region_arg.add_argument(
     "-G",
     "--region-file",
@@ -112,12 +116,21 @@ optional_arg.add_argument(
 )
 
 optional_arg.add_argument("-f", "--force", dest="force", action="store_true", help="force rewriting existing data.")
+
 optional_arg.add_argument(
     "-p",
     "--plot",
     dest="save_plots",
     action="store_true",
     help="plot the matrix, density and Kamada-Kawai plots, even when a " "single cutoff is selected.",
+)
+
+optional_arg.add_argument(
+    "-l",
+    "--pl",
+    dest="persistence_length",
+    action="store",
+    help="set a persistence length for the Kamada-Kawai layout.",
 )
 # TODO add sort of silent argument?
 
@@ -132,11 +145,13 @@ resolution = args.reso * 1000
 cutoffs = args.cutoff
 force = args.force
 save_plots = args.save_plots
+persistence_length = args.persistence_length
 debug = args.debug
 
 if not work_dir.endswith("/"):
 
     work_dir += "/"
+
 
 # if dataset_name == "":
 
@@ -187,12 +202,7 @@ pathlib.Path(os.path.join(work_dir)).mkdir(parents=True, exist_ok=True)
 
 bad_regions = {"region": [], "reason": []}
 
-# Input file with all regions to KK
-# regions = pd.read_csv(region_file, sep="\t")
-
 for i, row in df_regions.iterrows():
-
-    # chr1:36031800-40052000	POU3F1	ENSG00000185668.8
 
     region_chrom, region_start, region_end, poi = re.split(":|-|_", row.coords)
 
@@ -203,6 +213,7 @@ for i, row in df_regions.iterrows():
         int(region_end),
         resolution,
         int(poi),
+        persistence_length
     )
 
     filename = f"{mlobject.chrom}_{mlobject.start}_{mlobject.end}_{mlobject.poi}"
@@ -262,15 +273,11 @@ for i, row in df_regions.iterrows():
         print(f"\tCutoff to be used is: {int(mlobject.kk_cutoff * 100)} %")
 
         # Get submatrix of restraints
-        restraints_matrix, mlobject = kk.get_restraints_matrix(
-            mlobject,
-            None,
-            plot_bool=True,
-        )
+        restraints_matrix, mlobject = kk.get_restraints_matrix(mlobject)
 
         if save_plots:
 
-            mlobject, mixed_matrices_plot = plot.mixed_matrices_plot(mlobject)
+            mixed_matrices_plot = plot.mixed_matrices_plot(mlobject)
 
             pathlib.Path(os.path.join(work_dir, region_chrom), "plots", "mixed_matrices").mkdir(
                 parents=True, exist_ok=True
@@ -290,7 +297,6 @@ for i, row in df_regions.iterrows():
         print("\tLayouting Kamada-Kawai...")
         mlobject.kk_graph = nx.from_scipy_sparse_array(csr_matrix(restraints_matrix))
         mlobject.kk_nodes = nx.kamada_kawai_layout(mlobject.kk_graph)
-
         mlobject.kk_coords = list(mlobject.kk_nodes.values())
         mlobject.kk_distances = distance.cdist(mlobject.kk_coords, mlobject.kk_coords, "euclidean")
 
@@ -339,5 +345,5 @@ if bad_regions.shape[0] > 0:
         ]
 
 
-print(f"Total time spent: {timedelta(seconds=round(time() - start_timer))}.")
+print(f"\nTotal time spent: {timedelta(seconds=round(time() - start_timer))}.")
 print("\nall done.")

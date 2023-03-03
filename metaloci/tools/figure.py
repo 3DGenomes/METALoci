@@ -156,8 +156,6 @@ optional_arg.add_argument("-u", "--debug", dest="debug", action="store_true", he
 args = parser.parse_args(None if sys.argv[1:] else ["-h"])
 
 work_dir = args.work_dir
-
-
 regions = args.region_file
 signals = args.signals
 resolution = args.reso
@@ -197,7 +195,6 @@ legend_elements = [
     Line2D([0], [0], marker="o", color="w", markerfacecolor=colors[4], label="HL", markersize=20),
 ]
 
-
 start_timer = time()
 
 if re.compile("chr").search(regions):
@@ -214,8 +211,6 @@ if os.path.isfile(signals[0]) and os.access(signals[0], os.R_OK):
     with open(signals[0], "r", encoding="utf-8") as f:
 
         signals = [line.strip() for line in f]
-
-# regions_info = pd.read_table(rfile)
 
 plot_opt = {"bbox_inches": "tight", "dpi": 300, "transparent": True}
 data_moran = {"Coords": [], "Symbol": [], "Gene_id": [], "Signal": [], "R_value": [], "P_value": []}
@@ -295,21 +290,19 @@ for i, region_iter in df_regions.iterrows():
 
         merged_lmi_geometry = gpd.GeoDataFrame(merged_lmi_geometry, geometry=merged_lmi_geometry.geometry)
 
-        poi_factor = mlobject.poi / merged_lmi_geometry["bin_index"].shape[0]
-
         print("\t\tHiC plot", end="\r")
-        hic_plt = plot.get_hic_plot(mlobject, poi_factor)
+        hic_plt = plot.get_hic_plot(mlobject)
         hic_plt.savefig(f"{plot_filename}_hic.pdf", **plot_opt)
         hic_plt.savefig(f"{plot_filename}_hic.png", **plot_opt)
         hic_plt.close()
         print("\t\tHiC plot -> done.")
 
         print("\t\tKamada-Kawai plot", end="\r")
-        kk_plt = plot.get_kk_plot2(mlobject)
+        kk_plt = plot.get_kk_plot(mlobject)
         kk_plt.savefig(f"{plot_filename}_kk.pdf", **plot_opt)
         kk_plt.savefig(f"{plot_filename}_kk.png", **plot_opt)
         kk_plt.close()
-        print("\t\tKamada-Kawai plot -> done.")
+        print("\t\tKamada-Kawai plot -> done.")#
 
         print("\t\tGaudi Signal plot", end="\r")
         gs_plt = plot.get_gaudi_signal_plot(mlobject, merged_lmi_geometry)
@@ -352,25 +345,25 @@ for i, region_iter in df_regions.iterrows():
 
         maxx = int((img1.size[1] * 0.4 + img2.size[1] * 0.25 + img3.size[1] * 0.25) * 1.3)
 
-        compositeImage = Image.new(mode="RGBA", size=(maxx, 1550))
+        composite_image = Image.new(mode="RGBA", size=(maxx, 1550))
 
         # HiC image
-        compositeImage = plot.place_composite(compositeImage, f"{plot_filename}_hic.png", 0.5, 100, 50)
+        composite_image = plot.place_composite(composite_image, f"{plot_filename}_hic.png", 0.5, 100, 50)
         # Singal image
-        compositeImage = plot.place_composite(compositeImage, f"{plot_filename}_signal.png", 0.4, 42, 660)
+        composite_image = plot.place_composite(composite_image, f"{plot_filename}_signal.png", 0.4, 42, 660)
         # KK image
-        compositeImage = plot.place_composite(compositeImage, f"{plot_filename}_kk.png", 0.3, 1300, 50)
+        composite_image = plot.place_composite(composite_image, f"{plot_filename}_kk.png", 0.3, 1300, 50)
         # MLI scatter image
-        compositeImage = plot.place_composite(compositeImage, f"{plot_filename}_lmi.png", 0.4, 75, 900)
+        composite_image = plot.place_composite(composite_image, f"{plot_filename}_lmi.png", 0.4, 75, 900)
         # Gaudi signal image
-        compositeImage = plot.place_composite(compositeImage, f"{plot_filename}_gsp.png", 0.25, 900, 900)
+        composite_image = plot.place_composite(composite_image, f"{plot_filename}_gsp.png", 0.25, 900, 900)
         # Gaudi signi image
-        compositeImage = plot.place_composite(compositeImage, f"{plot_filename}_gtp.png", 0.25, 1600, 900)
+        composite_image = plot.place_composite(composite_image, f"{plot_filename}_gtp.png", 0.25, 1600, 900)
 
-        compositeImage.save(f"{plot_filename}.png")
+        composite_image.save(f"{plot_filename}.png")
 
         fig = plt.figure(figsize=(15, 15))
-        plt.imshow(compositeImage)
+        plt.imshow(composite_image)
         plt.axis("off")
         plt.savefig(f"{plot_filename}.pdf", **plot_opt)
         plt.close()
@@ -393,8 +386,6 @@ for i, region_iter in df_regions.iterrows():
                 os.remove(f"{plot_filename}_lmi.{ext}")
                 os.remove(f"{plot_filename}_gsp.{ext}")
                 os.remove(f"{plot_filename}_gtp.{ext}")
-
-        print("")
 
 data_moran = pd.DataFrame(data_moran)
 data_moran.to_csv(f"{os.path.join(work_dir, mlobject.chrom, 'moran_info.txt')}", sep="\t", index=False, mode="a")

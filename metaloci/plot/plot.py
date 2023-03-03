@@ -19,38 +19,22 @@ from shapely.geometry.multipolygon import MultiPolygon
 from metaloci import mlo
 
 
-def get_kk_plot(mlobject):
+def get_kk_plot(mlobject: mlo.MetalociObject, restraints: bool=True):
+    """
+    Generate Kamada-Kawai plot from pre-calculated restraints
 
-    plt.figure(figsize=(10, 10))
-    options = {"node_size": 50, "edge_color": "black", "linewidths": 0.1, "width": 0.05}
+    Parameters
+    ----------
+    mlobject : mlo.MetalociObject
+        METALoci object with Kamada-Kawai graphs and nodes (MetalociObject.kk_nodes and MetalociObject.kk_graph)
+    restraints : bool, optional
+        Boolean to set whether or not plot restraints, by default True
 
-    nx.draw(
-        mlobject.kk_graph,
-        mlobject.kk_nodes,
-        node_color=range(len(mlobject.kk_nodes)),
-        cmap=plt.cm.coolwarm,
-        **options,
-    )
-
-    if mlobject.poi is not None:
-
-        plt.scatter(
-            mlobject.kk_nodes[mlobject.poi - 1][0],
-            mlobject.kk_nodes[mlobject.poi - 1][1],
-            s=80,
-            facecolors="none",
-            edgecolors="r",
-        )
-
-    xs = [mlobject.kk_nodes[n][0] for n in mlobject.kk_nodes]
-    ys = [mlobject.kk_nodes[n][1] for n in mlobject.kk_nodes]
-
-    sns.lineplot(x=xs, y=ys, sort=False, lw=2, color="black", legend=False, zorder=1)
-
-    return plt
-
-
-def get_kk_plot2(mlobject):
+    Returns
+    -------
+    matplotlib.pyplot.figure.Figure
+        Kamada-Kawai layout plot object.
+    """
 
     PLOTSIZE = 10
     POINTSIZE = PLOTSIZE * 5
@@ -60,16 +44,30 @@ def get_kk_plot2(mlobject):
 
     plt.figure(figsize=(PLOTSIZE, PLOTSIZE))
     plt.axis("off")
+    options = {"node_size": 50, "edge_color": "black", "linewidths": 0.1, "width": 0.05}
 
-    g = sns.lineplot(x=xs, y=ys, sort=False, lw=1, color="grey", legend=False, zorder=1)
+    if restraints == True:
+
+        nx.draw(
+            mlobject.kk_graph,
+            mlobject.kk_nodes,
+            node_color=range(len(mlobject.kk_nodes)),
+            cmap=plt.cm.coolwarm,
+            **options,
+        )
+    
+    else:        
+
+        sns.scatterplot(x=xs, y=ys, hue=range(len(xs)), palette="coolwarm", legend=False, s=POINTSIZE, zorder=2)
+
+    g = sns.lineplot(x=xs, y=ys, sort=False, lw=2, color="black", legend=False, zorder=1)
     g.set_aspect("equal", adjustable="box")
     g.set(ylim=(-1.1, 1.1))
     g.set(xlim=(-1.1, 1.1))
     g.tick_params(bottom=False, left=False)
-    g.annotate(f"    {mlobject.chrom}:{mlobject.start}", (xs[0], ys[0]), size=8)
-    g.annotate(f"    {mlobject.chrom}:{mlobject.start}", (xs[len(xs) - 1], ys[len(ys) - 8]), size=8)
+    g.annotate(f"      {mlobject.chrom}:{mlobject.start}", (xs[0], ys[0]), size=8)
+    g.annotate(f"      {mlobject.chrom}:{mlobject.end}", (xs[len(xs) - 1], ys[len(ys) - 1]), size=8)
 
-    sns.scatterplot(x=xs, y=ys, hue=range(len(xs)), palette="coolwarm", legend=False, s=POINTSIZE, zorder=2)
     sns.scatterplot(
         x=[xs[mlobject.poi - 1]], y=[ys[mlobject.poi - 1]], s=POINTSIZE * 1.5, ec="lime", fc="none", zorder=3
     )
@@ -77,7 +75,23 @@ def get_kk_plot2(mlobject):
     return plt
 
 
-def mixed_matrices_plot(mlobject):
+def mixed_matrices_plot(mlobject: mlo.MetalociObject):
+    """
+    Get a plot of a subset of the Hi-C matrix with the top contact interactions in the matrix (defined by a cutoff) in
+    the lower diagonal and the original Hi-C matrix in the upper diagonal.
+
+    Parameters
+    ----------
+    mlobject : mlo.MetalociObject
+        METALoci object with the flat original matrix (MetalociObject.flat_matrix), the MetalociObject.kk_top_indexes,
+        and MetalociObject.kk_cutoff in it.
+
+    Returns
+    -------
+    fig_matrix : matplotlib.pyplot.figure.Figure
+        matplotlib object containing the mixed matrices figure.
+    
+    """
 
     if mlobject.flat_matrix is None:
 
@@ -109,20 +123,27 @@ def mixed_matrices_plot(mlobject):
     fig_matrix.tight_layout()
     fig_matrix.suptitle(f"Matrix for {mlobject.region} (cutoff: {mlobject.kk_cutoff})")
 
-    return mlobject, fig_matrix
+    return fig_matrix
 
 
-def get_hic_plot(mlobject: mlo.MetalociObject, poi_factor: int):
+def get_hic_plot(mlobject: mlo.MetalociObject):
     """
-    Create a plot of the HiC matrix for the region. It presents the HiC triangle along the diagonal
-    as a horizontal line
-    :param arr: HiC matrix
-    :param gene: gene name
-    :param region_hic: gene region
-    :param midp_factor_hic: factor calculated to correctly position the TSS of the gene
-    :return: plot object
+    Create a plot of the HiC matrix for the region. Only the upper triangle of the array is represented, rotated
+    45ª counter-clock wise.
+
+    Parameters
+    ----------
+    mlobject : mlo.MetalociObject
+        METALoci object with a matrix (MetalociObject.matrix) in it.
+
+    Returns
+    -------
+    matplotlib.pyplot.figure.Figure
+        matplotlib object containing the Hi-C matrix figure.
     """
 
+    poi_factor = mlobject.poi / mlobject.lmi_geometry["bin_index"].shape[0]
+    
     array = mlobject.matrix
     matrix_min_value = np.nanmin(array)
     matrix_max_value = np.nanmax(array)
@@ -213,9 +234,7 @@ def get_gaudi_type_plot(
     :param legend_info:
     :return:
     """
-    # Gaudi plot LMI type
-
-    poi_gaudi = lmi_geometry.loc[lmi_geometry["moran_index"] == mlobject.poi - 1, "bin_index"].iloc[0]
+    poi = lmi_geometry.loc[lmi_geometry["moran_index"] == mlobject.poi - 1, "bin_index"].iloc[0]
 
     legend_elements = [
         Line2D([0], [0], marker="o", color="w", markerfacecolor=colors[1], label="HH", markersize=20),
@@ -232,8 +251,8 @@ def get_gaudi_type_plot(
     plt.axis("off")
 
     sns.scatterplot(
-        x=[lmi_geometry.X[poi_gaudi]],
-        y=[lmi_geometry.Y[poi_gaudi]],
+        x=[lmi_geometry.X[poi]],
+        y=[lmi_geometry.Y[poi]],
         s=50,
         ec="none",
         fc="lime",
@@ -295,16 +314,7 @@ def get_lmi_scatterplot(
 
 
 def signal_bed(mlobject, lmi_geometry, quartiles, signipval, midds, bbfact):
-    """
-    Check for the METALoci bins and creation of a BED-type data-frame
-    :param mlgdata:
-    :param quartiles:
-    :param minpv_bed:
-    :param midp_bed:
-    :param midds_bed:
-    :param bbfact_bed:
-    :return:
-    """
+
     selsebins = lmi_geometry[
         (lmi_geometry.moran_quadrant.isin(quartiles)) & (lmi_geometry.LMI_pvalue <= signipval)
     ].bin_index.values.tolist()
@@ -356,18 +366,6 @@ def signal_bed(mlobject, lmi_geometry, quartiles, signipval, midds, bbfact):
 
 
 def signal_plot(mlobject, lmi_geometry, selmetaloci_sig, bins_sig, coords_sig):
-    """
-    Lineplot of the signal
-    :param mlgdata:
-    :param selmetaloci_sig:
-    :param midp_sig:
-    :param bins_sig:
-    :param coords_sig:
-    :param chrm_sig:
-    :return:
-    """
-    # Signal plot
-    # print('Signal profile for the region of interest: {}'.format(region))
 
     plt.figure(figsize=(10, 1.5))
     plt.tick_params(axis="both", which="minor", labelsize=24)
@@ -394,15 +392,6 @@ def signal_plot(mlobject, lmi_geometry, selmetaloci_sig, bins_sig, coords_sig):
 
 
 def place_composite(new_PI, ifile, ifactor, ixloc, iyloc):
-    """
-    Image stitcher
-    :param new_PI:
-    :param ifile:
-    :param ifactor:
-    :param ixloc:
-    :param iyloc:
-    :return:
-    """
     img = Image.open(ifile)
     niz = tuple([int(nu * ifactor) for nu in img.size])
     img = img.resize(niz, Image.Resampling.LANCZOS)

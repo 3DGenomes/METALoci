@@ -175,11 +175,8 @@ if debug:
     print(table)
     sys.exit()
 
-# warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
-
 INFLUENCE = 1.5
 BFACT = 2
-LIMITS = 2  # Create a "box" around the points of the Kamada-Kawai layout.
 
 timer = time()
 
@@ -217,7 +214,7 @@ for i, region_iter in df_regions.iterrows():
 
     except FileNotFoundError:
 
-        print(".mlo file not found for this region. Check dataset name and resolution. \nSkipping to next region.")
+        print("\t.mlo file not found for this region.\nSkipping to next region.")
 
         continue
 
@@ -232,7 +229,7 @@ for i, region_iter in df_regions.iterrows():
     # which should be ~2 particles of radius.
     mean_distance = mlobject.kk_distances.diagonal(1).mean()
     buffer = mean_distance * INFLUENCE
-    mlobject.lmi_geometry = lmi.construct_voronoi(mlobject, buffer, LIMITS)
+    mlobject.lmi_geometry = lmi.construct_voronoi(mlobject, buffer)
 
     print(f"\tAverage distance between consecutive particles: {mean_distance:6.4f} [{buffer:6.4f}]")
     print(f"\tGeometry information for region {mlobject.region} saved in: {mlobject.save_path}")

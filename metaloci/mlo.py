@@ -2,7 +2,7 @@ import dill as pickle
 
 
 class MetalociObject:
-    def __init__(self, region, chrom, start, end, resolution, poi):
+    def __init__(self, region, chrom, start, end, resolution, poi, persistence_length):
 
         self.region = region
         self.chrom = chrom
@@ -10,9 +10,9 @@ class MetalociObject:
         self.end = end
         self.resolution = resolution
         self.poi = poi
+        self.persistence_length = persistence_length
         self.matrix = None
         self.mixed_matrices = None
-        self.persistance_length = None
         self.signals_dict = None
         self.flat_matrix = None
         self.kk_top_indexes = None

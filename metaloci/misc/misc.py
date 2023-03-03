@@ -1,20 +1,21 @@
-__author__ = "Iago Maceda Porto and Leo Zuber Ponce"
-
 import numpy as np
 import pandas as pd
 from tqdm.auto import tqdm
 import re
 from collections import defaultdict
 import sys
+from metaloci import mlo
+from pathlib import Path
 
 
-def remove_folder(path):
-
+def remove_folder(path: Path):
     """
     Removes a folder that is not empty.
 
-    :param path: Folder to remove
-    :type path: Path
+    Parameters
+    ----------
+    path : Path
+        Path to the folder to be removed.
     """
 
     for subdirectory in path.iterdir():
@@ -30,17 +31,27 @@ def remove_folder(path):
     path.rmdir()
 
 
-def check_diagonal(diag_mat):
-
+def check_diagonal(diagonal: np.ndarray) -> tuple[int, float, float, list]:
     """
-    This function checks the 0s on the diagonal.
+    Checks the 0s on the diagonal and saves the total number os zeroes,
+    the the max stretch (number of zeros in a row) as a percentage,
+    the percentage of zeroes, and the location of zeroes.
 
-    :param diag_mat: The diagonal of the HiC matrix
-    :type diag_mat: ndarray
-    :return: total = total number of zeroes, max_stretch = max stretch of zeroes,
-    percentage_zeroes = percentage of zeroes, zero_loc = localization of 0 in the
-    diagonal.
-    :rtype: _type_
+    Parameters
+    ----------
+    diagonal : np.ndarray
+        Diagonal of the HiC matrix.
+
+    Returns
+    -------
+    int
+        Total number of zeroes.
+    float
+        Percentage of max stretch.
+    float
+        Percentage of zeroes.
+    list
+        Location of zeroes in the diagonal.
     """
 
     total = 0
@@ -48,7 +59,7 @@ def check_diagonal(diag_mat):
     max_stretch = 0
     zero_loc = []
 
-    for i, element in enumerate(diag_mat):
+    for i, element in enumerate(diagonal):
 
         if element == 0:
 
@@ -62,13 +73,13 @@ def check_diagonal(diag_mat):
 
             stretch = 0
 
-    percentage_zeroes = np.round(total / len(diag_mat) * 100, decimals=2)
-    percentage_stretch = np.round(max_stretch / len(diag_mat) * 100, decimals=2)
+    percentage_zeroes = np.round(total / len(diagonal) * 100, decimals=2)
+    percentage_stretch = np.round(max_stretch / len(diagonal) * 100, decimals=2)
 
     return total, percentage_stretch, percentage_zeroes, zero_loc
 
 
-def clean_matrix(mlo, bad_regions):
+def clean_matrix(mlobject: mlo.MetalociObject, bad_regions: pd.DataFrame) -> np.ndarray:
     """
     Clean a given HiC matrix. It checks if the matrix has too many zeroes at
     he diagonal, removes values that are zero at the diagonal but are not in
@@ -76,116 +87,122 @@ def clean_matrix(mlo, bad_regions):
     value, scales all values depending on the min value and computes the log10
     off all values.
 
-    :param mlo: METALoci object with a matrix in it.
-    :type mlo: np.array
-    :param bad_regions: Dictionay {"region": [], "reason": []} in which to append bad regions.
-    :type bad_regions: dict
-    :return: Clean matrix.
-    :rtype: np.array
+    Parameters
+    ----------
+    mlo : np.ndarray
+        METALoci object with a matrix in it.
+    bad_regions : dict
+        Dictionay {"region": [], "reason": []} in which to append bad regions.
+
+    Returns
+    -------
+    np.ndarray
+        Clean matrix.
     """
 
-    diagonal = np.array(mlo.matrix.diagonal())
+    diagonal = np.array(mlobject.matrix.diagonal())
     total_zeroes, max_stretch, percentage_zeroes, zero_loc = check_diagonal(diagonal)
 
     if total_zeroes == len(diagonal):
 
         print("\tMatrix is empty; passing to the next region")
-        bad_regions["region"].append(mlo.region)
+        bad_regions["region"].append(mlobject.region)
         bad_regions["reason"].append("empty")
 
         return None
 
     if percentage_zeroes >= 50:
 
-        bad_regions["region"].append(mlo.region)
+        bad_regions["region"].append(mlobject.region)
         bad_regions["reason"].append("percentage_of_zeroes")
 
     if max_stretch >= 20:
 
-        bad_regions["region"].append(mlo.region)
+        bad_regions["region"].append(mlobject.region)
         bad_regions["reason"].append("stretch")
 
-    mlo.matrix[zero_loc] = 0
-    mlo.matrix[:, zero_loc] = 0
+    mlobject.matrix[zero_loc] = 0
+    mlobject.matrix[:, zero_loc] = 0
 
     # Pseudocounts if min is zero
-    if np.nanmin(mlo.matrix) == 0:
+    if np.nanmin(mlobject.matrix) == 0:
 
-        pc = np.nanmin(mlo.matrix[mlo.matrix > 0])
+        pc = np.nanmin(mlobject.matrix[mlobject.matrix > 0])
         # print(f"\t\tPseudocounts: {pc}")
-        mlo.matrix = mlo.matrix + pc
+        mlobject.matrix = mlobject.matrix + pc
 
     # Scale if all below 1
-    if np.nanmax(mlo.matrix) <= 1 or np.nanmin(mlo.matrix) <= 1:
+    if np.nanmax(mlobject.matrix) <= 1 or np.nanmin(mlobject.matrix) <= 1:
 
-        sf = 1 / np.nanmin(mlo.matrix)
+        sf = 1 / np.nanmin(mlobject.matrix)
         # print(f"\t\tScaling factor: {sf}")
-        mlo.matrix = mlo.matrix * sf
+        mlobject.matrix = mlobject.matrix * sf
 
-    if np.nanmin(mlo.matrix) < 1:
+    if np.nanmin(mlobject.matrix) < 1:
 
-        mlo.matrix[mlo.matrix < 1] = 1
+        mlobject.matrix[mlobject.matrix < 1] = 1
 
-    mlo.matrix = np.log10(mlo.matrix)
+    mlobject.matrix = np.log10(mlobject.matrix)
 
-    return mlo.matrix
+    return mlobject.matrix
 
 
-def signal_normalization(sig_ind, pc, norm="01"):
+def signal_normalization(region_signal: pd.DataFrame, pseudocounts: float = 0.01, norm="01") -> np.ndarray:
     """
-    Get the signal profile given a region
-    :param sig_ind: Signal for a given individual
-    :param pc: Pseudocounts
-    :param norm: Normalization methods
-    :return: Numpy array of the parsed signal
+    Normalize signal values
+
+    Parameters
+    ----------
+    ind_signal : pd.DataFrame
+        Subset of the signal for a given region and for a signal type.
+    pseudocounts : float, optional
+        Pseudocounts to and if the signal is 0, by default 0.01
+    norm : str, optional
+        Type of normalization to use.
+        Values can be "max" (divide each value by the max value in the signal),
+        "sum" (divide each value by the sum of all values),
+        or "01" ( value - min(signal) / max(signal) - min(signal) ), by default "01"
+
+    Returns
+    -------
+    np.ndarray
+        Array of normalized signal values for a region and a signal type.
     """
     signal = []
 
-    for index in sig_ind:
+    for index in region_signal:
 
         if np.isnan(index):
 
-            asum = pc
+            asum = pseudocounts
 
         else:
 
             asum = index
 
-        asum = max(asum, pc)
+        asum = max(asum, pseudocounts)
         signal.append(asum)
 
     if isinstance(norm, (int, float)):
 
-        signal = [float(num) / int(norm) for num in signal]
+        signal = [float(value) / int(norm) for value in signal]
 
     elif norm == "max":
 
-        signal = [float(num) / max(signal) for num in signal]
+        signal = [float(value) / max(signal) for value in signal]
 
     elif norm == "sum":
 
-        signal = [float(num) / sum(signal) for num in signal]
+        signal = [float(value) / sum(signal) for value in signal]
 
     elif norm == "01":
 
-        signal = [(float(num) - min(signal)) / (max(signal) - min(signal) + 0.01) for num in signal]
+        signal = [(float(value) - min(signal)) / (max(signal) - min(signal) + 0.01) for value in signal]
 
     return np.array(signal)
 
 
 def bed_to_metaloci(data, coords, resolution):
-    """
-    _summary_
-
-    :param data: _description_
-    :type data: _type_
-    :param coords: _description_
-    :type coords: _type_
-    :param resolution: _description_
-    :type resolution: _type_
-    :return: _description_
-    :rtype: _type_
-    """
 
     boundaries_dictionary = defaultdict(dict)
 

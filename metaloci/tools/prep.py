@@ -16,9 +16,7 @@ Signal names must be in the format CLASS.ID_IND.ID.\n"
 \tClass.ID can be the name of the signal mark.\n"
 \tInd.ID can be the name of the patient/cell line/experiment.\n"""
 
-parser = ArgumentParser(
-    formatter_class=RawDescriptionHelpFormatter, description=description, add_help=False
-)
+parser = ArgumentParser(formatter_class=RawDescriptionHelpFormatter, description=description, add_help=False)
 
 input_arg = parser.add_argument_group(title="Input arguments")
 
@@ -47,9 +45,7 @@ input_arg.add_argument(
     "described below. "
     "(More than one file can be specified, space separated)",
 )
-input_arg.add_argument(
-    "-o", "--name", dest="output", required=True, metavar="STR", type=str, help="Output file name."
-)
+input_arg.add_argument("-o", "--name", dest="output", required=True, metavar="STR", type=str, help="Output file name.")
 input_arg.add_argument(
     "-r",
     "--resolution",
@@ -149,19 +145,15 @@ for f in data:
 
     # Intersect the sorted files and the binnarized file.
     sp.call(
-        f"bedtools intersect -a /{tmp_dir}/{resolution}bp_bin.bed -b {tmp_dir}/sorted_{f.rsplit('/', 1)[1]} -wo -sorted > {tmp_dir}/intersected_{f.rsplit('/', 1)[1]}",
+        f"bedtools intersect -a {tmp_dir}/{resolution}bp_bin.bed -b {tmp_dir}/sorted_{f.rsplit('/', 1)[1]} -wo -sorted > {tmp_dir}/intersected_{f.rsplit('/', 1)[1]}",
         shell=True,
     )
 
 # Create a list of paths to the intersected files.
 intersected_files_paths = [(f"{tmp_dir}/intersected_" + i.rsplit("/", 1)[1]) for i in data]
 
-final_intersect = pd.read_csv(
-    intersected_files_paths[0], sep="\t", header=None
-)  # Read the first intersected file,
-final_intersect = final_intersect.drop(
-    [3, 4, 5, len(final_intersect.columns) - 1], axis=1
-)  # Drop unnecesary columns,
+final_intersect = pd.read_csv(intersected_files_paths[0], sep="\t", header=None)  # Read the first intersected file,
+final_intersect = final_intersect.drop([3, 4, 5, len(final_intersect.columns) - 1], axis=1)  # Drop unnecesary columns,
 
 if header == True:
 
@@ -179,9 +171,7 @@ else:
     ]
 
 final_intersect = (  # Calculate the median of all signals of the same bin.
-    final_intersect.groupby(["chrom", "start", "end"])[
-        final_intersect.columns[3 : len(final_intersect.columns)]
-    ]
+    final_intersect.groupby(["chrom", "start", "end"])[final_intersect.columns[3 : len(final_intersect.columns)]]
     .median()
     .reset_index()
 )
@@ -210,19 +200,15 @@ if len(intersected_files_paths) > 1:
             ]
 
         tmp_intersect = (
-            tmp_intersect.groupby(["chrom", "start", "end"])[
-                tmp_intersect.columns[3 : len(tmp_intersect.columns)]
-            ]
+            tmp_intersect.groupby(["chrom", "start", "end"])[tmp_intersect.columns[3 : len(tmp_intersect.columns)]]
             .median()
             .reset_index()
         )
 
-        final_intersect = pd.merge(
-            final_intersect, tmp_intersect, on=["chrom", "start", "end"], how="inner"
-        )
+        final_intersect = pd.merge(final_intersect, tmp_intersect, on=["chrom", "start", "end"], how="inner")
 
 # For each chromosome, create a directory and save the information for that chromosome in .csv and
-# .parquet.
+# .pkl.
 for chrom in sorted(final_intersect["chrom"].unique()):
 
     pathlib.Path(f"{work_dir}signal/{chrom}").mkdir(parents=True, exist_ok=True)

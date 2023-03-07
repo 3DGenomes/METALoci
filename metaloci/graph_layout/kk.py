@@ -99,13 +99,14 @@ def get_subset_matrix(mlobject: mlo.MetalociObject) -> np.ndarray:
     subset_matrix[subset_matrix < np.nanmin(mlobject.flat_matrix[mlobject.kk_top_indexes])] = 0
 
     # rng = range of integers until size of matrix to locate the diagonal
-    rng = np.arange(len(subset_matrix) - 1)  # r
+    rng = np.arange(len(subset_matrix) - 1)
 
     if mlobject.persistence_length is None:
 
         mlobject.persistence_length = np.nanquantile(subset_matrix[subset_matrix > 0], 0.99) ** 2
 
     subset_matrix[rng, rng + 1] = mlobject.persistence_length
-    subset_matrix[rng, rng] = 0  # Remove diagonal
+    subset_matrix[0, 0] = 0
+    subset_matrix[rng + 1, rng + 1] = 0  # Remove diagonal
 
     return subset_matrix

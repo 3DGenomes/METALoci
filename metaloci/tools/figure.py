@@ -129,7 +129,7 @@ optional_arg.add_argument(
     "-q",
     "--quarts",
     dest="quart",
-    default=[1, 2],
+    default=[1, 3],
     metavar="INT",
     nargs="*",
     help="Space-separated list with the LMI quadrants to highlight "
@@ -237,7 +237,6 @@ for i, region_iter in df_regions.iterrows():
         continue
 
     buffer = mlobject.kk_distances.diagonal(1).mean() * INFLUENCE
-    midds = mlobject.kk_distances[mlobject.poi]
     bbfact = buffer * BFACT
 
     bins = []
@@ -290,32 +289,34 @@ for i, region_iter in df_regions.iterrows():
 
         merged_lmi_geometry = gpd.GeoDataFrame(merged_lmi_geometry, geometry=merged_lmi_geometry.geometry)
 
+        # The creation of the merged dataframe should be a function in misc. Put there the coditions of aggregation.
+
         print("\t\tHiC plot", end="\r")
         hic_plt = plot.get_hic_plot(mlobject)
         hic_plt.savefig(f"{plot_filename}_hic.pdf", **plot_opt)
         hic_plt.savefig(f"{plot_filename}_hic.png", **plot_opt)
-        hic_plt.close()
+        plt.close()
         print("\t\tHiC plot -> done.")
 
         print("\t\tKamada-Kawai plot", end="\r")
         kk_plt = plot.get_kk_plot(mlobject)
         kk_plt.savefig(f"{plot_filename}_kk.pdf", **plot_opt)
         kk_plt.savefig(f"{plot_filename}_kk.png", **plot_opt)
-        kk_plt.close()
-        print("\t\tKamada-Kawai plot -> done.")#
+        plt.close()
+        print("\t\tKamada-Kawai plot -> done.")  #
 
         print("\t\tGaudi Signal plot", end="\r")
         gs_plt = plot.get_gaudi_signal_plot(mlobject, merged_lmi_geometry)
         gs_plt.savefig(f"{plot_filename}_gsp.pdf", **plot_opt)
         gs_plt.savefig(f"{plot_filename}_gsp.png", **plot_opt)
-        gs_plt.close()
+        plt.close()
         print("\t\tGaudi Signal plot -> done.")
 
         print("\t\tGaudi Type plot", end="\r")
         gt_plt = plot.get_gaudi_type_plot(mlobject, merged_lmi_geometry, signipval, colors)
         gt_plt.savefig(f"{plot_filename}_gtp.pdf", **plot_opt)
         gt_plt.savefig(f"{plot_filename}_gtp.png", **plot_opt)
-        gt_plt.close()
+        plt.close()
         print("\t\tGaudi Type plot -> done.")
 
         print("\t\tLMI Scatter plot", end="\r")
@@ -324,18 +325,22 @@ for i, region_iter in df_regions.iterrows():
         )
         lmi_plt.savefig(f"{plot_filename}_lmi.pdf", **plot_opt)
         lmi_plt.savefig(f"{plot_filename}_lmi.png", **plot_opt)
-        lmi_plt.close()
+        plt.close()
         print("\t\tLMI Scatter plot -> done.")
 
         print("\t\tSignal plot", end="\r")
         bed_data, selmetaloci = plot.signal_bed(
-            mlobject, merged_lmi_geometry, quadrants, signipval, midds, buffer * BFACT
+            mlobject,
+            merged_lmi_geometry,
+            buffer * BFACT,
+            quadrants,
+            signipval,
         )
 
         sig_plt = plot.signal_plot(mlobject, merged_lmi_geometry, selmetaloci, bins, coords_b)
         sig_plt.savefig(f"{plot_filename}_signal.pdf", **plot_opt)
         sig_plt.savefig(f"{plot_filename}_signal.png", **plot_opt)
-        sig_plt.close()
+        plt.close()
         print("\t\tSignal plot -> done.")
 
         print(f"\t\tFinal composite figure for region of interest: {region} and signal: {signal}", end="\r")
@@ -388,9 +393,9 @@ for i, region_iter in df_regions.iterrows():
                 os.remove(f"{plot_filename}_gtp.{ext}")
 
 data_moran = pd.DataFrame(data_moran)
-data_moran.to_csv(f"{os.path.join(work_dir, mlobject.chrom, 'moran_info.txt')}", sep="\t", index=False, mode="a")
+data_moran.to_csv(f"{os.path.join(work_dir, 'moran_info.txt')}", sep="\t", index=False, mode="a")
 
-print(f"Information saved to {os.path.join(work_dir, 'moran_info.txt')}")
+print(f"\nInformation saved to {os.path.join(work_dir, 'moran_info.txt')}")
 
 print(f"\nTotal time spent: {timedelta(seconds=round(time() - start_timer))}")
 

@@ -17,18 +17,19 @@ from shapely.geometry import Point
 from shapely.geometry.multipolygon import MultiPolygon
 
 from metaloci import mlo
+from metaloci.misc import misc
 
 
-def get_kk_plot(mlobject: mlo.MetalociObject, restraints: bool=True):
+def get_kk_plot(mlobject: mlo.MetalociObject, restraints: bool = True):
     """
-    Generate Kamada-Kawai plot from pre-calculated restraints
+    Generate Kamada-Kawai plot from pre-calculated restraints.
 
     Parameters
     ----------
     mlobject : mlo.MetalociObject
         METALoci object with Kamada-Kawai graphs and nodes (MetalociObject.kk_nodes and MetalociObject.kk_graph)
     restraints : bool, optional
-        Boolean to set whether or not plot restraints, by default True
+        Boolean to set whether or not to plot restraints, by default True
 
     Returns
     -------
@@ -42,7 +43,7 @@ def get_kk_plot(mlobject: mlo.MetalociObject, restraints: bool=True):
     xs = [mlobject.kk_nodes[n][0] for n in mlobject.kk_nodes]
     ys = [mlobject.kk_nodes[n][1] for n in mlobject.kk_nodes]
 
-    plt.figure(figsize=(PLOTSIZE, PLOTSIZE))
+    kk_plt = plt.figure(figsize=(PLOTSIZE, PLOTSIZE))
     plt.axis("off")
     options = {"node_size": 50, "edge_color": "black", "linewidths": 0.1, "width": 0.05}
 
@@ -55,8 +56,8 @@ def get_kk_plot(mlobject: mlo.MetalociObject, restraints: bool=True):
             cmap=plt.cm.coolwarm,
             **options,
         )
-    
-    else:        
+
+    else:
 
         sns.scatterplot(x=xs, y=ys, hue=range(len(xs)), palette="coolwarm", legend=False, s=POINTSIZE, zorder=2)
 
@@ -72,7 +73,7 @@ def get_kk_plot(mlobject: mlo.MetalociObject, restraints: bool=True):
         x=[xs[mlobject.poi - 1]], y=[ys[mlobject.poi - 1]], s=POINTSIZE * 1.5, ec="lime", fc="none", zorder=3
     )
 
-    return plt
+    return kk_plt
 
 
 def mixed_matrices_plot(mlobject: mlo.MetalociObject):
@@ -90,8 +91,17 @@ def mixed_matrices_plot(mlobject: mlo.MetalociObject):
     -------
     fig_matrix : matplotlib.pyplot.figure.Figure
         matplotlib object containing the mixed matrices figure.
-    
+
     """
+
+    # Mix matrices to plot:
+    if mlobject.subset_matrix is None:
+
+        mlobject.subset_matrix = misc.get_subset_matrix(mlobject)
+
+    upper_triangle = np.triu(mlobject.matrix.copy(), k=1)  # Original matrix
+    lower_triangle = np.tril(mlobject.subset_matrix, k=-1)  # Top interactions matrix
+    mlobject.mixed_matrices = upper_triangle + lower_triangle
 
     if mlobject.flat_matrix is None:
 
@@ -143,7 +153,7 @@ def get_hic_plot(mlobject: mlo.MetalociObject):
     """
 
     poi_factor = mlobject.poi / mlobject.lmi_geometry["bin_index"].shape[0]
-    
+
     array = mlobject.matrix
     matrix_min_value = np.nanmin(array)
     matrix_max_value = np.nanmax(array)
@@ -181,17 +191,25 @@ def get_hic_plot(mlobject: mlo.MetalociObject):
     )  ## try to squeeze this in previous line
     plt.title(f"[{mlobject.region}]")
 
-    return plt
+    return hic_fig
 
 
-def get_gaudi_signal_plot(mlobject, lmi_geometry):
+def get_gaudi_signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame):
     """
-    'Gaudi' plot of the signal painted over the Kamada-Kawai layout
-    :param mlgdata:
-    :param midp_gs:
-    :return:
+    Get a Gaudí signal plot.
+
+    Parameters
+    ----------
+    mlobject : mlo.MetalociObject
+        METALoci object.
+    lmi_geometry : pd.DataFrame
+        Merging from MetalociObject.lmi_info for a specific signal and MetalociObject.geometry for a specific region.
+
+    Returns
+    -------
+    gsp : matplotlib.pyplot.figure.Figure
+        matplotlib figure containing the Gaudi signal plot.
     """
-    # Gaudi plot Signal
 
     poi = lmi_geometry.loc[lmi_geometry["moran_index"] == mlobject.poi - 1, "bin_index"].iloc[0]
 
@@ -199,7 +217,7 @@ def get_gaudi_signal_plot(mlobject, lmi_geometry):
     min_value = lmi_geometry.signal.min()
     max_value = lmi_geometry.signal.max()
 
-    _, ax = plt.subplots(figsize=(12, 10), subplot_kw={"aspect": "equal"})
+    gsp, ax = plt.subplots(figsize=(12, 10), subplot_kw={"aspect": "equal"})
     lmi_geometry.plot(column="signal", cmap=cmap, linewidth=2, edgecolor="white", ax=ax)
 
     sns.scatterplot(x=[lmi_geometry.X[poi]], y=[lmi_geometry.Y[poi]], s=50, ec="none", fc="lime")
@@ -219,20 +237,34 @@ def get_gaudi_signal_plot(mlobject, lmi_geometry):
     cbar.set_label("Signal", rotation=270, size=20, labelpad=35)
     plt.axis("off")
 
-    return plt
+    return gsp
 
 
 def get_gaudi_type_plot(
-    mlobject, lmi_geometry, signipval=0.05, colors={1: "firebrick", 2: "lightskyblue", 3: "steelblue", 4: "orange"}
+    mlobject: mlo.MetalociObject,
+    lmi_geometry: pd.DataFrame,
+    signipval: float = 0.05,
+    colors: dict = {1: "firebrick", 2: "lightskyblue", 3: "steelblue", 4: "orange"},
 ):
     """
-    'Gaudi' plot of the LMI type over the Kamada-Kawai layout
-    :param mlgdata:
-    :param minpv_gt:
-    :param midp_gt:
-    :param colors_gt:
-    :param legend_info:
-    :return:
+    Get a Gaudí type plot.
+
+    Parameters
+    ----------
+    mlobject : mlo.MetalociObject
+        METALoci object.
+    lmi_geometry : pd.DataFrame
+        Merging from MetalociObject.lmi_info for a specific signal and MetalociObject.geometry for a specific region.
+    signipval : float, optional
+        Significance threshold for p-value, by default 0.05
+    colors : dict, optional
+        Dictionary containing the colors to use in the plot, in matplotlib format;
+        by default {1: "firebrick", 2: "lightskyblue", 3: "steelblue", 4: "orange"}
+
+    Returns
+    -------
+    gtp : matplotlib.pyplot.figure.Figure
+        matplotlib figure containing the Gaudi type plot.
     """
     poi = lmi_geometry.loc[lmi_geometry["moran_index"] == mlobject.poi - 1, "bin_index"].iloc[0]
 
@@ -246,7 +278,7 @@ def get_gaudi_type_plot(
     cmap = LinearSegmentedColormap.from_list("Custom cmap", [colors[nu] for nu in colors], len(colors))
     alpha = [1.0 if quad <= signipval else 0.3 for quad in lmi_geometry.LMI_pvalue]
 
-    _, ax = plt.subplots(figsize=(12, 10), subplot_kw={"aspect": "equal"})
+    gtp, ax = plt.subplots(figsize=(12, 10), subplot_kw={"aspect": "equal"})
     lmi_geometry.plot(column="moran_quadrant", cmap=cmap, alpha=alpha, linewidth=2, edgecolor="white", ax=ax)
     plt.axis("off")
 
@@ -261,24 +293,41 @@ def get_gaudi_type_plot(
 
     ax.legend(handles=legend_elements, frameon=False, fontsize=20, loc="center left", bbox_to_anchor=(1, 0.5))
 
-    return plt
+    return gtp
 
 
 def get_lmi_scatterplot(
-    mlobject,
-    lmi_geometry,
-    neighbourhood,
-    signipval=0.05,
-    colors_lmi={1: "firebrick", 2: "lightskyblue", 3: "steelblue", 4: "orange"},
+    mlobject: mlo.MetalociObject,
+    lmi_geometry: pd.DataFrame,
+    neighbourhood: float,
+    signipval: float = 0.05,
+    colors_lmi: dict = {1: "firebrick", 2: "lightskyblue", 3: "steelblue", 4: "orange"},
 ):
     """
-    Scatterplot of the LMI signal and the spatial lag of the data.
-    :param mlgdata:
-    :param bbfact_lmi:
-    :param midp_lmi:
-    :param minpv_lmi:
-    :param colors_lmi:
-    :return:
+    Get a scatterplot of Z-scores of signal vs Z-score of signal spacial lag, given LMI values.
+
+    Parameters
+    ----------
+    mlobject : mlo.MetalociObject
+        METALoci object.
+    lmi_geometry : pd.DataFrame
+        Merging from MetalociObject.lmi_info for a specific signal and MetalociObject.geometry for a specific region.
+    neighbourhood : float
+        buffer * BFACT. It determines the size of the neihbourhood of each point.
+    signipval : float, optional
+        Significance threshold for p-value, by default 0.05
+    colors_lmi : _type_, optional
+        Dictionary containing the colors to use in the plot, in matplotlib format;
+        by default {1: "firebrick", 2: "lightskyblue", 3: "steelblue", 4: "orange"}
+
+    Returns
+    -------
+    scatter : matplotlib.pyplot.figure.Figure
+        matplotlib figure containing the LMI scatterplot.
+    r_value_scat : float
+        r-value of the linear regression.
+    p-value
+        p-value of the linear regression.
     """
 
     weights = lp.weights.DistanceBand.from_dataframe(lmi_geometry, neighbourhood)
@@ -290,7 +339,7 @@ def get_lmi_scatterplot(
     y = zscore(y_lag)
 
     _, _, r_value_scat, p_value_scat, _ = linregress(x, y)
-    _, ax = plt.subplots(figsize=(5, 5))  # , subplot_kw={'aspect':'equal'})
+    scatter, ax = plt.subplots(figsize=(5, 5))  # , subplot_kw={'aspect':'equal'})
 
     alpha_sp = [1.0 if val < signipval else 0.1 for val in lmi_geometry.LMI_pvalue]
     colors_sp = [colors_lmi[val] for val in lmi_geometry.moran_quadrant]
@@ -310,20 +359,54 @@ def get_lmi_scatterplot(
     ax.set_xlabel("Z-score(Signal)")
     ax.set_ylabel("Z-score(Signal Spatial Lag)")
 
-    return plt, r_value_scat, p_value_scat
+    r_value_scat = float(r_value_scat)
+    p_value_scat = float(r_value_scat)
+
+    return scatter, r_value_scat, p_value_scat
 
 
-def signal_bed(mlobject, lmi_geometry, quartiles, signipval, midds, bbfact):
+def signal_bed(
+    mlobject: mlo.MetalociObject,
+    lmi_geometry: pd.DataFrame,
+    neighbourhood: float,
+    quadrants: list = [1, 3],
+    signipval: float = 0.05,
+):
+    """
+    signal_bed _summary_
 
-    selsebins = lmi_geometry[
-        (lmi_geometry.moran_quadrant.isin(quartiles)) & (lmi_geometry.LMI_pvalue <= signipval)
+    Parameters
+    ----------
+    mlobject : mlo.MetalociObject
+        _description_
+    lmi_geometry : pd.DataFrame
+        _description_
+    neighbourhood : float
+        _description_
+    quadrants : list, optional
+        _description_, by default [1, 3]
+    signipval : float, optional
+        _description_, by default 0.05
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
+
+    midds = mlobject.kk_distances[mlobject.poi]
+
+    ml_bins = lmi_geometry[
+        (lmi_geometry.moran_quadrant.isin(quadrants)) & (lmi_geometry.LMI_pvalue <= signipval)
     ].bin_index.values.tolist()
 
-    mls = lmi_geometry[lmi_geometry.bin_index.isin(selsebins)].unary_union
+    metalocis = lmi_geometry[lmi_geometry.bin_index.isin(ml_bins)].unary_union
 
-    if mls:
-        if mls.geom_type == "Polygon":
-            mls = MultiPolygon([mls])
+    if metalocis:
+
+        if metalocis.geom_type == "Polygon":
+
+            metalocis = MultiPolygon([metalocis])
 
     s = Point(
         (lmi_geometry[lmi_geometry.bin_index == mlobject.poi].X, lmi_geometry[lmi_geometry.bin_index == mlobject.poi].Y)
@@ -335,7 +418,7 @@ def signal_bed(mlobject, lmi_geometry, quartiles, signipval, midds, bbfact):
 
     try:
 
-        for _, ml in enumerate(mls.geoms):
+        for _, ml in enumerate(metalocis.geoms):
 
             ml = gpd.GeoSeries(ml)
 
@@ -344,15 +427,18 @@ def signal_bed(mlobject, lmi_geometry, quartiles, signipval, midds, bbfact):
                 for _, row_ml in lmi_geometry.iterrows():
 
                     s2 = Point((row_ml.X, row_ml.Y))
+
                     if s2.within(ml[0]):
+
                         selmetaloci_bed.append(row_ml.bin_index)
 
                 # Add close particles
                 selmetaloci_bed.sort()
-                closebins = [nu for nu, val in enumerate(midds) if val <= bbfact]
+                closebins = [nu for nu, val in enumerate(midds) if val <= neighbourhood]
                 selmetaloci_bed = np.sort(list(set(closebins + selmetaloci_bed)))
 
                 for p in selmetaloci_bed:
+
                     beddata["chr"].append(lmi_geometry.bin_chr[p])
                     beddata["start"].append(lmi_geometry.bin_start[p])
                     beddata["end"].append(lmi_geometry.bin_end[p])
@@ -360,19 +446,20 @@ def signal_bed(mlobject, lmi_geometry, quartiles, signipval, midds, bbfact):
     except:
 
         pass  # Ask Marc about this.
+
     beddata = pd.DataFrame(beddata)
 
     return beddata, selmetaloci_bed
 
 
-def signal_plot(mlobject, lmi_geometry, selmetaloci_sig, bins_sig, coords_sig):
+def signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, metalocis, bins_sig, coords_sig):
 
-    plt.figure(figsize=(10, 1.5))
+    sig_plt = plt.figure(figsize=(10, 1.5))
     plt.tick_params(axis="both", which="minor", labelsize=24)
 
     g = sns.lineplot(x=lmi_geometry.bin_index, y=lmi_geometry.signal)
 
-    for p in selmetaloci_sig:
+    for p in metalocis:
 
         plt.axvline(x=p, color="red", linestyle=":", lw=1.5)
 
@@ -388,12 +475,14 @@ def signal_plot(mlobject, lmi_geometry, selmetaloci_sig, bins_sig, coords_sig):
 
     sns.despine(top=True, right=True, left=False, bottom=True, offset=None, trim=False)
 
-    return plt
+    return sig_plt
 
 
 def place_composite(new_PI, ifile, ifactor, ixloc, iyloc):
+
     img = Image.open(ifile)
     niz = tuple([int(nu * ifactor) for nu in img.size])
     img = img.resize(niz, Image.Resampling.LANCZOS)
     new_PI.paste(img, (ixloc, iyloc))
+
     return new_PI

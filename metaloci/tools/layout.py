@@ -213,7 +213,7 @@ for i, row in df_regions.iterrows():
         int(region_end),
         resolution,
         int(poi),
-        persistence_length
+        persistence_length,
     )
 
     filename = f"{mlobject.chrom}_{mlobject.start}_{mlobject.end}_{mlobject.poi}"
@@ -316,7 +316,7 @@ for i, row in df_regions.iterrows():
 
         if len(cutoffs) > 1 or save_plots:
 
-            plt = plot.get_kk_plot(mlobject)
+            kk_plt = plot.get_kk_plot(mlobject)
 
             fig_name = os.path.join(
                 work_dir,
@@ -324,7 +324,7 @@ for i, row in df_regions.iterrows():
                 f"plots/KK/{filename}_" f"{mlobject.kk_cutoff}_KK.pdf",
             )
 
-            plt.savefig(fig_name, dpi=300)
+            kk_plt.savefig(fig_name, dpi=300)
             plt.close()
 
         elapsed_time_secs = time() - time_per_kk

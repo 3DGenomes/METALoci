@@ -4,15 +4,15 @@ from metaloci import mlo
 
 def get_restraints_matrix(mlobject: mlo.MetalociObject) -> tuple[np.ndarray, mlo.MetalociObject]:
     """
-    Calculate top interaction matrix subset, plot matrix and get restraints. 
+    Calculate top interaction matrix subset, plot matrix and get restraints.
 
     Parameters
     ----------
     mlobject : mlo.MetalociObject
-        METALoci object with a matrix and a cutoff (MetalociObject.matrix and MetalociObject.kk_cutoff) in it. 
+        METALoci object with a matrix and a cutoff (MetalociObject.matrix and MetalociObject.kk_cutoff) in it.
         MetalociObject.persistence_length is optional.
     plot_bool : bool, optional
-        Boolean. If true, it will save a Kamada-Kawai of the region in the working directory. 
+        Boolean. If true, it will save a Kamada-Kawai of the region in the working directory.
         This is useful when exploring your data. By default True
 
     Returns
@@ -24,26 +24,15 @@ def get_restraints_matrix(mlobject: mlo.MetalociObject) -> tuple[np.ndarray, mlo
         is the subset matrix), the flattened matrix and the top indexes of the subset matrix
         added to it, for plotting purposes.
     """
-    
 
     # Get subset matrix
-    subset_matrix = get_subset_matrix(mlobject)
-
-    # Mix matrices to plot:
-    upper_triangle = np.triu(mlobject.matrix.copy() + 1, k=1)  # Original matrix
-    lower_triangle = np.tril(subset_matrix, k=-1)  # Top interactions matrix
-    mlobject.mixed_matrices = upper_triangle + lower_triangle
+    mlobject.subset_matrix = get_subset_matrix(mlobject)
 
     # Modify the matrix and transform to restraints
-    restraints_matrix = np.where(subset_matrix == 0, np.nan, subset_matrix)  # Remove zeroes
-    restraints_matrix = (  # Convert to distance Matrix instead of similarity matrix
-        1 / restraints_matrix
-    )
+    restraints_matrix = np.where(mlobject.subset_matrix == 0, np.nan, mlobject.subset_matrix)  # Remove zeroes
+    restraints_matrix = 1 / restraints_matrix  # Convert to distance Matrix instead of similarity matrix
     restraints_matrix = np.triu(restraints_matrix, k=0)  # Remove lower triangle
-
-    restraints_matrix = np.nan_to_num(  # Clean nans and infs
-        restraints_matrix, nan=0, posinf=0, neginf=0
-    )
+    restraints_matrix = np.nan_to_num(restraints_matrix, nan=0, posinf=0, neginf=0)  # Clean nans and infs
 
     # Giving some info about the matrix to the user (perhaps implement silent mode to skip all
     # this prints?)
@@ -82,10 +71,10 @@ def get_subset_matrix(mlobject: mlo.MetalociObject) -> np.ndarray:
     Notes
     -----
     This function is called from::
-    
+
     get_restraints_matrix()
 
-    so it is not required to call it when computing 
+    so it is not required to call it when computing
     the regular pipeline.
     """
 
@@ -101,21 +90,16 @@ def get_subset_matrix(mlobject: mlo.MetalociObject) -> np.ndarray:
 
     # Calculating the top interactions of and subsetting the matrix to get those.
     # We do not use pseudocounts to calculate the top interactions.
-    top = int(
-        len(mlobject.flat_matrix[mlobject.flat_matrix > np.nanmin(mlobject.flat_matrix)])
-        * mlobject.kk_cutoff
-    )
+    top = int(len(mlobject.flat_matrix[mlobject.flat_matrix > np.nanmin(mlobject.flat_matrix)]) * mlobject.kk_cutoff)
     mlobject.kk_top_indexes = np.argpartition(mlobject.flat_matrix, -top)[-top:]
 
     # Subset to cutoff percentil
     subset_matrix = mlobject.matrix.copy()
     subset_matrix = np.where(subset_matrix == 1.0, 0, subset_matrix)
     subset_matrix[subset_matrix < np.nanmin(mlobject.flat_matrix[mlobject.kk_top_indexes])] = 0
-    
+
     # rng = range of integers until size of matrix to locate the diagonal
-    rng = np.arange(  # r
-        len(subset_matrix) - 1
-    )
+    rng = np.arange(len(subset_matrix) - 1)  # r
 
     if mlobject.persistence_length is None:
 

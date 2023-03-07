@@ -11,6 +11,7 @@ class MetalociObject:
         self.resolution = resolution
         self.poi = poi
         self.persistence_length = persistence_length
+        self.subset_matrix = None
         self.matrix = None
         self.mixed_matrices = None
         self.signals_dict = None

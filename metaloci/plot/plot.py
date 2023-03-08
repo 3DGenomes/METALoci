@@ -170,14 +170,11 @@ def get_hic_plot(mlobject: mlo.MetalociObject):
 
     hic_fig = plt.figure(figsize=(10, 10))
     ax = hic_fig.add_subplot(111)
-
     ax.matshow(array, cmap="YlOrRd", vmin=matrix_min_value, vmax=matrix_max_value, label="")
 
     sns.scatterplot(x=[poi_X], y=[mid + 4], color="lime", marker="^", label="", ax=ax)
 
-    plt.axis("off")
-
-    cbar = plt.colorbar(
+    plt.colorbar(
         plt.cm.ScalarMappable(cmap="YlOrRd"),
         ticks=np.linspace(matrix_min_value, matrix_max_value, 6),
         values=np.linspace(matrix_min_value, matrix_max_value, 6),
@@ -185,11 +182,10 @@ def get_hic_plot(mlobject: mlo.MetalociObject):
         label="log10(Hi-C interactions)",
         format=FormatStrFormatter("%.2f"),
         ax=ax,
-    )
-    cbar.set_label(
-        "log10(Hi-C interactions)", rotation=270, size=14, labelpad=20
-    )  ## try to squeeze this in previous line
+    ).set_label("log10(Hi-C interactions)", rotation=270, size=14, labelpad=20)
+
     plt.title(f"[{mlobject.region}]")
+    plt.axis("off")
 
     return hic_fig
 

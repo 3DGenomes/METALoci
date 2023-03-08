@@ -43,7 +43,7 @@ def construct_voronoi(mlobject: mlo.MetalociObject, buffer: float):
     """
 
     # The number two is a constant to define borders in the construction of the voronoi. Without those limits,
-    # the voronoi could extend to infinity in the areas than do not adjoin with another point of the KK layout 
+    # the voronoi could extend to infinity in the areas than do not adjoin with another point of the KK layout
     # (and we do not want that for our gaudi plot).
     points = mlobject.kk_coords.copy()
     points.append(np.array([-2, 2]))
@@ -93,13 +93,14 @@ def construct_voronoi(mlobject: mlo.MetalociObject, buffer: float):
 
     return df_geometry
 
+
 def coord_to_id(mlobject: mlo.MetalociObject, poly_from_lines: list):
     """
     Correlates the bin index, determined by genomic positions, and the LMI index, which is
     determined by the LMI function. This is called in::
-    
+
     construct_voronoi()
-    
+
     and saved into columns of a dataframe, mostly for plotting purposes.
 
     Parameters
@@ -108,7 +109,7 @@ def coord_to_id(mlobject: mlo.MetalociObject, poly_from_lines: list):
         METALoci object with Kamada-Kawai layout coordinates in it (MetalociObject.kk_coords).
     poly_from_lines : list
         List of polygon information for gaudi plots, calculated in::
-        
+
         construct_voronoi().
 
     Returns
@@ -151,7 +152,7 @@ def load_signals(df_regions: pd.DataFrame, work_dir: Path):
 
     Notes
     -----
-    The values of df_regions.symbol and df_regions.id can be dummy values, it only affects the 
+    The values of df_regions.symbol and df_regions.id can be dummy values, it only affects the
     plot and tables labelling at output.
     """
 
@@ -219,7 +220,9 @@ def load_region_signals(mlobject: mlo.MetalociObject, signal_data: dict, signal_
     return signals_dict, signal_types
 
 
-def compute_lmi(mlobject: mlo.MetalociObject, signal_type: str, neighbourhood: float, n_permutations=9999, signipval=0.05) -> pd.DataFrame:
+def compute_lmi(
+    mlobject: mlo.MetalociObject, signal_type: str, neighbourhood: float, n_permutations=9999, signipval=0.05
+) -> pd.DataFrame:
     """
     Computes Local Moran's Index for a signal type and outputs information of the LMI value and its p-value
     for each bin for a given signal, as well as some other information.
@@ -229,7 +232,7 @@ def compute_lmi(mlobject: mlo.MetalociObject, signal_type: str, neighbourhood: f
     mlobject : mlo.MetalociObject
         METALoci with signals for that region (MetalociObject.signals_dict) and MetalociObject.lmi_geometry
         calculated with::
-        
+
         lmi.construct_voronoi()
 
     signal_type : str
@@ -258,9 +261,7 @@ def compute_lmi(mlobject: mlo.MetalociObject, signal_type: str, neighbourhood: f
 
     signal_geometry = {"v": [], "geometry": []}
 
-    df_tmp = mlobject.lmi_geometry.sort_values(by="moran_index").reset_index()
-
-    for _, poly in df_tmp.iterrows():
+    for _, poly in mlobject.lmi_geometry.sort_values(by="moran_index").reset_index().iterrows():
 
         signal_geometry["v"].append(signal[poly.bin_index])
         signal_geometry["geometry"].append(poly.geometry)
@@ -274,13 +275,14 @@ def compute_lmi(mlobject: mlo.MetalociObject, signal_type: str, neighbourhood: f
     weights.transform = "r"
 
     # Calculate Local Moran's I
-    moran_local_object = Moran_Local(y, weights, permutations=n_permutations)
+    moran_local_object = Moran_Local(
+        y, weights, permutations=n_permutations
+    )  # geoda_quadsbool (default=False) If True use GeoDa scheme: HH=1, LL=2, LH=3, HL=4 If False use PySAL Scheme: HH=1, LH=2, LL=3, HL=4
     lags = lag_spatial(moran_local_object.w, moran_local_object.z)
     print(
         f"\tThere is a total of {len(moran_local_object.p_sim[(moran_local_object.p_sim < signipval)])} "
         f"significant points in Local Moran's I for signal {signal_type}"
     )
-    chrom_number = mlobject.chrom[3:]
 
     df_lmi = defaultdict(list)
 
@@ -293,7 +295,7 @@ def compute_lmi(mlobject: mlo.MetalociObject, signal_type: str, neighbourhood: f
         df_lmi["ID"].append(signal_type)
 
         df_lmi["bin_index"].append(row.bin_index)
-        df_lmi["bin_chr"].append(chrom_number)
+        df_lmi["bin_chr"].append(mlobject.chrom[3:])
         df_lmi["bin_start"].append(bin_start)
         df_lmi["bin_end"].append(bin_end)
 
@@ -304,8 +306,8 @@ def compute_lmi(mlobject: mlo.MetalociObject, signal_type: str, neighbourhood: f
         df_lmi["LMI_score"].append(round(moran_local_object.Is[row.moran_index], 9))
         df_lmi["LMI_pvalue"].append(round(moran_local_object.p_sim[row.moran_index], 9))
         df_lmi["LMI_inv_pval"].append(round((1 - moran_local_object.p_sim[row.moran_index]), 9))
-        df_lmi["ZSig"].append(y[row.bin_index])  ## MAYBE IT'S MORAN_INDEX INSTED OF BIN_INDEX. CHECK
-        df_lmi["ZLag"].append(lags[row.bin_index])
+        df_lmi["ZSig"].append(y[row.moran_index])  ## MAYBE IT'S MORAN_INDEX INSTED OF BIN_INDEX. CHECK
+        df_lmi["ZLag"].append(lags[row.moran_index])
 
     df_lmi = pd.DataFrame(df_lmi)
 

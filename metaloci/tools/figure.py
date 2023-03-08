@@ -45,17 +45,6 @@ input_arg.add_argument(
     "-w", "--work-dir", dest="work_dir", required=True, metavar="PATH", type=str, help="Path to working directory."
 )
 
-
-input_arg.add_argument(
-    "-r",
-    "--resolution",
-    dest="reso",
-    metavar="INT",
-    type=int,
-    required=True,
-    help="resolution of the cooler files.",
-)
-
 signal_arg = parser.add_argument_group(title="Signal arguments", description="Choose one of the following options:")
 
 signal_arg.add_argument(
@@ -158,7 +147,6 @@ args = parser.parse_args(None if sys.argv[1:] else ["-h"])
 work_dir = args.work_dir
 regions = args.region_file
 signals = args.signals
-resolution = args.reso
 quadrants = args.quart
 signipval = args.signipval
 rmtypes = args.rm_types
@@ -219,7 +207,7 @@ for i, region_iter in df_regions.iterrows():
 
     region = region_iter.coords
 
-    print(f"\n------> Working on region {region} [{i + 1}/{len(df_regions)}]\n")
+    print(f"\n------> Working on region {region} [{i + 1}/{len(df_regions)}]")
 
     try:
 
@@ -256,7 +244,7 @@ for i, region_iter in df_regions.iterrows():
 
             bins.append(int(((i - 1) / 2) * len(mlobject.lmi_geometry)) - 1)
 
-        coords_b.append(f"{mlobject.start + bins[i - 1] * resolution:,}")
+        coords_b.append(f"{mlobject.start + bins[i - 1] * mlobject.resolution:,}")
 
     for signal in signals:
 
@@ -264,13 +252,14 @@ for i, region_iter in df_regions.iterrows():
 
             continue
 
-        print(f"\tPlotting signal: {signal}")
+        print(f"\n\tPlotting signal: {signal}")
 
         plot_filename = os.path.join(work_dir, mlobject.chrom, "plots", signal, mlobject.region)
         pathlib.Path(plot_filename).mkdir(parents=True, exist_ok=True)
 
         plot_filename = os.path.join(
-            plot_filename, f"{mlobject.chrom}_{mlobject.start}_{mlobject.end}_{mlobject.poi}_{resolution}_{signal}"
+            plot_filename,
+            f"{mlobject.chrom}_{mlobject.start}_{mlobject.end}_{mlobject.poi}_{mlobject.resolution}_{signal}",
         )
 
         # if re.compile("_").search(signal):

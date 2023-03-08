@@ -81,7 +81,7 @@ input_arg.add_argument(
     metavar="INT",
     type=int,
     required=True,
-    help="resolution of the cooler files.",
+    help="Resolution of the cooler files to be used (in bp).",
 )
 
 region_arg = parser.add_argument_group(title="region arguments", description="Choose one of the following options.")
@@ -141,7 +141,7 @@ args = parser.parse_args(None if sys.argv[1:] else ["-h"])
 work_dir = args.work_dir
 cooler_file = args.cooler_file
 regions = args.regions
-resolution = args.reso * 1000
+resolution = args.reso
 cutoffs = args.cutoff
 force = args.force
 save_plots = args.save_plots

@@ -53,7 +53,7 @@ input_arg.add_argument(
     required=True,
     metavar="INT",
     type=int,
-    help="Resolution of the bins to calculate the signal (in kb).",
+    help="Resolution of the bins to calculate the signal (in bp).",
 )
 region_arg = parser.add_argument_group(title="Region arguments")
 
@@ -82,7 +82,7 @@ work_dir = args.work_dir
 data = args.data
 out_name = args.output
 coords = args.coords
-resolution = args.reso * 1000
+resolution = args.reso
 debug = args.debug
 
 if debug:

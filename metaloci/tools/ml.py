@@ -43,18 +43,6 @@ input_arg.add_argument(
 )
 
 input_arg.add_argument(
-    "-r",
-    "--resolution",
-    dest="reso",
-    metavar="INT",
-    type=int,
-    required=True,
-    help="Resolution of the cooler files, in Kb. Used in case multiple "
-    "resolution "
-    "Kamada-Kawai layouts exist in the same folder",
-)
-
-input_arg.add_argument(
     "-s",
     "--signal",
     dest="signal_file",
@@ -148,7 +136,6 @@ work_dir = args.work_dir
 regions = args.region_file
 signal_file = args.signal_file
 signals = args.signals
-resolution = args.reso * 1000
 n_cores = args.num_cores
 n_permutations = args.perms
 signipval = args.signipval
@@ -165,7 +152,6 @@ if debug:
         ["gene_file", regions],
         ["ind_file", signal_file],
         ["types", signals],
-        ["reso", resolution],
         ["num_cores", n_cores],
         ["perms", n_permutations],
         ["debug", debug],

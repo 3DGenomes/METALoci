@@ -390,62 +390,64 @@ def signal_bed(
         _description_
     """
 
-    midds = mlobject.kk_distances[mlobject.poi]
+    poi_distance = mlobject.kk_distances[mlobject.poi]
 
-    ml_bins = lmi_geometry[
+    # Select the polygons that are in the quadrant of interest and are significative.
+    ml_indexes = lmi_geometry[
         (lmi_geometry.moran_quadrant.isin(quadrants)) & (lmi_geometry.LMI_pvalue <= signipval)
     ].bin_index.values.tolist()
 
-    metalocis = lmi_geometry[lmi_geometry.bin_index.isin(ml_bins)].unary_union
+    # Make a big polygon from the small poligons that are significant.
+    metalocis = lmi_geometry[lmi_geometry.bin_index.isin(ml_indexes)].unary_union
 
     if metalocis:
 
         if metalocis.geom_type == "Polygon":
 
-            metalocis = MultiPolygon([metalocis])
+            metalocis = MultiPolygon([metalocis])  # Need a multipolygon in order for the code to work.
 
-    s = Point(
+    poi_point = Point(
         (lmi_geometry[lmi_geometry.bin_index == mlobject.poi].X, lmi_geometry[lmi_geometry.bin_index == mlobject.poi].Y)
     )
 
-    selmetaloci_bed = []
+    metalocis_bed = []
 
     beddata = defaultdict(list)
 
     try:
 
-        for _, ml in enumerate(metalocis.geoms):
+        for metaloci in metalocis.geoms:
 
-            ml = gpd.GeoSeries(ml)
+            metaloci = gpd.GeoSeries(metaloci)
 
-            if s.within(ml[0]):
+            if poi_point.within(metaloci[0]):
 
                 for _, row_ml in lmi_geometry.iterrows():
 
-                    s2 = Point((row_ml.X, row_ml.Y))
+                    adjacent_point = Point((row_ml.X, row_ml.Y))
 
-                    if s2.within(ml[0]):
+                    if adjacent_point.within(metaloci[0]):
 
-                        selmetaloci_bed.append(row_ml.bin_index)
+                        metalocis_bed.append(row_ml.bin_index)
 
                 # Add close particles
-                selmetaloci_bed.sort()
-                closebins = [nu for nu, val in enumerate(midds) if val <= neighbourhood]
-                selmetaloci_bed = np.sort(list(set(closebins + selmetaloci_bed)))
+                metalocis_bed.sort()
+                close_bins = [i for i, distance in enumerate(poi_distance) if distance <= neighbourhood / 2]
+                metalocis_bed = np.sort(list(set(close_bins + metalocis_bed)))
 
-                for p in selmetaloci_bed:
+                for point in metalocis_bed:
 
-                    beddata["chr"].append(lmi_geometry.bin_chr[p])
-                    beddata["start"].append(lmi_geometry.bin_start[p])
-                    beddata["end"].append(lmi_geometry.bin_end[p])
-                    beddata["bin"].append(p)
+                    beddata["chr"].append(lmi_geometry.bin_chr[point])
+                    beddata["start"].append(lmi_geometry.bin_start[point])
+                    beddata["end"].append(lmi_geometry.bin_end[point])
+                    beddata["bin"].append(point)
     except:
 
-        pass  # Ask Marc about this.
+        pass
 
     beddata = pd.DataFrame(beddata)
 
-    return beddata, selmetaloci_bed
+    return beddata, metalocis_bed
 
 
 def signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, metalocis, bins_sig, coords_sig):

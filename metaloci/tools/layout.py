@@ -255,7 +255,13 @@ for i, row in df_regions.iterrows():
 
         continue
 
-    mlobject.matrix = cooler.Cooler(cooler_file_str).matrix(sparse=True).fetch(mlobject.region).toarray()
+    mlobject.matrix = cooler.Cooler(cooler_file_str)
+
+    if "chr" not in mlobject.matrix.chromnames[0]:
+
+        cooler.rename_chroms(mlobject.matrix, {chrom: "chr" + str(chrom) for chrom in mlobject.matrix.chromnames})
+
+    mlobject.matrix = mlobject.matrix.matrix(sparse=True).fetch(mlobject.region).toarray()
     mlobject.matrix = misc.clean_matrix(mlobject, bad_regions)
 
     # This if statement is for detecting empty arrays. If the array is too empty,

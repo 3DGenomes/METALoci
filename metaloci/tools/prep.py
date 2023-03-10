@@ -8,6 +8,7 @@ from metaloci.misc import misc
 import subprocess as sp
 import pandas as pd
 import pathlib
+import csv
 
 description = """
 This script picks a bed file (USCS format) of signals and transforms it into the format  
@@ -118,14 +119,27 @@ sp.call(
 # names to a dictionary to put it in the next step, then sort the file.
 for f in data:
 
+    signal_file_name = f.rsplit("/", 1)[1]
+
+    sp.call(f"cp {f} {tmp_dir}/tmp_{signal_file_name}", shell=True)
+
     try:
 
         float(  # If first row fourth column is convertible to float, it is a signal, so the first row is not a header.
             sp.getoutput(f"head -n 1 {f} | cut -f 4")
         )
 
+        with open(f"{tmp_dir}/tmp_{signal_file_name}") as handler:
+
+            if not [line.strip() for line in handler][1].startswith("chr"):
+
+                sp.call(
+                    f"cat {tmp_dir}/tmp_{signal_file_name} | sed -e 's/.*/chr&/' > {tmp_dir}/tmp_{signal_file_name}",
+                    shell=True,
+                )
+
         sp.call(
-            f"sort {f} -k1,1V -k2,2n -k3,3n | grep -v random | grep -v chrUn > {tmp_dir}/sorted_{f.rsplit('/', 1)[1]}",
+            f"sort {tmp_dir}/tmp_{signal_file_name} -k1,1V -k2,2n -k3,3n | grep -v random | grep -v chrUn > {tmp_dir}/sorted_{f.rsplit('/', 1)[1]}",
             shell=True,
         )
 
@@ -133,11 +147,20 @@ for f in data:
 
     except ValueError:
 
-        column_dict[f.rsplit("/", 1)[1]] = sp.getoutput(f"head -n 1 {f}").split(
-            sep="\t"
-        )  # Saving the corresponding column names in a dict, with only the file name as a key.
+        # Saving the corresponding column names in a dict, with only the file name as a key.
+        column_dict[f.rsplit("/", 1)[1]] = sp.getoutput(f"head -n 1 {f}").split(sep="\t")
+
+        with open(f"{tmp_dir}/tmp_{signal_file_name}") as handler:
+
+            if not [line.strip() for line in handler][1].startswith("chr"):
+
+                sp.call(
+                    f"tail -n +2 {tmp_dir}/tmp_{signal_file_name} | sed -e 's/.*/chr&/' > {tmp_dir}/tmp_{signal_file_name}_tmp && mv {tmp_dir}/tmp_{signal_file_name}_tmp {tmp_dir}/tmp_{signal_file_name}",
+                    shell=True,
+                )
+
         sp.call(
-            f"tail -n +2 {f} | sort -k1,1V -k2,2n -k3,3n | grep -v random | grep -v chrUn > {tmp_dir}/sorted_{f.rsplit('/', 1)[1]}",
+            f"tail -n +1 {tmp_dir}/tmp_{signal_file_name} | sort -k1,1V -k2,2n -k3,3n | grep -v random | grep -v chrUn > {tmp_dir}/sorted_{f.rsplit('/', 1)[1]}",
             shell=True,
         )
 

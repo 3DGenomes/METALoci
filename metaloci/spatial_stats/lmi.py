@@ -277,7 +277,7 @@ def compute_lmi(
     # Calculate Local Moran's I
     moran_local_object = Moran_Local(
         y, weights, permutations=n_permutations
-    )  # geoda_quadsbool (default=False) If True use GeoDa scheme: HH=1, LL=2, LH=3, HL=4 If False use PySAL Scheme: HH=1, LH=2, LL=3, HL=4
+    )  # geoda_quadsbool (default=False) If False use PySAL Scheme: HH=1, LH=2, LL=3, HL=4
     lags = lag_spatial(moran_local_object.w, moran_local_object.z)
     print(
         f"\tThere is a total of {len(moran_local_object.p_sim[(moran_local_object.p_sim < signipval)])} "

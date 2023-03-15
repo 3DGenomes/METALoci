@@ -185,13 +185,13 @@ legend_elements = [
 
 start_timer = time()
 
-if re.compile("chr").search(regions):
+if "/" in regions:
 
-    df_regions = pd.DataFrame({"coords": [regions], "name": ["symbol"], "id": ["id"]})
+    df_regions = pd.read_table(regions)
 
 else:
 
-    df_regions = pd.read_table(regions)
+    df_regions = pd.DataFrame({"coords": [regions], "symbol": ["symbol"], "id": ["id"]})
 
 # hacer que un archivo de señales sera una lista. cambia esta lógica que es super enrevesada.
 if os.path.isfile(signals[0]) and os.access(signals[0], os.R_OK):

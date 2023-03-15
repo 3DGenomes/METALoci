@@ -6,6 +6,8 @@ from collections import defaultdict
 import sys
 from metaloci import mlo
 from pathlib import Path
+import cooler
+import subprocess as sp
 
 
 def remove_folder(path: Path):
@@ -147,7 +149,7 @@ def clean_matrix(mlobject: mlo.MetalociObject, bad_regions: pd.DataFrame) -> np.
     return mlobject.matrix
 
 
-def signal_normalization(region_signal: pd.DataFrame, pseudocounts: float = 0.01, norm="01") -> np.ndarray:
+def signal_normalization(region_signal: pd.DataFrame, pseudocounts: float = None, norm=None) -> np.ndarray:
     """
     Normalize signal values
 
@@ -168,20 +170,14 @@ def signal_normalization(region_signal: pd.DataFrame, pseudocounts: float = 0.01
     np.ndarray
         Array of normalized signal values for a region and a signal type.
     """
-    signal = []
 
-    for index in region_signal:
+    if pseudocounts is None:
 
-        if np.isnan(index):
+        signal = [0.0 if np.isnan(index) else index for index in region_signal]
 
-            asum = pseudocounts
+    else:
 
-        else:
-
-            asum = index
-
-        asum = max(asum, pseudocounts)
-        signal.append(asum)
+        signal = [pseudocounts if np.isnan(index) else index + pseudocounts for index in region_signal]
 
     if isinstance(norm, (int, float)):
 
@@ -200,6 +196,51 @@ def signal_normalization(region_signal: pd.DataFrame, pseudocounts: float = 0.01
         signal = [(float(value) - min(signal)) / (max(signal) - min(signal) + 0.01) for value in signal]
 
     return np.array(signal)
+
+
+def check_chromosome_names(cooler_file: Path, data: Path, coords: bool):
+
+    with open(data[0], "r") as handler:
+
+        if [line.strip() for line in handler][1].startswith("chr"):
+
+            signal_chr_nom = "chrN"
+
+        else:
+
+            signal_chr_nom = "N"
+
+    if "chr" in [cooler_file.chromnames][0][0]:
+
+        cooler_chr_nom = "chrN"
+
+    else:
+
+        cooler_chr_nom = "N"
+
+    with open(coords, "r") as handler:
+
+        if [line.strip() for line in handler][1].startswith("chr"):
+
+            coords_chr_nom = "chrN"
+
+        else:
+
+            coords_chr_nom = "N"
+
+    if not signal_chr_nom == cooler_chr_nom == coords_chr_nom:
+
+        exit(
+            "\nThe signal, cooler and chromosome sizes files do not have the same nomenclature for chromosomes:\n"
+            f"\n\tSignal chromosomes nomenclature is '{signal_chr_nom}'. "
+            f"\n\tCooler chromosomes nomenclature is '{cooler_chr_nom}'. "
+            f"\n\tChromosome sizes nomenclature is '{coords_chr_nom}'. "
+            "\n\nPlease, rename the chromosome names. "
+            "\nYou may want to rename the chromosome names in a cooler file with cooler.rename_chroms() in python. "
+            "\n\nExiting..."
+        )
+
+    del cooler_file
 
 
 def bed_to_metaloci(data, coords, resolution):

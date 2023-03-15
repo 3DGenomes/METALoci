@@ -25,6 +25,7 @@ from metaloci import mlo
 from metaloci.graph_layout import kk
 from metaloci.misc import misc
 from metaloci.plot import plot
+import pathlib
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
@@ -189,14 +190,15 @@ if debug:
 
 start_timer = time()
 
-# Parsing the one-line region into a pandas data-frame
-if re.compile("chr").search(regions):
+# Parsing the one-line region into a pandas data-frame. If the region contains '/', it is a path.
+# There is no need to add Windows path as METALoci will not work on Windows either way.
+if "/" in regions:
 
-    df_regions = pd.DataFrame({"coords": [regions], "symbol": ["symbol"], "id": ["id"]})
+    df_regions = pd.read_table(regions)
 
 else:
 
-    df_regions = pd.read_table(regions)
+    df_regions = pd.DataFrame({"coords": [regions], "symbol": ["symbol"], "id": ["id"]})
 
 pathlib.Path(os.path.join(work_dir)).mkdir(parents=True, exist_ok=True)
 
@@ -208,7 +210,7 @@ for i, row in df_regions.iterrows():
 
     mlobject = mlo.MetalociObject(
         f"{region_chrom}:{region_start}-{region_end}",
-        region_chrom,
+        str(region_chrom),
         int(region_start),
         int(region_end),
         resolution,
@@ -255,14 +257,12 @@ for i, row in df_regions.iterrows():
 
         continue
 
-    mlobject.matrix = cooler.Cooler(cooler_file_str)
-
-    if "chr" not in mlobject.matrix.chromnames[0]:
-
-        cooler.rename_chroms(mlobject.matrix, {chrom: "chr" + str(chrom) for chrom in mlobject.matrix.chromnames})
-
-    mlobject.matrix = mlobject.matrix.matrix(sparse=True).fetch(mlobject.region).toarray()
+    mlobject.matrix = cooler.Cooler(cooler_file_str).matrix(sparse=True).fetch(mlobject.region).toarray()
     mlobject.matrix = misc.clean_matrix(mlobject, bad_regions)
+
+    # if "chr" not in mlobject.matrix.chromnames[0]:
+
+    #     cooler.rename_chroms(mlobject.matrix, {chrom: "chr" + str(chrom) for chrom in mlobject.matrix.chromnames})
 
     # This if statement is for detecting empty arrays. If the array is too empty,
     # clean_matrix() returns mlo as None.
@@ -337,8 +337,9 @@ for i, row in df_regions.iterrows():
 
         print(f"\tdone in {timedelta(seconds=round(elapsed_time_secs))}.")
 
+# If there is bad regions, write to a file which is the bad region and why,
+# but only if that region-reason pair does not lready exist in the file.
 bad_regions = pd.DataFrame(bad_regions)
-
 
 if bad_regions.shape[0] > 0:
 
@@ -349,7 +350,6 @@ if bad_regions.shape[0] > 0:
             for _, row in bad_regions.iterrows()
             if not any(f"{row.region}\t{row.reason}" in line for line in handler)
         ]
-
 
 print(f"\nTotal time spent: {timedelta(seconds=round(time() - start_timer))}.")
 print("\nall done.")

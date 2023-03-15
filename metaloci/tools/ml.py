@@ -168,13 +168,13 @@ timer = time()
 
 # Read region list. If its a region as parameter, create a dataframe.
 # If its a path to a file, read that dataframe.
-if re.compile("chr").search(regions):
+if "/" in regions:
 
-    df_regions = pd.DataFrame({"coords": [regions], "symbol": ["symbol"], "id": ["id"]})
+    df_regions = pd.read_table(regions)
 
 else:
 
-    df_regions = pd.read_table(regions)
+    df_regions = pd.DataFrame({"coords": [regions], "symbol": ["symbol"], "id": ["id"]})
 
 # Read the signal of the chromosomes corresponding to the regions of interest,
 # not to load useless data.

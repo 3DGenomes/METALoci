@@ -158,7 +158,10 @@ def load_signals(df_regions: pd.DataFrame, work_dir: Path):
 
     chrom_to_do = list(
         dict.fromkeys(
-            re.compile("chr[0-9]*[A-Z]*").findall("\n".join([x for y in df_regions["coords"] for x in y.split(":")]))
+            #            re.compile("chr[0-9]*[A-Z]*").findall("\n".join([x for y in df_regions["coords"] for x in y.split(":")]))
+            [
+                chrom for coord in df_regions["coords"] for chrom in coord.split(":")[0:1]
+            ]  # for cases where chr is not in the chromosome name
         )
     )
 
@@ -198,9 +201,14 @@ def load_region_signals(mlobject: mlo.MetalociObject, signal_data: dict, signal_
 
         signal_types = [line.rstrip() for line in signals_handler]
 
+    # region_signal = signal_data[mlobject.chrom][
+    #     (signal_data[mlobject.chrom]["start"] >= int(mlobject.start))
+    #     & (signal_data[mlobject.chrom]["end"] <= int(mlobject.end))
+    # ]
+
     region_signal = signal_data[mlobject.chrom][
-        (signal_data[mlobject.chrom]["start"] >= int(mlobject.start))
-        & (signal_data[mlobject.chrom]["end"] <= int(mlobject.end))
+        (signal_data[mlobject.chrom]["end"] >= int(mlobject.start))
+        & (signal_data[mlobject.chrom]["start"] <= int(mlobject.end))
     ]
 
     if len(region_signal) != len(mlobject.kk_coords):

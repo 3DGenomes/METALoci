@@ -1,5 +1,6 @@
 """
-This script parses a bed file into the proper parquet files needed for METALoci.
+This script processes signal .bed files or .bedGraph files, binnarizing them at a given resolution,
+merging all signals in the same dataframe and subsetting by chromosomes.
 """
 
 import sys
@@ -8,7 +9,10 @@ from metaloci.misc import misc
 import subprocess as sp
 import pandas as pd
 import pathlib
-import csv
+import cooler
+import warnings
+
+warnings.filterwarnings("ignore", category=FutureWarning)
 
 description = """
 This script picks a bed file (USCS format) of signals and transforms it into the format  
@@ -30,6 +34,17 @@ input_arg.add_argument(
     type=str,
     help="Path to working directory.",
 )
+
+input_arg.add_argument(
+    "-c",
+    "--cooler",
+    dest="cooler_file",
+    metavar="PATH",
+    type=str,
+    required=True,
+    help="complete path to the cooler file.",
+)
+
 input_arg.add_argument(
     "-d",
     "--data",
@@ -59,7 +74,7 @@ input_arg.add_argument(
 region_arg = parser.add_argument_group(title="Region arguments")
 
 region_arg.add_argument(
-    "-c",
+    "-s",
     "--coords",
     dest="coords",
     required=True,
@@ -81,6 +96,7 @@ if not args.work_dir.endswith("/"):
 
 work_dir = args.work_dir
 data = args.data
+cooler_path = args.cooler_file
 out_name = args.output
 coords = args.coords
 resolution = args.reso
@@ -102,6 +118,16 @@ if debug:
 tmp_dir = f"{work_dir}tmp"
 pathlib.Path(tmp_dir).mkdir(parents=True, exist_ok=True)
 
+cooler_file = cooler.Cooler(cooler_path + "::/resolutions/" + str(resolution))
+
+# The following commented lines change the chromosome names of a cooler file from only number to UCSC format.
+# Only for testing purposes.
+# if "chr" not in cooler_file.chromnames[0]:
+
+#     cooler.rename_chroms(cooler_file, {chrom: "chr" + str(chrom) for chrom in cooler_file.chromnames})
+
+misc.check_chromosome_names(cooler_file, data, coords)
+
 column_dict = {}
 
 # Create a bed file that contains regions of a given resolution and sort it.
@@ -120,8 +146,9 @@ sp.call(
 for f in data:
 
     signal_file_name = f.rsplit("/", 1)[1]
+    tmp_signal_path = f"{tmp_dir}/tmp_{signal_file_name}"
 
-    sp.call(f"cp {f} {tmp_dir}/tmp_{signal_file_name}", shell=True)
+    sp.call(f"cp {f} {tmp_signal_path}", shell=True)
 
     try:
 
@@ -129,17 +156,13 @@ for f in data:
             sp.getoutput(f"head -n 1 {f} | cut -f 4")
         )
 
-        with open(f"{tmp_dir}/tmp_{signal_file_name}") as handler:
-
-            if not [line.strip() for line in handler][1].startswith("chr"):
-
-                sp.call(
-                    f"cat {tmp_dir}/tmp_{signal_file_name} | sed -e 's/.*/chr&/' > {tmp_dir}/tmp_{signal_file_name}",
-                    shell=True,
-                )
+        # sp.call(
+        #     f"cat {tmp_signal_path} | sed -e 's/.*/chr&/' > {tmp_signal_path}_tmp && mv {tmp_signal_path}_tmp {tmp_signal_path}",
+        #     shell=True,
+        # )
 
         sp.call(
-            f"sort {tmp_dir}/tmp_{signal_file_name} -k1,1V -k2,2n -k3,3n | grep -v random | grep -v chrUn > {tmp_dir}/sorted_{f.rsplit('/', 1)[1]}",
+            f"sort {tmp_signal_path} -k1,1V -k2,2n -k3,3n | grep -v random | grep -v chrUn > {tmp_dir}/sorted_{f.rsplit('/', 1)[1]}",
             shell=True,
         )
 
@@ -148,19 +171,15 @@ for f in data:
     except ValueError:
 
         # Saving the corresponding column names in a dict, with only the file name as a key.
-        column_dict[f.rsplit("/", 1)[1]] = sp.getoutput(f"head -n 1 {f}").split(sep="\t")
+        column_dict[signal_file_name] = sp.getoutput(f"head -n 1 {f}").split(sep="\t")
 
-        with open(f"{tmp_dir}/tmp_{signal_file_name}") as handler:
-
-            if not [line.strip() for line in handler][1].startswith("chr"):
-
-                sp.call(
-                    f"tail -n +2 {tmp_dir}/tmp_{signal_file_name} | sed -e 's/.*/chr&/' > {tmp_dir}/tmp_{signal_file_name}_tmp && mv {tmp_dir}/tmp_{signal_file_name}_tmp {tmp_dir}/tmp_{signal_file_name}",
-                    shell=True,
-                )
+        # sp.call(
+        #     f"tail -n +2 {tmp_signal_path} | sed -e 's/.*/chr&/' > {tmp_signal_path}_tmp && mv {tmp_signal_path}_tmp {tmp_signal_path}",
+        #     shell=True,
+        # )
 
         sp.call(
-            f"tail -n +1 {tmp_dir}/tmp_{signal_file_name} | sort -k1,1V -k2,2n -k3,3n | grep -v random | grep -v chrUn > {tmp_dir}/sorted_{f.rsplit('/', 1)[1]}",
+            f"tail -n +1 {tmp_signal_path} | sort -k1,1V -k2,2n -k3,3n | grep -v random | grep -v chrUn > {tmp_dir}/sorted_{f.rsplit('/', 1)[1]}",
             shell=True,
         )
 
@@ -172,16 +191,24 @@ for f in data:
         shell=True,
     )
 
-# Create a list of paths to the intersected files.
-intersected_files_paths = [(f"{tmp_dir}/intersected_" + i.rsplit("/", 1)[1]) for i in data]
+    awk_com = (
+        "awk '{print $0\"\t\"$7*($8/($6-$5))}' "
+        + f"{tmp_dir}/intersected_{f.rsplit('/', 1)[1]} > {tmp_dir}/intersected_ok_{f.rsplit('/', 1)[1]}"
+    )
+    sp.call(awk_com, shell=True)
 
-final_intersect = pd.read_csv(intersected_files_paths[0], sep="\t", header=None)  # Read the first intersected file,
-final_intersect = final_intersect.drop([3, 4, 5, len(final_intersect.columns) - 1], axis=1)  # Drop unnecesary columns,
+# Create a list of paths to the intersected files.
+intersected_files_paths = [(f"{tmp_dir}/intersected_ok_" + i.rsplit("/", 1)[1]) for i in data]
+
+final_intersect = pd.read_csv(
+    intersected_files_paths[0], sep="\t", header=None, low_memory=False
+)  # Read the first intersected file,
+final_intersect = final_intersect.drop([3, 4, 5, 6, 7], axis=1)  # Drop unnecesary columns,
 
 if header == True:
 
     final_intersect.columns = column_dict[
-        intersected_files_paths[0].rsplit("/", 1)[1].split("_", 1)[1]
+        intersected_files_paths[0].rsplit("/", 1)[1].split("_", 2)[2]
     ]  # Input the corresponding column names
 
 else:
@@ -190,7 +217,7 @@ else:
         "chrom",
         "start",
         "end",
-        f"{intersected_files_paths[0].rsplit('/', 1)[1].split('_', 1)[1]}",
+        f"{intersected_files_paths[0].rsplit('/', 1)[1].split('_', 2)[2]}",
     ]
 
 final_intersect = (  # Calculate the median of all signals of the same bin.
@@ -205,12 +232,12 @@ if len(intersected_files_paths) > 1:
     for i in range(1, len(intersected_files_paths)):
 
         tmp_intersect = pd.read_csv(intersected_files_paths[i], sep="\t", header=None)
-        tmp_intersect = tmp_intersect.drop([3, 4, 5, len(tmp_intersect.columns) - 1], axis=1)
+        tmp_intersect = tmp_intersect.drop([3, 4, 5, 6, 7], axis=1)
 
         if header == True:
 
             tmp_intersect.columns = column_dict[
-                intersected_files_paths[i].rsplit("/", 1)[1].split("_", 1)[1]
+                intersected_files_paths[i].rsplit("/", 1)[1].split("_", 2)[2]
             ]  # Input the corresponding column names
 
         else:
@@ -219,7 +246,7 @@ if len(intersected_files_paths) > 1:
                 "chrom",
                 "start",
                 "end",
-                f"{intersected_files_paths[i].rsplit('/', 1)[1].split('_', 1)[1]}",
+                f"{intersected_files_paths[i].rsplit('/', 1)[1].split('_', 2)[2]}",
             ]
 
         tmp_intersect = (
@@ -242,15 +269,22 @@ for chrom in sorted(final_intersect["chrom"].unique()):
         f"{work_dir}signal/{chrom}/{out_name}_{chrom}.csv", sep="\t", index=False
     )
 
-# sp.call(f"tree -h {work_dir}", shell=True)  # Show directory tree.
+print(f"\nSignal bed files saved to {work_dir}signal/")
 
-print(f"Signal bed files saved in {work_dir}signal/")
+chroms_no_signal = [
+    chrom
+    for chrom in sp.getoutput(f"cut -f 1 {tmp_dir}/{resolution}bp_bin.bed | uniq").split("\n")
+    if chrom not in final_intersect["chrom"].unique()
+]
 
-for chrom in sp.getoutput(f"cut -f 1 {tmp_dir}/{resolution}bp_bin.bed | uniq").split("\n"):
+if len(chroms_no_signal) > 1:
 
-    if chrom not in final_intersect["chrom"].unique():
+    print(f"Omited chromosomes {', '.join(chroms_no_signal)} as they did not have any signal.")
 
-        print(f"Omited chromosome {chrom} as it did not have any signal.")
+else:
+
+    print(f"Omited chromosome {chroms_no_signal[0]} as it did not have any signal.")
+
 
 misc.remove_folder(pathlib.Path(tmp_dir))  # Remove tmp folder (not empty).
 

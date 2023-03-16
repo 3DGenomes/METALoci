@@ -178,6 +178,10 @@ if cores is None:
 
     cores = mp.cpu_count() - 2
 
+if cores > mp.cpu_count():
+
+    cores = mp.cpu_count()
+
 if cutoffs is None:
 
     cutoffs = [0.2]
@@ -221,16 +225,16 @@ def get_region_layout(row, silent: bool = True):
             save_path,
         )
 
-    # elif (
-    #     region_coords in bad_regions["region"]
-    #     and bad_regions["reason"][bad_regions["region"].index(region_coords)] == "empty"
-    # ):
+    elif (
+        region_coords in bad_regions["region"]
+        and bad_regions["reason"][bad_regions["region"].index(region_coords)] == "empty"
+    ):
 
-    #     if silent == False:
+        if silent == False:
 
-    #         print(f"\n------> Region {region_coords} already done (no data).")
+            print(f"\n------> Region {region_coords} already done (no data).")
 
-    #     return
+        return
 
     else:
 
@@ -246,6 +250,17 @@ def get_region_layout(row, silent: bool = True):
                     "\tForce option (-f) selected, recalculating "
                     "the Kamada-Kawai layout (files will be overwritten)\n"
                 )
+
+            mlobject = mlo.MetalociObject(
+                f"{region_chrom}:{region_start}-{region_end}",
+                str(region_chrom),
+                int(region_start),
+                int(region_end),
+                resolution,
+                int(poi),
+                persistence_length,
+                save_path,
+            )
 
         else:
 
@@ -315,19 +330,6 @@ def get_region_layout(row, silent: bool = True):
         mlobject.kk_coords = list(mlobject.kk_nodes.values())
         mlobject.kk_distances = distance.cdist(mlobject.kk_coords, mlobject.kk_coords, "euclidean")
 
-        if len(cutoffs) == 1:
-
-            # Save mlobject.
-            with open(mlobject.save_path, "wb") as hamlo_namendle:
-
-                mlobject.save(hamlo_namendle)
-
-            if silent == False:
-                print(
-                    f"\tKamada-Kawai layout of region {mlobject.region} saved"
-                    f" at {int(cutoff * 100)} % cutoff to file: {mlobject.save_path}"
-                )
-
         if len(cutoffs) > 1 or save_plots:
 
             kk_plt = plot.get_kk_plot(mlobject)
@@ -344,6 +346,19 @@ def get_region_layout(row, silent: bool = True):
         if silent == False:
 
             print(f"\tdone in {timedelta(seconds=round(time() - time_per_kk))}.")
+
+        if len(cutoffs) == 1:
+
+            if silent == False:
+                print(
+                    f"\tKamada-Kawai layout of region {mlobject.region} saved"
+                    f" at {int(cutoff * 100)} % cutoff to file: {mlobject.save_path}"
+                )
+
+            # Save mlobject.
+            with open(mlobject.save_path, "wb") as hamlo_namendle:
+
+                mlobject.save(hamlo_namendle)
 
         # with open(f"{work_dir}bad_regions.txt", "a+") as handler:
 
@@ -401,12 +416,17 @@ bad_regions = defaultdict(list)
 if multiprocess:
 
     if __name__ == "__main__":
+
         try:
 
             pool = mp.Pool(processes=cores)
             process_map(get_region_layout, [row for _, row in df_regions.iterrows()], max_workers=cores, chunksize=1)
-        except KeyboardInterrupt:
             pool.close()
+            pool.join()
+
+        except KeyboardInterrupt:
+
+            pool.terminate()
 
 else:
 

@@ -26,6 +26,9 @@ from metaloci.graph_layout import kk
 from metaloci.misc import misc
 from metaloci.plot import plot
 import pathlib
+import multiprocessing as mp
+from tqdm.contrib.concurrent import process_map
+from collections import defaultdict
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
@@ -127,6 +130,18 @@ optional_arg.add_argument(
 )
 
 optional_arg.add_argument(
+    "-m",
+    "--mp",
+    dest="multiprocess",
+    action="store_true",
+    help="Set use of multiprocessing.",
+)
+
+optional_arg.add_argument(
+    "-t", "--threads", dest="threads", type=int, action="store", help="Number of cores to use in multiprocessing."
+)
+
+optional_arg.add_argument(
     "-l",
     "--pl",
     dest="persistence_length",
@@ -146,6 +161,8 @@ resolution = args.reso
 cutoffs = args.cutoff
 force = args.force
 save_plots = args.save_plots
+multiprocess = args.multiprocess
+cores = args.threads
 persistence_length = args.persistence_length
 debug = args.debug
 
@@ -153,16 +170,13 @@ if not work_dir.endswith("/"):
 
     work_dir += "/"
 
+if multiprocess is None:
 
-# if dataset_name == "":
+    multiprocess = False
 
-#     if cooler_file.endswith(".cool") or cooler_file.endswith(".mcool"):
+if cores is None:
 
-#         dataset_name = cooler_file.rsplit("/", 1)[1].rsplit(".")[0] + "_" + str(resolution)
-
-#     else:
-
-#         dataset_name = cooler_file.rsplit("/", 1)[1] + "_" + str(resolution)
+    cores = mp.cpu_count() - 2
 
 if cutoffs is None:
 
@@ -186,46 +200,59 @@ if debug:
     print(table)
     sys.exit()
 
-# Computing
 
-start_timer = time()
-
-# Parsing the one-line region into a pandas data-frame. If the region contains '/', it is a path.
-# There is no need to add Windows path as METALoci will not work on Windows either way.
-if "/" in regions:
-
-    df_regions = pd.read_table(regions)
-
-else:
-
-    df_regions = pd.DataFrame({"coords": [regions], "symbol": ["symbol"], "id": ["id"]})
-
-pathlib.Path(os.path.join(work_dir)).mkdir(parents=True, exist_ok=True)
-
-bad_regions = {"region": [], "reason": []}
-
-for i, row in df_regions.iterrows():
+def get_region_layout(row, silent: bool = True):
 
     region_chrom, region_start, region_end, poi = re.split(":|-|_", row.coords)
-
-    mlobject = mlo.MetalociObject(
-        f"{region_chrom}:{region_start}-{region_end}",
-        str(region_chrom),
-        int(region_start),
-        int(region_end),
-        resolution,
-        int(poi),
-        persistence_length,
-    )
-
-    filename = f"{mlobject.chrom}_{mlobject.start}_{mlobject.end}_{mlobject.poi}"
-
+    region_coords = f"{region_chrom}_{region_start}_{region_end}_{poi}"
     pathlib.Path(os.path.join(work_dir, region_chrom), "plots", "KK").mkdir(parents=True, exist_ok=True)
+    save_path = os.path.join(work_dir, region_chrom, f"{region_coords}.mlo")
 
-    coordsfile = f"{os.path.join(work_dir, region_chrom, filename)}_KK.pkl"
-    cooler_file_str = cooler_file + "::/resolutions/" + str(mlobject.resolution)
+    if not os.path.isfile(save_path):
 
-    print(f"\n------> Working on region: {mlobject.region}\n")
+        mlobject = mlo.MetalociObject(
+            f"{region_chrom}:{region_start}-{region_end}",
+            str(region_chrom),
+            int(region_start),
+            int(region_end),
+            resolution,
+            int(poi),
+            persistence_length,
+            save_path,
+        )
+
+    # elif (
+    #     region_coords in bad_regions["region"]
+    #     and bad_regions["reason"][bad_regions["region"].index(region_coords)] == "empty"
+    # ):
+
+    #     if silent == False:
+
+    #         print(f"\n------> Region {region_coords} already done (no data).")
+
+    #     return
+
+    else:
+
+        if silent == False:
+
+            print(f"\n------> Region {region_coords} already done.")
+
+        if force:
+
+            if silent == False:
+
+                print(
+                    "\tForce option (-f) selected, recalculating "
+                    "the Kamada-Kawai layout (files will be overwritten)\n"
+                )
+
+        else:
+
+            return
+
+    if silent == False:
+        print(f"\n------> Working on region: {mlobject.region}\n")
 
     # This part has been modified. In some datasets (NeuS) the matrix was completely empty,
     # so the pkl file was not created (gave an error in the MatTransform function:
@@ -234,29 +261,7 @@ for i, row in df_regions.iterrows():
     # is also found in this
     # file, the script skips the calculations (as the script already has checked
     # the region).
-    if os.path.isfile(coordsfile):
-
-        print(f"\t{mlobject.region} already done.")
-
-        if force:
-
-            print(
-                "\tForce option (-f) selected, recalculating " "the Kamada-Kawai layout (files will be overwritten)\n"
-            )
-
-        else:
-
-            continue
-
-    elif (
-        mlobject.region in bad_regions["region"]
-        and bad_regions["reason"][bad_regions["region"].index(mlobject.region)] == "empty"
-    ):
-
-        print("\t<--- already done (no data)!")
-
-        continue
-
+    cooler_file_str = cooler_file + "::/resolutions/" + str(mlobject.resolution)
     mlobject.matrix = cooler.Cooler(cooler_file_str).matrix(sparse=True).fetch(mlobject.region).toarray()
     mlobject.matrix = misc.clean_matrix(mlobject, bad_regions)
 
@@ -268,15 +273,16 @@ for i, row in df_regions.iterrows():
     # clean_matrix() returns mlo as None.
     if mlobject.matrix is None:
 
-        continue
+        return
 
-    for j, cutoff in enumerate(cutoffs):
+    for cutoff in cutoffs:
 
         time_per_kk = time()
 
         mlobject.kk_cutoff = cutoff
 
-        print(f"\tCutoff to be used is: {int(mlobject.kk_cutoff * 100)} %")
+        if silent == False:
+            print(f"\tCutoff to be used is: {int(mlobject.kk_cutoff * 100)} %")
 
         # Get submatrix of restraints
         restraints_matrix, mlobject = kk.get_restraints_matrix(mlobject)
@@ -293,14 +299,17 @@ for i, row in df_regions.iterrows():
                 os.path.join(
                     work_dir,
                     region_chrom,
-                    f"plots/mixed_matrices/{filename}_" f"{mlobject.kk_cutoff}_mixed-matrices.pdf",
+                    f"plots/mixed_matrices/{region_coords}_" f"{mlobject.kk_cutoff}_mixed-matrices.pdf",
                 ),
                 dpi=300,
             )
 
             plt.close()
 
-        print("\tLayouting Kamada-Kawai...")
+        if silent == False:
+
+            print("\tLayouting Kamada-Kawai...")
+
         mlobject.kk_graph = nx.from_scipy_sparse_array(csr_matrix(restraints_matrix))
         mlobject.kk_nodes = nx.kamada_kawai_layout(mlobject.kk_graph)
         mlobject.kk_coords = list(mlobject.kk_nodes.values())
@@ -308,17 +317,16 @@ for i, row in df_regions.iterrows():
 
         if len(cutoffs) == 1:
 
-            mlobject.save_path = os.path.join(work_dir, region_chrom, f"{filename}.mlo")
-
             # Save mlobject.
             with open(mlobject.save_path, "wb") as hamlo_namendle:
 
                 mlobject.save(hamlo_namendle)
 
-            print(
-                f"\tKamada-Kawai layout of region {mlobject.region} saved"
-                f" at {int(cutoff * 100)} % cutoff to file: {mlobject.save_path}"
-            )
+            if silent == False:
+                print(
+                    f"\tKamada-Kawai layout of region {mlobject.region} saved"
+                    f" at {int(cutoff * 100)} % cutoff to file: {mlobject.save_path}"
+                )
 
         if len(cutoffs) > 1 or save_plots:
 
@@ -327,29 +335,98 @@ for i, row in df_regions.iterrows():
             fig_name = os.path.join(
                 work_dir,
                 region_chrom,
-                f"plots/KK/{filename}_" f"{mlobject.kk_cutoff}_KK.pdf",
+                f"plots/KK/{region_coords}_" f"{mlobject.kk_cutoff}_KK.pdf",
             )
 
             kk_plt.savefig(fig_name, dpi=300)
             plt.close()
 
-        elapsed_time_secs = time() - time_per_kk
+        if silent == False:
 
-        print(f"\tdone in {timedelta(seconds=round(elapsed_time_secs))}.")
+            print(f"\tdone in {timedelta(seconds=round(time() - time_per_kk))}.")
+
+        # with open(f"{work_dir}bad_regions.txt", "a+") as handler:
+
+        #     for region, reason in bad_regions.items():
+
+        #         if not any(f"{region}\t{reason[0]}" in line for line in handler):
+
+        #             handler.write(f"{region}\t{reason[0]}\n")
+        #             handler.flush()
+
+        # with open(f"{work_dir}bad_regions.txt", "a+") as handler:
+
+        #     lines = [line.rstrip("\n") for line in handler]
+
+        #     for region, reason in bad_regions.items():
+
+        #         if f"{region}\t{reason[0]}" not in lines:
+        #             # inserts on top, elsewise use lines.append(name) to append at the end of the file.
+        #             lines.insert(0, f"{region}\t{reason[0]}\n")
+
+        #     handler.seek(0)  # move to first position in the file, to overwrite !
+        #     handler.write("\n".join(lines))
+        #     handler.flush()
+
+        # with open(f"{work_dir}bad_regions.txt", "a+") as handler:
+
+        #     x = handler.readlines()  # reading all the lines in a list, no worry about '\n'
+
+        #     for region, reason in bad_regions.items():
+
+        #         if f"{region}\t{reason[0]}" not in x:
+        #             # if word not in file then write the word to the file
+        #             handler.write(f"{region}\t{reason[0]}\n")
+        #             handler.flush()
+
+
+# Computing
+
+start_timer = time()
+
+# Parsing the one-line region into a pandas data-frame. If the region contains '/', it is a path.
+# There is no need to add Windows path as METALoci will not work on Windows either way.
+if "/" in regions:
+
+    df_regions = pd.read_table(regions)
+
+else:
+
+    df_regions = pd.DataFrame({"coords": [regions], "symbol": ["symbol"], "id": ["id"]})
+
+pathlib.Path(os.path.join(work_dir)).mkdir(parents=True, exist_ok=True)
+
+bad_regions = defaultdict(list)
+
+if multiprocess:
+
+    if __name__ == "__main__":
+        try:
+
+            pool = mp.Pool(processes=cores)
+            process_map(get_region_layout, [row for _, row in df_regions.iterrows()], max_workers=cores, chunksize=1)
+        except KeyboardInterrupt:
+            pool.close()
+
+else:
+
+    for _, row in df_regions.iterrows():
+
+        get_region_layout(row, silent=False)
 
 # If there is bad regions, write to a file which is the bad region and why,
 # but only if that region-reason pair does not lready exist in the file.
-bad_regions = pd.DataFrame(bad_regions)
+# bad_regions = pd.DataFrame(bad_regions)
 
-if bad_regions.shape[0] > 0:
+# if bad_regions.shape[0] > 0:
 
-    with open(f"{work_dir}bad_regions.txt", "a+") as handler:
+#     with open(f"{work_dir}bad_regions.txt", "a+") as handler:
 
-        [
-            handler.write(f"{row.region}\t{row.reason}\n")
-            for _, row in bad_regions.iterrows()
-            if not any(f"{row.region}\t{row.reason}" in line for line in handler)
-        ]
+#         [
+#             handler.write(f"{row.region}\t{row.reason}\n")
+#             for _, row in bad_regions.iterrows()
+#             if not any(f"{row.region}\t{row.reason}" in line for line in handler)
+#         ]
 
 print(f"\nTotal time spent: {timedelta(seconds=round(time() - start_timer))}.")
 print("\nall done.")

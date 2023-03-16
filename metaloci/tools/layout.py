@@ -1,16 +1,11 @@
-"""
-Script to create the Kamada-Kaway layouts based on HiC data
-"""
-__author__ = "Iago Maceda Porto and Leo Zuber Ponce"
-
-# pylint: disable=invalid-name, wrong-import-position, wrong-import-order
-
+import multiprocessing as mp
 import os
 import pathlib
 import re
 import sys
 import warnings
 from argparse import SUPPRESS, ArgumentParser, RawDescriptionHelpFormatter
+from collections import defaultdict
 from datetime import timedelta
 from time import time
 
@@ -20,15 +15,12 @@ import networkx as nx
 import pandas as pd
 from scipy.sparse import csr_matrix
 from scipy.spatial import distance
+from tqdm.contrib.concurrent import process_map
 
 from metaloci import mlo
 from metaloci.graph_layout import kk
 from metaloci.misc import misc
 from metaloci.plot import plot
-import pathlib
-import multiprocessing as mp
-from tqdm.contrib.concurrent import process_map
-from collections import defaultdict
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
@@ -416,6 +408,8 @@ bad_regions = defaultdict(list)
 if multiprocess:
 
     if __name__ == "__main__":
+
+        print(f"{len(df_regions)} regions will be computed.\n")
 
         try:
 

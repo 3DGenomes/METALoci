@@ -229,7 +229,12 @@ def load_region_signals(mlobject: mlo.MetalociObject, signal_data: dict, signal_
 
 
 def compute_lmi(
-    mlobject: mlo.MetalociObject, signal_type: str, neighbourhood: float, n_permutations=9999, signipval=0.05
+    mlobject: mlo.MetalociObject,
+    signal_type: str,
+    neighbourhood: float,
+    n_permutations=9999,
+    signipval=0.05,
+    silent=False,
 ) -> pd.DataFrame:
     """
     Computes Local Moran's Index for a signal type and outputs information of the LMI value and its p-value
@@ -287,10 +292,13 @@ def compute_lmi(
         y, weights, permutations=n_permutations
     )  # geoda_quadsbool (default=False) If False use PySAL Scheme: HH=1, LH=2, LL=3, HL=4
     lags = lag_spatial(moran_local_object.w, moran_local_object.z)
-    print(
-        f"\tThere is a total of {len(moran_local_object.p_sim[(moran_local_object.p_sim < signipval)])} "
-        f"significant points in Local Moran's I for signal {signal_type}"
-    )
+
+    if silent == False:
+
+        print(
+            f"\tThere is a total of {len(moran_local_object.p_sim[(moran_local_object.p_sim < signipval)])} "
+            f"significant points in Local Moran's I for signal {signal_type}"
+        )
 
     df_lmi = defaultdict(list)
 

@@ -41,7 +41,7 @@ input_arg.add_argument(
     dest="cooler_file",
     metavar="PATH",
     type=str,
-    required=True,
+    required=False,
     help="complete path to the cooler file.",
 )
 
@@ -118,15 +118,16 @@ if debug:
 tmp_dir = f"{work_dir}tmp"
 pathlib.Path(tmp_dir).mkdir(parents=True, exist_ok=True)
 
-cooler_file = cooler.Cooler(cooler_path + "::/resolutions/" + str(resolution))
-
-# The following commented lines change the chromosome names of a cooler file from only number to UCSC format.
-# Only for testing purposes.
-# if "chr" not in cooler_file.chromnames[0]:
-
-#     cooler.rename_chroms(cooler_file, {chrom: "chr" + str(chrom) for chrom in cooler_file.chromnames})
-
-misc.check_chromosome_names(cooler_file, data, coords)
+if (cooler_path):
+    cooler_file = cooler.Cooler(cooler_path + "::/resolutions/" + str(resolution))
+    
+    # The following commented lines change the chromosome names of a cooler file from only number to UCSC format.
+    # Only for testing purposes.
+    # if "chr" not in cooler_file.chromnames[0]:
+    
+    #     cooler.rename_chroms(cooler_file, {chrom: "chr" + str(chrom) for chrom in cooler_file.chromnames})
+    
+    misc.check_chromosome_names(cooler_file, data, coords)
 
 column_dict = {}
 
@@ -203,7 +204,8 @@ intersected_files_paths = [(f"{tmp_dir}/intersected_ok_" + i.rsplit("/", 1)[1]) 
 final_intersect = pd.read_csv(
     intersected_files_paths[0], sep="\t", header=None, low_memory=False
 )  # Read the first intersected file,
-final_intersect = final_intersect.drop([3, 4, 5, 6, 7], axis=1)  # Drop unnecesary columns,
+final_intersect = final_intersect.drop([3, 4, 5, 7, 8], axis=1)  # Drop unnecesary columns, # marcius WAS DROPPING THE WRONG COLUMNS
+#print(intersected_files_paths[0],final_intersect.head(10))
 
 if header == True:
 
@@ -225,14 +227,16 @@ final_intersect = (  # Calculate the median of all signals of the same bin.
     .median()
     .reset_index()
 )
+#print(final_intersect.head(10))
+
 
 # Process the rest of the files the same way and merge with next one, until all files are merged.
 if len(intersected_files_paths) > 1:
 
     for i in range(1, len(intersected_files_paths)):
 
-        tmp_intersect = pd.read_csv(intersected_files_paths[i], sep="\t", header=None)
-        tmp_intersect = tmp_intersect.drop([3, 4, 5, 6, 7], axis=1)
+        tmp_intersect = pd.read_csv(intersected_files_paths[i], sep="\t", header=None, low_memory=False) # marcius
+        tmp_intersect = tmp_intersect.drop([3, 4, 5, 7, 8], axis=1) # marcius WAS DROPPING THE WRONG COLUMNS
 
         if header == True:
 
@@ -256,6 +260,7 @@ if len(intersected_files_paths) > 1:
         )
 
         final_intersect = pd.merge(final_intersect, tmp_intersect, on=["chrom", "start", "end"], how="inner")
+        print(final_intersect.head(10))
 
 # For each chromosome, create a directory and save the information for that chromosome in .csv and
 # .pkl.
@@ -277,13 +282,13 @@ chroms_no_signal = [
     if chrom not in final_intersect["chrom"].unique()
 ]
 
-if len(chroms_no_signal) > 1:
+if len(chroms_no_signal): # marcius
 
     print(f"Omited chromosomes {', '.join(chroms_no_signal)} as they did not have any signal.")
 
-else:
+#marcius else:
 
-    print(f"Omited chromosome {chroms_no_signal[0]} as it did not have any signal.")
+#marcius    print(f"Omited chromosome {chroms_no_signal[0]} as it did not have any signal.")
 
 
 misc.remove_folder(pathlib.Path(tmp_dir))  # Remove tmp folder (not empty).

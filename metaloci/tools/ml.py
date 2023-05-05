@@ -57,8 +57,8 @@ region_input = parser.add_argument_group(title="Region arguments", description="
 region_input.add_argument(
     "-g",
     "--region",
-    dest="region_file",
-    metavar="PATH",
+    dest="single_region",
+    metavar="STR",
     type=str,
     help="Region to apply LMI in format chrN:start-end_midpoint.",
 )
@@ -133,6 +133,7 @@ optional_arg.add_argument("-u", "--debug", dest="debug", action="store_true", he
 args = parser.parse_args(None if sys.argv[1:] else ["-h"])
 
 work_dir = args.work_dir
+sregion = args.single_region
 regions = args.region_file
 signal_file = args.signal_file
 signals = args.signals
@@ -149,7 +150,8 @@ if debug:
 
     table = [
         ["work_dir", work_dir],
-        ["gene_file", regions],
+        ["single_region", sregion],
+        ["region_file", regions],
         ["ind_file", signal_file],
         ["types", signals],
         ["num_cores", n_cores],
@@ -168,11 +170,11 @@ timer = time()
 
 # Read region list. If its a region as parameter, create a dataframe.
 # If its a path to a file, read that dataframe.
-if "/" in regions:
+if regions: # marcius
 
     df_regions = pd.read_table(regions)
 
-else:
+if sregion: # marcius
 
     df_regions = pd.DataFrame({"coords": [regions], "symbol": ["symbol"], "id": ["id"]})
 

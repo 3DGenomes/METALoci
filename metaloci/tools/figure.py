@@ -72,8 +72,8 @@ region_input = parser.add_argument_group(title="Region arguments", description="
 region_input.add_argument(
     "-g",
     "--region",
-    dest="region_file",
-    metavar="FILE",
+    dest="single_region", # marcius change so is always a different variable than region_file
+    metavar="STR", # marcius
     type=str,
     nargs="*",
     action="extend",
@@ -145,6 +145,7 @@ optional_arg.add_argument("-u", "--debug", dest="debug", action="store_true", he
 args = parser.parse_args(None if sys.argv[1:] else ["-h"])
 
 work_dir = args.work_dir
+sregion = args.single_region
 regions = args.region_file
 signals = args.signals
 quadrants = args.quart
@@ -162,6 +163,7 @@ if debug:
 
     table = [
         ["work_dir", work_dir],
+        ["region", sregion],
         ["rfile", regions],
         ["signals", signals],
         ["quart", quadrants],
@@ -185,11 +187,11 @@ legend_elements = [
 
 start_timer = time()
 
-if "/" in regions:
+if regions: # marcius
 
     df_regions = pd.read_table(regions)
 
-else:
+if sregion: # marcius
 
     df_regions = pd.DataFrame({"coords": [regions], "symbol": ["symbol"], "id": ["id"]})
 
@@ -318,13 +320,14 @@ for i, region_iter in df_regions.iterrows():
         print("\t\tLMI Scatter plot -> done.")
 
         print("\t\tSignal plot", end="\r")
-        bed_data, selmetaloci = plot.signal_bed(
+        bed_data, selmetaloci = plot.signal_bed( #####marcius####### THIS FUNCTION NEEDS TO BE FIXED! CURRENTLY NOT WORKING
             mlobject,
             merged_lmi_geometry,
             buffer * BFACT,
             quadrants,
             signipval,
         )
+        selmetaloci = [] #####marcius####### THIS FUNCTION NEEDS TO BE FIXED! CURRENTLY NOT WORKING
 
         sig_plt = plot.signal_plot(mlobject, merged_lmi_geometry, selmetaloci, bins, coords_b)
         sig_plt.savefig(f"{plot_filename}_signal.pdf", **plot_opt)

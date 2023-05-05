@@ -15,6 +15,7 @@ from datetime import timedelta
 from time import time
 
 import cooler
+import hicstraw
 import matplotlib.pyplot as plt
 import networkx as nx
 import pandas as pd
@@ -71,8 +72,18 @@ input_arg.add_argument(
     dest="cooler_file",
     metavar="PATH",
     type=str,
-    required=True,
+    required=False,
     help="complete path to the cooler file.",
+)
+
+input_arg.add_argument(
+    "-i",
+    "--hic_file",
+    dest="hic_file",
+    metavar="PATH",
+    type=str,
+    required=True,
+    help="complete path to the Hi-C file in either .cool/.mcool or .hic format.",
 )
 
 input_arg.add_argument(
@@ -82,14 +93,14 @@ input_arg.add_argument(
     metavar="INT",
     type=int,
     required=True,
-    help="Resolution of the cooler files to be used (in bp).",
+    help="Resolution of the Hi-C files to be used (in bp).",
 )
 
 region_arg = parser.add_argument_group(title="region arguments", description="Choose one of the following options.")
 region_arg.add_argument(
     "-g",
     "--region",
-    dest="regions",
+    dest="single_region", # marcius
     metavar="STR",
     type=str,
     help="region to be computed in chr:start-end format.",
@@ -130,6 +141,7 @@ optional_arg.add_argument(
     "-l",
     "--pl",
     dest="persistence_length",
+    type=float, # marcius
     action="store",
     help="set a persistence length for the Kamada-Kawai layout.",
 )
@@ -140,7 +152,9 @@ optional_arg.add_argument("-u", "--debug", dest="debug", action="store_true", he
 args = parser.parse_args(None if sys.argv[1:] else ["-h"])
 
 work_dir = args.work_dir
+hic_file = args.hic_file
 cooler_file = args.cooler_file
+sregion = args.single_region # marcius
 regions = args.regions
 resolution = args.reso
 cutoffs = args.cutoff
@@ -175,7 +189,8 @@ if debug:
 
     table = [
         ["work_dir", work_dir],
-        ["cooler_dir", cooler_file],
+        ["hic_fiile", hic_file],
+        ["region", sregion], # marcius
         ["region_file", regions],
         ["reso", resolution],
         ["cutoffs", cutoffs],
@@ -192,11 +207,11 @@ start_timer = time()
 
 # Parsing the one-line region into a pandas data-frame. If the region contains '/', it is a path.
 # There is no need to add Windows path as METALoci will not work on Windows either way.
-if "/" in regions:
+if regions: # marcius
 
     df_regions = pd.read_table(regions)
 
-else:
+if sregion:
 
     df_regions = pd.DataFrame({"coords": [regions], "symbol": ["symbol"], "id": ["id"]})
 
@@ -223,7 +238,14 @@ for i, row in df_regions.iterrows():
     pathlib.Path(os.path.join(work_dir, region_chrom), "plots", "KK").mkdir(parents=True, exist_ok=True)
 
     coordsfile = f"{os.path.join(work_dir, region_chrom, filename)}_KK.pkl"
-    cooler_file_str = cooler_file + "::/resolutions/" + str(mlobject.resolution)
+    
+    if hic_file.endswith(".cool") or hic_file.endswith(".mcool"):
+        
+        hic_file_str = hic_file + "::/resolutions/" + str(mlobject.resolution)
+
+    if hic_file.endswith(".hic"):
+        
+        hic_file_str = hic_file
 
     print(f"\n------> Working on region: {mlobject.region}\n")
 
@@ -257,8 +279,16 @@ for i, row in df_regions.iterrows():
 
         continue
 
-    mlobject.matrix = cooler.Cooler(cooler_file_str).matrix(sparse=True).fetch(mlobject.region).toarray()
-    mlobject.matrix = misc.clean_matrix(mlobject, bad_regions)
+    if hic_file.endswith(".cool") or hic_file.endswith(".mcool"):
+        mlobject.matrix = cooler.Cooler(hic_file_str).matrix(sparse=True).fetch(mlobject.region).toarray()
+        mlobject.matrix = misc.clean_matrix(mlobject, bad_regions)
+
+    if hic_file.endswith(".hic"):
+        hic = hicstraw.HiCFile(hic_file_str)
+        chrm,start,end = re.split(':|-', mlobject.region)
+        mzd = hic.getMatrixZoomData(chrm, chrm, 'observed', 'VC_SQRT', 'BP', resolution)
+        mlobject.matrix = mzd.getRecordsAsMatrix(int(start), int(end), int(start), int(end))        
+        mlobject.matrix = misc.clean_matrix(mlobject, bad_regions)
 
     # if "chr" not in mlobject.matrix.chromnames[0]:
 

@@ -63,7 +63,7 @@ def check_diagonal(diagonal: np.ndarray) -> tuple[int, float, float, list]:
 
     for i, element in enumerate(diagonal):
 
-        if element == 0:
+        if element == 0 or np.isnan(element):
 
             total += 1
             stretch += 1
@@ -107,21 +107,20 @@ def clean_matrix(mlobject: mlo.MetalociObject, bad_regions: pd.DataFrame) -> np.
 
     if total_zeroes == len(diagonal):
 
-        print("\tMatrix is empty; passing to the next region")
-        bad_regions["region"].append(mlobject.region)
-        bad_regions["reason"].append("empty")
+        # bad_regions[mlobject.region].append(mlobject.region)
+        bad_regions[mlobject.region].append("empty")
 
         return None
 
     if percentage_zeroes >= 50:
 
-        bad_regions["region"].append(mlobject.region)
-        bad_regions["reason"].append("percentage_of_zeroes")
+        # bad_regions[mlobject.region].append(mlobject.region)
+        bad_regions[mlobject.region].append("percentage_of_zeroes")
 
     if max_stretch >= 20:
 
-        bad_regions["region"].append(mlobject.region)
-        bad_regions["reason"].append("stretch")
+        # bad_regions[mlobject.region].append(mlobject.region)
+        bad_regions[mlobject.region].append("stretch")
 
     mlobject.matrix[zero_loc] = 0
     mlobject.matrix[:, zero_loc] = 0

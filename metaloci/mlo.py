@@ -2,7 +2,7 @@ import dill as pickle
 
 
 class MetalociObject:
-    def __init__(self, region, chrom, start, end, resolution, poi, persistence_length):
+    def __init__(self, region, chrom, start, end, resolution, poi, persistence_length, save_path):
 
         self.region = region
         self.chrom = chrom
@@ -11,6 +11,7 @@ class MetalociObject:
         self.resolution = resolution
         self.poi = poi
         self.persistence_length = persistence_length
+        self.save_path = save_path
         self.subset_matrix = None
         self.matrix = None
         self.mixed_matrices = None
@@ -23,7 +24,6 @@ class MetalociObject:
         self.kk_distances = None
         self.lmi_geometry = None
         self.lmi_info = None
-        self.save_path = None
 
     def save(self, file_handler):
 

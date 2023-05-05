@@ -1,10 +1,7 @@
 """
 Script to "paint" the Kamada-Kawai layaouts using a signal, grouping individuals by type
 """
-
-
-# pylint: disable=invalid-name, wrong-import-position, wrong-import-order
-
+import multiprocessing as mp
 import pickle
 import re
 import sys
@@ -13,6 +10,7 @@ from datetime import timedelta
 from time import time
 
 import pandas as pd
+from tqdm.contrib.concurrent import process_map
 
 from metaloci.spatial_stats import lmi
 
@@ -96,10 +94,12 @@ signal_arg.add_argument(
 
 optional_arg = parser.add_argument_group(title="Optional arguments")
 
+optional_arg.add_argument("-f", "--force", dest="force", action="store_true", help="force rewriting existing data.")
+
 optional_arg.add_argument("-h", "--help", action="help", help="Show this help message and exit.")
 
 optional_arg.add_argument(
-    "-t",
+    "-c",
     "--cores",
     dest="num_cores",
     default=1,
@@ -128,6 +128,18 @@ optional_arg.add_argument(
     help="P-value significance threshold (default: %(default)4.2f).",
 )
 
+optional_arg.add_argument(
+    "-m",
+    "--mp",
+    dest="multiprocess",
+    action="store_true",
+    help="Set use of multiprocessing.",
+)
+
+optional_arg.add_argument(
+    "-t", "--threads", dest="threads", type=int, action="store", help="Number of cores to use in multiprocessing."
+)
+
 optional_arg.add_argument("-u", "--debug", dest="debug", action="store_true", help=SUPPRESS)
 
 args = parser.parse_args(None if sys.argv[1:] else ["-h"])
@@ -139,6 +151,9 @@ signals = args.signals
 n_cores = args.num_cores
 n_permutations = args.perms
 signipval = args.signipval
+multiprocess = args.multiprocess
+cores = args.threads
+force = args.force
 debug = args.debug
 
 if not work_dir.endswith("/"):
@@ -164,6 +179,82 @@ if debug:
 INFLUENCE = 1.5
 BFACT = 2
 
+
+def get_lmi(region_iter, i=None, silent: bool = True):
+
+    region_timer = time()
+
+    region = region_iter.coords
+
+    if silent == False:
+
+        print(f"\n------> Working on region {region} [{i + 1}/{len(df_regions)}]\n")
+
+    try:
+
+        with open(
+            f"{work_dir}{region.split(':', 1)[0]}/{re.sub(':|-', '_', region)}.mlo",
+            "rb",
+        ) as mlobject_handler:
+
+            mlobject = pickle.load(mlobject_handler)
+
+    except FileNotFoundError:
+
+        if silent == False:
+            print("\t.mlo file not found for this region.\n\tSkipping to next region...")
+
+        return
+
+    # If the pickle file contains the
+    if mlobject.kk_nodes is None:
+
+        if silent == False:
+
+            print("Kamada-Kawai layout has not been calculated for this region. \n\tSkipping to next region...")
+
+        return
+
+    if mlobject.lmi_geometry is not None and force == False:
+
+        if silent == False:
+
+            print("\tLMI already computed for this region. \n\tSkipping to next region...")
+
+        return
+
+    # Get average distance between consecutive points to define influence,
+    # which should be ~2 particles of radius.
+    mean_distance = mlobject.kk_distances.diagonal(1).mean()
+    buffer = mean_distance * INFLUENCE
+    mlobject.lmi_geometry = lmi.construct_voronoi(mlobject, buffer)
+
+    if silent == False:
+
+        print(f"\tAverage distance between consecutive particles: {mean_distance:6.4f} [{buffer:6.4f}]")
+        print(f"\tGeometry information for region {mlobject.region} saved in: {mlobject.save_path}")
+
+    # Load only signal for this specific region.
+    mlobject.signals_dict, signal_types = lmi.load_region_signals(mlobject, signal_data, signal_file)
+
+    all_lmi = {}
+
+    for signal_type in signal_types:
+
+        all_lmi[signal_type] = lmi.compute_lmi(mlobject, signal_type, buffer * BFACT, n_permutations, signipval, silent)
+
+    mlobject.lmi_info = all_lmi
+
+    if silent == False:
+
+        print(f"\n\tRegion done in {timedelta(seconds=round(time() - region_timer))}")
+        print(f"\tLMI information for region {mlobject.region} will be saved in: {mlobject.save_path}\n")
+
+    with open(mlobject.save_path, "wb") as hamlo_namendle:
+
+        mlobject.save(hamlo_namendle)
+
+
 timer = time()
 
 # Read region list. If its a region as parameter, create a dataframe.
@@ -180,65 +271,28 @@ else:
 # not to load useless data.
 signal_data = lmi.load_signals(df_regions, work_dir=work_dir)
 
-# Iterating through all the genes of the regions file (regions to process).
-for i, region_iter in df_regions.iterrows():
+if multiprocess:
 
-    region_timer = time()
+    if __name__ == "__main__":
 
-    region = region_iter.coords
+        print(f"{len(df_regions)} regions will be computed.\n")
 
-    print(f"\n------> Working on region {region} [{i + 1}/{len(df_regions)}]\n")
+        try:
 
-    try:
+            pool = mp.Pool(processes=cores)
+            process_map(get_lmi, [row for _, row in df_regions.iterrows()], max_workers=cores, chunksize=1)
+            pool.close()
+            pool.join()
 
-        with open(
-            f"{work_dir}{region.split(':', 1)[0]}/{re.sub(':|-', '_', region)}.mlo",
-            "rb",
-        ) as mlobject_handler:
+        except KeyboardInterrupt:
 
-            mlobject = pickle.load(mlobject_handler)
+            pool.terminate()
 
-    except FileNotFoundError:
+else:
 
-        print("\t.mlo file not found for this region.\nSkipping to next region.")
+    for i, row in df_regions.iterrows():
 
-        continue
+        get_lmi(row, i, silent=False)
 
-    # If the pickle file contains the
-    if mlobject.kk_nodes is None:
-
-        print("Kamada-Kawai layout has not been calculated for this region. \nSkipping to next region.")
-
-        continue
-
-    # Get average distance between consecutive points to define influence,
-    # which should be ~2 particles of radius.
-    mean_distance = mlobject.kk_distances.diagonal(1).mean()
-    buffer = mean_distance * INFLUENCE
-    mlobject.lmi_geometry = lmi.construct_voronoi(mlobject, buffer)
-
-    print(f"\tAverage distance between consecutive particles: {mean_distance:6.4f} [{buffer:6.4f}]")
-    print(f"\tGeometry information for region {mlobject.region} saved in: {mlobject.save_path}")
-
-    ########################################################################################################################
-
-    # Load only signal for this specific region.
-    mlobject.signals_dict, signal_types = lmi.load_region_signals(mlobject, signal_data, signal_file)
-
-    all_lmi = {}
-
-    for signal_type in signal_types:
-
-        all_lmi[signal_type] = lmi.compute_lmi(mlobject, signal_type, buffer * BFACT, n_permutations, signipval)
-
-    mlobject.lmi_info = all_lmi
-
-    print(f"\n\tRegion done in {timedelta(seconds=round(time() - region_timer))}")
-    print(f"\tLMI information for region {mlobject.region} will be saved in: {mlobject.save_path}\n")
-
-    with open(mlobject.save_path, "wb") as hamlo_namendle:
-
-        mlobject.save(hamlo_namendle)
-
-print(f"Total time spent: {timedelta(seconds=round(time() - timer))}.")
+print(f"\nTotal time spent: {timedelta(seconds=round(time() - timer))}.")
 print("\nall done.")

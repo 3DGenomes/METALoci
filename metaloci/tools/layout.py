@@ -84,7 +84,7 @@ input_arg.add_argument(
 input_arg.add_argument(
     "-g",
     "--region",
-    dest="region_file",
+    dest="regions",
     metavar="PATH",
     type=str,
     help="Region to apply LMI in format chrN:start-end_midpoint or file with the regions of interest.",

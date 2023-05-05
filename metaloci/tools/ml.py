@@ -2,6 +2,7 @@
 Script to "paint" the Kamada-Kawai layaouts using a signal, grouping individuals by type
 """
 import multiprocessing as mp
+import os
 import pickle
 import re
 import sys
@@ -58,16 +59,7 @@ region_input.add_argument(
     dest="region_file",
     metavar="PATH",
     type=str,
-    help="Region to apply LMI in format chrN:start-end_midpoint.",
-)
-
-region_input.add_argument(
-    "-G",
-    "--region-file",
-    dest="region_file",
-    metavar="PATH",
-    type=str,
-    help="Path to the file with the regions of interest.",
+    help="Region to apply LMI in format chrN:start-end_midpoint or file with the regions of interest.",
 )
 
 signal_arg = parser.add_argument_group(title="Signal arguments", description="Choose one of the following options:")
@@ -259,7 +251,7 @@ timer = time()
 
 # Read region list. If its a region as parameter, create a dataframe.
 # If its a path to a file, read that dataframe.
-if "/" in regions:
+if os.path.isfile(regions):
 
     df_regions = pd.read_table(regions)
 

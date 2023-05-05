@@ -37,8 +37,8 @@ input_arg.add_argument(
 
 input_arg.add_argument(
     "-c",
-    "--cooler",
-    dest="cooler_file",
+    "--hic",
+    dest="hic_file",
     metavar="PATH",
     type=str,
     required=True,
@@ -96,7 +96,7 @@ if not args.work_dir.endswith("/"):
 
 work_dir = args.work_dir
 data = args.data
-cooler_path = args.cooler_file
+hic_path = args.hic_file
 out_name = args.output
 coords = args.coords
 resolution = args.reso
@@ -118,15 +118,11 @@ if debug:
 tmp_dir = f"{work_dir}tmp"
 pathlib.Path(tmp_dir).mkdir(parents=True, exist_ok=True)
 
-cooler_file = cooler.Cooler(cooler_path + "::/resolutions/" + str(resolution))
+if hic_path.endswith(".cool") or hic_path.endswith(".mcool"):
 
-# The following commented lines change the chromosome names of a cooler file from only number to UCSC format.
-# Only for testing purposes.
-# if "chr" not in cooler_file.chromnames[0]:
+    hic_path = hic_path + "::/resolutions/" + str(resolution)
 
-#     cooler.rename_chroms(cooler_file, {chrom: "chr" + str(chrom) for chrom in cooler_file.chromnames})
-
-misc.check_chromosome_names(cooler_file, data, coords)
+misc.check_chromosome_names(hic_path, data, coords)
 
 column_dict = {}
 
@@ -203,7 +199,7 @@ intersected_files_paths = [(f"{tmp_dir}/intersected_ok_" + i.rsplit("/", 1)[1]) 
 final_intersect = pd.read_csv(
     intersected_files_paths[0], sep="\t", header=None, low_memory=False
 )  # Read the first intersected file,
-final_intersect = final_intersect.drop([3, 4, 5, 6, 7], axis=1)  # Drop unnecesary columns,
+final_intersect = final_intersect.drop([3, 4, 5, 7, 8], axis=1)  # Drop unnecesary columns,
 
 if header == True:
 
@@ -232,7 +228,7 @@ if len(intersected_files_paths) > 1:
     for i in range(1, len(intersected_files_paths)):
 
         tmp_intersect = pd.read_csv(intersected_files_paths[i], sep="\t", header=None)
-        tmp_intersect = tmp_intersect.drop([3, 4, 5, 6, 7], axis=1)
+        tmp_intersect = tmp_intersect.drop([3, 4, 5, 7, 8], axis=1)
 
         if header == True:
 
@@ -277,16 +273,14 @@ chroms_no_signal = [
     if chrom not in final_intersect["chrom"].unique()
 ]
 
-if len(chroms_no_signal) > 1:
-
-    print(f"Omited chromosomes {', '.join(chroms_no_signal)} as they did not have any signal.")
-
-else:
+if len(chroms_no_signal) == 1:
 
     print(f"Omited chromosome {chroms_no_signal[0]} as it did not have any signal.")
 
+elif len(chroms_no_signal) > 1:
 
-misc.remove_folder(pathlib.Path(tmp_dir))  # Remove tmp folder (not empty).
+    print(f"Omited chromosomes {', '.join(chroms_no_signal)} as they did not have any signal.")
 
+misc.remove_folder(pathlib.Path(tmp_dir))  
 
 print("\ndone.")

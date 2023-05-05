@@ -207,17 +207,17 @@ def load_region_signals(mlobject: mlo.MetalociObject, signal_data: dict, signal_
     # ]
 
     region_signal = signal_data[mlobject.chrom][
-        (signal_data[mlobject.chrom]["end"] >= int(mlobject.start))
-        & (signal_data[mlobject.chrom]["start"] <= int(mlobject.end))
+        (signal_data[mlobject.chrom]["start"] >= int(mlobject.start / mlobject.resolution) * mlobject.resolution)
+        & (signal_data[mlobject.chrom]["end"] <= int(mlobject.end / mlobject.resolution) * mlobject.resolution)
     ]
 
     if len(region_signal) != len(mlobject.kk_coords):
 
         tmp = len(mlobject.kk_coords) - len(region_signal)
         tmp = np.empty((tmp, len(region_signal.columns)))
-        tmp[:] = np.nan
+        tmp[:] = 0
 
-        region_signal = region_signal.append(pd.DataFrame(tmp, columns=list(region_signal)), ignore_index=True)
+        region_signal = pd.concat([region_signal, pd.DataFrame(tmp, columns=list(region_signal))], ignore_index=True)
 
     signals_dict = defaultdict(list)
 

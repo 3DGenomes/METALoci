@@ -185,7 +185,7 @@ legend_elements = [
 
 start_timer = time()
 
-if "/" in regions:
+if os.path.isfile(regions):
 
     df_regions = pd.read_table(regions)
 
@@ -196,9 +196,9 @@ else:
 # hacer que un archivo de señales sera una lista. cambia esta lógica que es super enrevesada.
 if os.path.isfile(signals[0]) and os.access(signals[0], os.R_OK):
 
-    with open(signals[0], "r", encoding="utf-8") as f:
+    with open(signals[0], "r", encoding="utf-8") as handler:
 
-        signals = [line.strip() for line in f]
+        signals = [line.strip() for line in handler]
 
 plot_opt = {"bbox_inches": "tight", "dpi": 300, "transparent": True}
 data_moran = {"Coords": [], "Symbol": [], "Gene_id": [], "Signal": [], "R_value": [], "P_value": []}
@@ -325,6 +325,8 @@ for i, region_iter in df_regions.iterrows():
             quadrants,
             signipval,
         )
+
+        selmetaloci = []
 
         sig_plt = plot.signal_plot(mlobject, merged_lmi_geometry, selmetaloci, bins, coords_b)
         sig_plt.savefig(f"{plot_filename}_signal.pdf", **plot_opt)

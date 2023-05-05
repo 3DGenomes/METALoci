@@ -8,6 +8,7 @@ from metaloci import mlo
 from pathlib import Path
 import cooler
 import subprocess as sp
+import hicstraw
 
 
 def remove_folder(path: Path):
@@ -197,7 +198,7 @@ def signal_normalization(region_signal: pd.DataFrame, pseudocounts: float = None
     return np.array(signal)
 
 
-def check_chromosome_names(cooler_file: Path, data: Path, coords: bool):
+def check_chromosome_names(hic_file: Path, data: Path, coords: bool):
 
     with open(data[0], "r") as handler:
 
@@ -209,13 +210,29 @@ def check_chromosome_names(cooler_file: Path, data: Path, coords: bool):
 
             signal_chr_nom = "N"
 
-    if "chr" in [cooler_file.chromnames][0][0]:
+    try:
 
-        cooler_chr_nom = "chrN"
+        hic_file = cooler.Cooler(hic_file)
 
-    else:
+        if "chr" in [hic_file.chromnames][0][0]:
 
-        cooler_chr_nom = "N"
+            cooler_chr_nom = "chrN"
+
+        else:
+
+            cooler_chr_nom = "N"
+
+    except OSError: #CHECK EXCEPTION
+
+        if "chr" in hicstraw.HiCFile(hic_file).getChromosomes()[1].name:
+
+            cooler_chr_nom = "chrN"
+
+        else:
+
+            cooler_chr_nom = "N"
+
+    del hic_file
 
     with open(coords, "r") as handler:
 
@@ -232,16 +249,14 @@ def check_chromosome_names(cooler_file: Path, data: Path, coords: bool):
         exit(
             "\nThe signal, cooler and chromosome sizes files do not have the same nomenclature for chromosomes:\n"
             f"\n\tSignal chromosomes nomenclature is '{signal_chr_nom}'. "
-            f"\n\tCooler chromosomes nomenclature is '{cooler_chr_nom}'. "
+            f"\n\tHi-C chromosomes nomenclature is '{cooler_chr_nom}'. "
             f"\n\tChromosome sizes nomenclature is '{coords_chr_nom}'. "
             "\n\nPlease, rename the chromosome names. "
             "\nYou may want to rename the chromosome names in a cooler file with cooler.rename_chroms() in python. "
             "\n\nExiting..."
         )
 
-    del cooler_file
-
-
+    
 def bed_to_metaloci(data, coords, resolution):
 
     boundaries_dictionary = defaultdict(dict)

@@ -16,6 +16,7 @@ import pandas as pd
 from scipy.sparse import csr_matrix
 from scipy.spatial import distance
 from tqdm.contrib.concurrent import process_map
+import hicstraw
 
 from metaloci import mlo
 from metaloci.graph_layout import kk
@@ -62,8 +63,8 @@ input_arg.add_argument(
 
 input_arg.add_argument(
     "-c",
-    "--cooler",
-    dest="cooler_file",
+    "--hic",
+    dest="hic_file",
     metavar="PATH",
     type=str,
     required=True,
@@ -77,26 +78,16 @@ input_arg.add_argument(
     metavar="INT",
     type=int,
     required=True,
-    help="Resolution of the cooler files to be used (in bp).",
+    help="Resolution of the HI-C files to be used (in bp).",
 )
 
-region_arg = parser.add_argument_group(title="region arguments", description="Choose one of the following options.")
-region_arg.add_argument(
+input_arg.add_argument(
     "-g",
     "--region",
-    dest="regions",
-    metavar="STR",
-    type=str,
-    help="region to be computed in chr:start-end format.",
-)
-
-region_arg.add_argument(
-    "-G",
-    "--region-file",
-    dest="regions",
+    dest="region_file",
     metavar="PATH",
     type=str,
-    help="path to the file with the regions of interest.",
+    help="Region to apply LMI in format chrN:start-end_midpoint or file with the regions of interest.",
 )
 
 optional_arg = parser.add_argument_group(title="Optional arguments")
@@ -147,7 +138,7 @@ optional_arg.add_argument("-u", "--debug", dest="debug", action="store_true", he
 args = parser.parse_args(None if sys.argv[1:] else ["-h"])
 
 work_dir = args.work_dir
-cooler_file = args.cooler_file
+hic_path = args.hic_file
 regions = args.regions
 resolution = args.reso
 cutoffs = args.cutoff
@@ -185,7 +176,7 @@ if debug:
 
     table = [
         ["work_dir", work_dir],
-        ["cooler_dir", cooler_file],
+        ["hic_file", hic_path],
         ["region_file", regions],
         ["reso", resolution],
         ["cutoffs", cutoffs],
@@ -261,23 +252,19 @@ def get_region_layout(row, silent: bool = True):
     if silent == False:
         print(f"\n------> Working on region: {mlobject.region}\n")
 
-    # This part has been modified. In some datasets (NeuS) the matrix was completely empty,
-    # so the pkl file was not created (gave an error in the MatTransform function:
-    # pc = np.min(mat[mat>0]))
-    # To bypass this part, the script checks the bad_regions.txt; if the regions
-    # is also found in this
-    # file, the script skips the calculations (as the script already has checked
-    # the region).
-    cooler_file_str = cooler_file + "::/resolutions/" + str(mlobject.resolution)
-    mlobject.matrix = cooler.Cooler(cooler_file_str).matrix(sparse=True).fetch(mlobject.region).toarray()
+    if hic_path.endswith(".cool") or hic_path.endswith(".mcool"):
+
+        mlobject.matrix = cooler.Cooler(hic_path + "::/resolutions/" + str(mlobject.resolution)).matrix(sparse=True).fetch(mlobject.region).toarray()
+
+    elif hic_path.endswith(".hic"):
+
+        chrm, start, end = re.split(':|-', mlobject.region)
+        mlobject.matrix = hicstraw.HiCFile(hic_path).getMatrixZoomData(chrm, chrm, 'observed', 'VC_SQRT', 'BP', mlobject.resolution).getRecordsAsMatrix(int(start), int(end), int(start), int(end))      
+    
     mlobject.matrix = misc.clean_matrix(mlobject, bad_regions)
 
-    # if "chr" not in mlobject.matrix.chromnames[0]:
-
-    #     cooler.rename_chroms(mlobject.matrix, {chrom: "chr" + str(chrom) for chrom in mlobject.matrix.chromnames})
-
     # This if statement is for detecting empty arrays. If the array is too empty,
-    # clean_matrix() returns mlo as None.
+    # clean_matrix() would return mlobject.matrix as None.
     if mlobject.matrix is None:
 
         return
@@ -391,9 +378,7 @@ def get_region_layout(row, silent: bool = True):
 
 start_timer = time()
 
-# Parsing the one-line region into a pandas data-frame. If the region contains '/', it is a path.
-# There is no need to add Windows path as METALoci will not work on Windows either way.
-if "/" in regions:
+if os.path.isfile(regions):
 
     df_regions = pd.read_table(regions)
 

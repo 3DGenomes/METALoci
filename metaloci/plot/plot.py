@@ -70,7 +70,7 @@ def get_kk_plot(mlobject: mlo.MetalociObject, restraints: bool = True):
     g.annotate(f"      {mlobject.chrom}:{mlobject.end}", (xs[len(xs) - 1], ys[len(ys) - 1]), size=8)
 
     sns.scatterplot(
-        x=[xs[mlobject.poi - 1]], y=[ys[mlobject.poi - 1]], s=POINTSIZE * 1.5, ec="lime", fc="none", zorder=3
+        x=[xs[mlobject.poi]], y=[ys[mlobject.poi]], s=POINTSIZE * 1.5, ec="lime", fc="none", zorder=3
     )
 
     return kk_plt
@@ -207,7 +207,7 @@ def get_gaudi_signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFra
         matplotlib figure containing the Gaudi signal plot.
     """
 
-    poi = lmi_geometry.loc[lmi_geometry["moran_index"] == mlobject.poi - 1, "bin_index"].iloc[0]
+    poi = lmi_geometry.loc[lmi_geometry["moran_index"] == mlobject.poi, "bin_index"].iloc[0]
 
     cmap = "PuOr_r"
     min_value = lmi_geometry.signal.min()
@@ -262,7 +262,7 @@ def get_gaudi_type_plot(
     gtp : matplotlib.pyplot.figure.Figure
         matplotlib figure containing the Gaudi type plot.
     """
-    poi = lmi_geometry.loc[lmi_geometry["moran_index"] == mlobject.poi - 1, "bin_index"].iloc[0]
+    poi = lmi_geometry.loc[lmi_geometry["moran_index"] == mlobject.poi, "bin_index"].iloc[0]
 
     legend_elements = [
         Line2D([0], [0], marker="o", color="w", markerfacecolor=colors[1], label="HH", markersize=20),
@@ -343,7 +343,7 @@ def get_lmi_scatterplot(
     plt.scatter(x=x, y=y, s=100, ec="white", fc=colors_sp, alpha=alpha_sp)
 
     sns.scatterplot(
-        x=[x[mlobject.poi - 1]], y=[y[mlobject.poi - 1]], s=150, ec="lime", fc="none", zorder=len(lmi_geometry)
+        x=[x[mlobject.poi]], y=[y[mlobject.poi]], s=150, ec="lime", fc="none", zorder=len(lmi_geometry)
     )
     sns.regplot(x=x, y=y, scatter=False, color="k")
     sns.despine(top=True, right=True, left=False, bottom=False, offset=10, trim=False)

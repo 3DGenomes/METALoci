@@ -17,15 +17,9 @@ from metaloci.spatial_stats import lmi
 
 description = (
     "This script adds signal data to a Kamada-Kawai layout and calculates Local Moran's I "
-    "for every bin in the layout.\n"
+    "for every bin in the layout."
 )
-description += "It groups the data signal by types/classes specified by the user.\n"
-description += "The script will create a structure of folders and subfolders as follows:\n\n"
-description += "WORK_DIR\n"
-description += " |-datasets\n"
-description += "    |-DATASET_NAME\n"
-description += "       |-CHROMOSOME\n"
-description += "          |-output_file\n"
+
 
 parser = ArgumentParser(formatter_class=RawDescriptionHelpFormatter, description=description, add_help=False)
 
@@ -125,11 +119,11 @@ optional_arg.add_argument(
     "--mp",
     dest="multiprocess",
     action="store_true",
-    help="Set use of multiprocessing.",
+    help="Flag to set use of multiprocessing.",
 )
 
 optional_arg.add_argument(
-    "-t", "--threads", dest="threads", type=int, action="store", help="Number of cores to use in multiprocessing."
+    "-t", "--threads", dest="threads", type=int, action="store", help="Number of threads to use in multiprocessing."
 )
 
 optional_arg.add_argument("-u", "--debug", dest="debug", action="store_true", help=SUPPRESS)

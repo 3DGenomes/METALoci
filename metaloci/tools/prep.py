@@ -3,14 +3,15 @@ This script processes signal .bed files or .bedGraph files, binnarizing them at 
 merging all signals in the same dataframe and subsetting by chromosomes.
 """
 
-import sys
-from argparse import SUPPRESS, ArgumentParser, RawDescriptionHelpFormatter
-from metaloci.misc import misc
-import subprocess as sp
-import pandas as pd
 import pathlib
-import cooler
+import subprocess as sp
+import sys
 import warnings
+from argparse import SUPPRESS, ArgumentParser, RawDescriptionHelpFormatter
+
+import pandas as pd
+
+from metaloci.misc import misc
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 
@@ -32,7 +33,7 @@ input_arg.add_argument(
     required=True,
     metavar="PATH",
     type=str,
-    help="Path to working directory.",
+    help="Path to a working directory.",
 )
 
 input_arg.add_argument(
@@ -42,7 +43,7 @@ input_arg.add_argument(
     metavar="PATH",
     type=str,
     required=True,
-    help="complete path to the cooler file.",
+    help="Complete path to the cooler file.",
 )
 
 input_arg.add_argument(
@@ -58,10 +59,11 @@ input_arg.add_argument(
     " being the first 3 columns coded as chrom, start, end. The following "
     "columns should contain the name of the signal coded as: id1_id2.\n"
     "Names of the chromosomes must be the same as the coords_file "
-    "described below. "
-    "(More than one file can be specified, space separated)",
+    "described below. ",
 )
+
 input_arg.add_argument("-o", "--name", dest="output", required=True, metavar="STR", type=str, help="Output file name.")
+
 input_arg.add_argument(
     "-r",
     "--resolution",
@@ -69,7 +71,7 @@ input_arg.add_argument(
     required=True,
     metavar="INT",
     type=int,
-    help="Resolution of the bins to calculate the signal (in bp).",
+    help="Resolution of the bins, to calculate the signal (in bp).",
 )
 region_arg = parser.add_argument_group(title="Region arguments")
 
@@ -82,7 +84,7 @@ region_arg.add_argument(
     type=str,
     help="Full path to a file that contains the name of the chromosomes in the "
     "first column and the ending coordinate of the chromosome in the "
-    "second column.",
+    "second column. This can be found in UCSC for your species of interest.",
 )
 optional_arg = parser.add_argument_group(title="Optional arguments")
 optional_arg.add_argument("-h", "--help", action="help", help="Show this help message and exit.")
@@ -133,7 +135,7 @@ sp.call(
 )
 
 sp.call(
-    f"sort {tmp_dir}/{resolution}bp_bin_unsorted.bed -k1,1V -k2,2n -k3,3n | grep -v random | grep -v chrUn > {tmp_dir}/{resolution}bp_bin.bed",
+    f"sort {tmp_dir}/{resolution}bp_bin_unsorted.bed -k1,1V -k2,2n -k3,3n | grep -v random | grep -v Un > {tmp_dir}/{resolution}bp_bin.bed",
     shell=True,
 )
 
@@ -152,11 +154,6 @@ for f in data:
             sp.getoutput(f"head -n 1 {f} | cut -f 4")
         )
 
-        # sp.call(
-        #     f"cat {tmp_signal_path} | sed -e 's/.*/chr&/' > {tmp_signal_path}_tmp && mv {tmp_signal_path}_tmp {tmp_signal_path}",
-        #     shell=True,
-        # )
-
         sp.call(
             f"sort {tmp_signal_path} -k1,1V -k2,2n -k3,3n | grep -v random | grep -v chrUn > {tmp_dir}/sorted_{f.rsplit('/', 1)[1]}",
             shell=True,
@@ -168,11 +165,6 @@ for f in data:
 
         # Saving the corresponding column names in a dict, with only the file name as a key.
         column_dict[signal_file_name] = sp.getoutput(f"head -n 1 {f}").split(sep="\t")
-
-        # sp.call(
-        #     f"tail -n +2 {tmp_signal_path} | sed -e 's/.*/chr&/' > {tmp_signal_path}_tmp && mv {tmp_signal_path}_tmp {tmp_signal_path}",
-        #     shell=True,
-        # )
 
         sp.call(
             f"tail -n +1 {tmp_signal_path} | sort -k1,1V -k2,2n -k3,3n | grep -v random | grep -v chrUn > {tmp_dir}/sorted_{f.rsplit('/', 1)[1]}",
@@ -227,7 +219,7 @@ if len(intersected_files_paths) > 1:
 
     for i in range(1, len(intersected_files_paths)):
 
-        tmp_intersect = pd.read_csv(intersected_files_paths[i], sep="\t", header=None)
+        tmp_intersect = pd.read_csv(intersected_files_paths[i], sep="\t", header=None, low_memory=False)
         tmp_intersect = tmp_intersect.drop([3, 4, 5, 7, 8], axis=1)
 
         if header == True:

@@ -1,5 +1,5 @@
 """
-Script to prduce the different plots of METAloci
+This script generates METALoci plots.
 """
 import argparse
 import os
@@ -26,14 +26,7 @@ description += "    - Kamada-Kawai layout\n"
 description += "    - Local Moran's I scatterplot\n"
 description += "    - Gaudí plot for signal\n"
 description += "    - Gaudí plot for LMI quadrant\n"
-description += "\n"
-description += "The script will create a structure of folders and subfolders as follows:\n"
-description += "\n"
-description += "WORK_DIR\n"
-description += "   |-DATASET_NAME\n"
-description += "     |-CHROMOSOME\n"
-description += "         |-SIGNAL(n)\n"
-description += "             |-region_plot\n"
+
 
 parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter, description=description, add_help=False)
 
@@ -64,7 +57,7 @@ signal_arg.add_argument(
     dest="signals",
     metavar="STR",
     type=str,
-    help="Path to the file with the list of signals to plot.",
+    help="Path to the file with the list of signals to plot, one per line.",
 )
 
 region_input = parser.add_argument_group(title="Region arguments", description="Choose one of the following options:")
@@ -261,13 +254,6 @@ for i, region_iter in df_regions.iterrows():
             plot_filename,
             f"{mlobject.chrom}_{mlobject.start}_{mlobject.end}_{mlobject.poi}_{mlobject.resolution}_{signal}",
         )
-
-        # if re.compile("_").search(signal):
-
-        #     s_class, s_id = signal.split("_")
-        #     lmi_data_temp = mlobject.lmi_info[(mlobject.lmi_info.Class == s_class) & (mlobject.lmi_info.ID == s_id)]
-
-        # else:
 
         merged_lmi_geometry = pd.merge(
             mlobject.lmi_info[signal],

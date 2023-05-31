@@ -10,13 +10,13 @@ from datetime import timedelta
 from time import time
 
 import cooler
+import hicstraw
 import matplotlib.pyplot as plt
 import networkx as nx
 import pandas as pd
 from scipy.sparse import csr_matrix
 from scipy.spatial import distance
 from tqdm.contrib.concurrent import process_map
-import hicstraw
 
 from metaloci import mlo
 from metaloci.graph_layout import kk
@@ -26,26 +26,7 @@ from metaloci.plot import plot
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 description = """
-This script adds signal data to a Kamada-Kawai layout and calculates Local Moran's I for every 
-bin in the layout.
-The script will create a structure of folders and subfolders as follows:
-WORK_DIR
- |-DATASET_NAME
-    |-CHROMOSOME
-       |-output_files
-
-The script will save the 'clean' matrix to a pickle file without applying any cutoff to the count 
-data.
-
-To find the appropiate cutoff, run the script with a list of cutoffs (space separated) using the 
--x option and the WHATEVER mode activated, -put_thing. For example:
-
-03_KK_layouts.py -w WORK_DIR -l COOLER_DIR -g/-G REGION -r RESOLUTION -o NAME -x 0.5 0.15 put_thing
-
-The script will show the plots of the matrix and the different cutoffs chosen, in descending order.
-From the different plots choose the one you think fits better with your data.
-If the script runs with only one cutoff, it will save the Kamada-Kawai layout data  to a pickle 
-file"""
+"""
 
 parser = ArgumentParser(formatter_class=RawDescriptionHelpFormatter, description=description, add_help=False)
 
@@ -58,7 +39,7 @@ input_arg.add_argument(
     metavar="PATH",
     type=str,
     required=True,
-    help="path to working directory.",
+    help="Path to working directory.",
 )
 
 input_arg.add_argument(
@@ -68,7 +49,7 @@ input_arg.add_argument(
     metavar="PATH",
     type=str,
     required=True,
-    help="complete path to the cooler file.",
+    help="Complete path to the cooler file.",
 )
 
 input_arg.add_argument(
@@ -87,7 +68,8 @@ input_arg.add_argument(
     dest="regions",
     metavar="PATH",
     type=str,
-    help="Region to apply LMI in format chrN:start-end_midpoint or file with the regions of interest.",
+    help="Region to apply LMI in format chrN:start-end_midpoint or file with the regions of interest. If a file is provided, "
+    "it must contain as a header 'coords', 'symbol' and 'id', and one region per line, tab separated.",
 )
 
 optional_arg = parser.add_argument_group(title="Optional arguments")
@@ -99,7 +81,7 @@ optional_arg.add_argument(
     nargs="*",
     type=float,
     action="extend",
-    help="percentage of top interactions to keep, space separated (default: " "0.2)",
+    help="Percentage of top interactions to keep, space separated (default: 0.2)",
 )
 
 optional_arg.add_argument("-f", "--force", dest="force", action="store_true", help="force rewriting existing data.")
@@ -109,7 +91,7 @@ optional_arg.add_argument(
     "--plot",
     dest="save_plots",
     action="store_true",
-    help="plot the matrix, density and Kamada-Kawai plots, even when a " "single cutoff is selected.",
+    help="Plot the matrix, density and Kamada-Kawai plots, even when a single cutoff is selected.",
 )
 
 optional_arg.add_argument(
@@ -117,11 +99,11 @@ optional_arg.add_argument(
     "--mp",
     dest="multiprocess",
     action="store_true",
-    help="Set use of multiprocessing.",
+    help="Flag to set use of multiprocessing.",
 )
 
 optional_arg.add_argument(
-    "-t", "--threads", dest="threads", type=int, action="store", help="Number of cores to use in multiprocessing."
+    "-t", "--threads", dest="threads", type=int, action="store", help="Number of threads to use in multiprocessing."
 )
 
 optional_arg.add_argument(
@@ -129,7 +111,7 @@ optional_arg.add_argument(
     "--pl",
     dest="persistence_length",
     action="store",
-    help="set a persistence length for the Kamada-Kawai layout.",
+    help="Set a persistence length for the Kamada-Kawai layout.",
 )
 # TODO add sort of silent argument?
 
@@ -414,7 +396,7 @@ else:
         get_region_layout(row, silent=False)
 
 # If there is bad regions, write to a file which is the bad region and why,
-# but only if that region-reason pair does not lready exist in the file.
+# but only if that region-reason pair does not already exist in the file.
 # bad_regions = pd.DataFrame(bad_regions)
 
 # if bad_regions.shape[0] > 0:

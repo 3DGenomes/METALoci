@@ -201,11 +201,6 @@ def load_region_signals(mlobject: mlo.MetalociObject, signal_data: dict, signal_
 
         signal_types = [line.rstrip() for line in signals_handler]
 
-    # region_signal = signal_data[mlobject.chrom][
-    #     (signal_data[mlobject.chrom]["start"] >= int(mlobject.start))
-    #     & (signal_data[mlobject.chrom]["end"] <= int(mlobject.end))
-    # ]
-
     region_signal = signal_data[mlobject.chrom][
         (signal_data[mlobject.chrom]["start"] >= int(mlobject.start / mlobject.resolution) * mlobject.resolution)
         & (signal_data[mlobject.chrom]["end"] <= int(mlobject.end / mlobject.resolution) * mlobject.resolution)
@@ -266,7 +261,7 @@ def compute_lmi(
 
     signal = []
 
-    res = dict(filter(lambda item: signal_type in item[0], mlobject.signals_dict.items()))
+    res = dict(filter(lambda item: signal_type == item[0], mlobject.signals_dict.items()))
 
     for _, row in mlobject.lmi_geometry.iterrows():
 

@@ -1,61 +1,95 @@
-import argparse  # pragma: no cover
+import io
+import os
+import sys
+from argparse import ArgumentParser, RawDescriptionHelpFormatter, HelpFormatter
 
-from . import BaseClass, base_function  # pragma: no cover
-
-
-def main() -> None:  # pragma: no cover
-    """
-    The main function executes on commands:
-    `python -m metaloci` and `$ metaloci `.
-
-    This is your program's entry point.
-
-    You can change this function to do whatever you want.
-    Examples:
-        * Run a test suite
-        * Run a server
-        * Do some other stuff
-        * Run a command line application (Click, Typer, ArgParse)
-        * List all available tasks
-        * Run an application (Flask, FastAPI, Django, etc.)
-    """
-    parser = argparse.ArgumentParser(
-        description="metaloci.",
-        epilog="Enjoy the metaloci functionality!",
-    )
-    # This is required positional argument
-    parser.add_argument(
-        "name",
-        type=str,
-        help="The username",
-        default="3DGenomes",
-    )
-    # This is optional named argument
-    parser.add_argument(
-        "-m",
-        "--message",
-        type=str,
-        help="The Message",
-        default="Hello",
-        required=False,
-    )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        help="Optionally adds verbosity",
-    )
-    args = parser.parse_args()
-    print(f"{args.message} {args.name}!")
-    if args.verbose:
-        print("Verbose mode is on.")
-
-    print("Executing main function")
-    base = BaseClass()
-    print(base.base_method())
-    print(base_function())
-    print("End of main function")
+from metaloci.tools import figure, layout, ml, prep
 
 
-if __name__ == "__main__":  # pragma: no cover
-    main()
+def read(*paths, **kwargs):
+
+    content = ""
+    with io.open(
+        os.path.join(os.path.dirname(__file__), *paths),
+        encoding=kwargs.get("encoding", "utf8"),
+    ) as open_file:
+        content = open_file.read().strip()
+    return content
+
+
+def main(arguments) -> None:  # pragma: no cover
+
+    DESCRIPTION = "METALoci: spatially auto-correlated signals in 3D genomes.\n"
+
+    if len(arguments) > 1:
+
+        subcommand = arguments[1]
+
+        if subcommand == "version" or subcommand == "--version":
+
+            print("METALoci v" + read(".", "VERSION"))
+            return
+        
+    parser = ArgumentParser()
+
+    parser.formatter_class=lambda prog: HelpFormatter(prog, width=120,
+                                                      max_help_position=60)
+    
+    subparser = parser.add_subparsers(title="Available programs")
+
+    args_pp = {}
+
+    # prep
+    args_pp["prep"] = subparser.add_parser("prep",
+                                          description=prep.DESCRIPTION,
+                                          help=prep.DESCRIPTION,
+                                          formatter_class=RawDescriptionHelpFormatter)
+    args_pp["prep"].set_defaults(func=prep.run)
+    prep.populate_args(args_pp["prep"])
+
+    # layout
+    args_pp["layout"] = subparser.add_parser("layout",
+                                          description=layout.DESCRIPTION,
+                                          help=layout.DESCRIPTION,
+                                          formatter_class=RawDescriptionHelpFormatter)
+    args_pp["layout"].set_defaults(func=layout.run)
+    layout.populate_args(args_pp["layout"])
+
+    # ml
+    args_pp["lm"] = subparser.add_parser("lm",
+                                          description=ml.DESCRIPTION,
+                                          help=ml.DESCRIPTION,
+                                          formatter_class=RawDescriptionHelpFormatter)
+    args_pp["lm"].set_defaults(func=ml.run)
+    ml.populate_args(args_pp["lm"])
+
+    # figure
+    args_pp["figure"] = subparser.add_parser("figure",
+                                          description=figure.DESCRIPTION,
+                                          help=figure.DESCRIPTION,
+                                          formatter_class=RawDescriptionHelpFormatter)
+    args_pp["figure"].set_defaults(func=figure.run)
+    figure.populate_args(args_pp["figure"])
+
+    if len(arguments) == 1:
+
+        print(DESCRIPTION)
+        parser.print_help()
+        return
+
+    if len(arguments) == 2:
+
+        try:
+
+            args_pp[arguments[1]].print_help()
+            return
+        
+        except KeyError:
+
+            pass
+
+    args = parser.parse_args(arguments[1:])
+
+    args.func(args)
+
+sys.exit(main(sys.argv))

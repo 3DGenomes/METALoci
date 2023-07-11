@@ -2,9 +2,8 @@ import multiprocessing as mp
 import os
 import pathlib
 import re
-import sys
 import warnings
-from argparse import SUPPRESS, ArgumentParser, RawDescriptionHelpFormatter
+from argparse import SUPPRESS, HelpFormatter
 from collections import defaultdict
 from datetime import timedelta
 from time import time
@@ -16,7 +15,6 @@ import networkx as nx
 import pandas as pd
 from scipy.sparse import csr_matrix
 from scipy.spatial import distance
-from tqdm.contrib.concurrent import process_map
 
 from metaloci import mlo
 from metaloci.graph_layout import kk
@@ -25,156 +23,120 @@ from metaloci.plot import plot
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
-description = """
+DESCRIPTION = """ Creates a Kamada-Kawai layout from a Hi-C for a given region.
 """
 
-parser = ArgumentParser(formatter_class=RawDescriptionHelpFormatter, description=description, add_help=False)
 
-input_arg = parser.add_argument_group(title="Input arguments")
+def populate_args(parser):
 
-input_arg.add_argument(
-    "-w",
-    "--work-dir",
-    dest="work_dir",
-    metavar="PATH",
-    type=str,
-    required=True,
-    help="Path to working directory.",
-)
+    parser.formatter_class=lambda prog: HelpFormatter(prog, width=120,
+                                                      max_help_position=60)
+    
+    input_arg = parser.add_argument_group(title="Input arguments")
+    optional_arg = parser.add_argument_group(title="Optional arguments")
 
-input_arg.add_argument(
-    "-c",
-    "--hic",
-    dest="hic_file",
-    metavar="PATH",
-    type=str,
-    required=True,
-    help="Complete path to the cooler file.",
-)
+    input_arg.add_argument(
+        "-w",
+        "--work-dir",
+        dest="work_dir",
+        metavar="PATH",
+        type=str,
+        required=True,
+        help="Path to working directory.",
+    )
 
-input_arg.add_argument(
-    "-r",
-    "--resolution",
-    dest="reso",
-    metavar="INT",
-    type=int,
-    required=True,
-    help="Resolution of the HI-C files to be used (in bp).",
-)
+    input_arg.add_argument(
+        "-c",
+        "--hic",
+        dest="hic_file",
+        metavar="PATH",
+        type=str,
+        required=True,
+        help="Complete path to the cooler file.",
+    )
 
-input_arg.add_argument(
-    "-g",
-    "--region",
-    dest="regions",
-    metavar="PATH",
-    type=str,
-    help="Region to apply LMI in format chrN:start-end_midpoint or file with the regions of interest. If a file is provided, "
-    "it must contain as a header 'coords', 'symbol' and 'id', and one region per line, tab separated.",
-)
+    input_arg.add_argument(
+        "-r",
+        "--resolution",
+        dest="reso",
+        metavar="INT",
+        type=int,
+        required=True,
+        help="Resolution of the HI-C files to be used (in bp).",
+    )
 
-optional_arg = parser.add_argument_group(title="Optional arguments")
-optional_arg.add_argument("-h", "--help", action="help", help="Show this help message and exit.")
-optional_arg.add_argument(
-    "-o",
-    "--cutoff",
-    dest="cutoff",
-    nargs="*",
-    type=float,
-    action="extend",
-    help="Percentage of top interactions to keep, space separated (default: 0.2)",
-)
+    input_arg.add_argument(
+        "-g",
+        "--region",
+        dest="regions",
+        metavar="PATH",
+        type=str,
+        required=True,
+        help="Region to apply LMI in format chrN:start-end_midpoint or file with the regions of interest. If a file is provided, "
+        "it must contain as a header 'coords', 'symbol' and 'id', and one region per line, tab separated.",
+    )
 
-optional_arg.add_argument("-f", "--force", dest="force", action="store_true", help="force rewriting existing data.")
+    optional_arg.add_argument(
+        "-o",
+        "--cutoff",
+        dest="cutoff",
+        nargs="*",
+        type=float,
+        action="extend",
+        help="Percentage of top interactions to keep, space separated (default: 0.2)",
+    )
 
-optional_arg.add_argument(
-    "-p",
-    "--plot",
-    dest="save_plots",
-    action="store_true",
-    help="Plot the matrix, density and Kamada-Kawai plots, even when a single cutoff is selected.",
-)
+    optional_arg.add_argument("-f", "--force", dest="force", action="store_true", help="force rewriting existing data.")
 
-optional_arg.add_argument(
-    "-m",
-    "--mp",
-    dest="multiprocess",
-    action="store_true",
-    help="Flag to set use of multiprocessing.",
-)
+    optional_arg.add_argument(
+        "-p",
+        "--plot",
+        dest="save_plots",
+        action="store_true",
+        help="Plot the matrix, density and Kamada-Kawai plots, even when a single cutoff is selected.",
+    )
 
-optional_arg.add_argument(
-    "-t", "--threads", dest="threads", type=int, action="store", help="Number of threads to use in multiprocessing."
-)
+    optional_arg.add_argument(
+        "-m",
+        "--mp",
+        dest="multiprocess",
+        action="store_true",
+        help="Flag to set use of multiprocessing.",
+    )
 
-optional_arg.add_argument(
-    "-l",
-    "--pl",
-    dest="persistence_length",
-    action="store",
-    help="Set a persistence length for the Kamada-Kawai layout.",
-)
-# TODO add sort of silent argument?
+    optional_arg.add_argument(
+        "-t", "--threads", dest="threads", type=int, action="store", help="Number of threads to use in multiprocessing."
+    )
 
-optional_arg.add_argument("-u", "--debug", dest="debug", action="store_true", help=SUPPRESS)
+    optional_arg.add_argument(
+        "-l",
+        "--pl",
+        dest="persistence_length",
+        action="store",
+        help="Set a persistence length for the Kamada-Kawai layout.",
+    )
 
-args = parser.parse_args(None if sys.argv[1:] else ["-h"])
+def get_region_layout(row, opts, silent: bool = True):
 
-work_dir = args.work_dir
-hic_path = args.hic_file
-regions = args.regions
-resolution = args.reso
-cutoffs = args.cutoff
-force = args.force
-save_plots = args.save_plots
-multiprocess = args.multiprocess
-cores = args.threads
-persistence_length = args.persistence_length
-debug = args.debug
+    work_dir = opts.work_dir
+    hic_path = opts.hic_file
+    resolution = opts.reso
+    cutoffs = opts.cutoff
+    force = opts.force
+    save_plots = opts.save_plots
+    persistence_length = opts.persistence_length
 
-if not work_dir.endswith("/"):
+    if cutoffs is None:
 
-    work_dir += "/"
+        cutoffs = [0.2] 
 
-if multiprocess is None:
+    cutoffs.sort(key=float, reverse=True)
 
-    multiprocess = False
-
-if cores is None:
-
-    cores = mp.cpu_count() - 2
-
-if cores > mp.cpu_count():
-
-    cores = mp.cpu_count()
-
-if cutoffs is None:
-
-    cutoffs = [0.2]
-
-# To sort the floats from the cutoffs
-cutoffs.sort(key=float, reverse=True)
-
-if debug:
-
-    table = [
-        ["work_dir", work_dir],
-        ["hic_file", hic_path],
-        ["region_file", regions],
-        ["reso", resolution],
-        ["cutoffs", cutoffs],
-        ["force", force],
-        ["debug", debug],
-    ]
-
-    print(table)
-    sys.exit()
-
-
-def get_region_layout(row, silent: bool = True):
+    bad_regions = defaultdict(list) # does not belong here, this is to prevent an error TODO
 
     region_chrom, region_start, region_end, poi = re.split(":|-|_", row.coords)
     region_coords = f"{region_chrom}_{region_start}_{region_end}_{poi}"
-    pathlib.Path(os.path.join(work_dir, region_chrom), "plots", "KK").mkdir(parents=True, exist_ok=True)
+    pathlib.Path(os.path.join(work_dir, region_chrom)).mkdir(parents=True, exist_ok=True)
     save_path = os.path.join(work_dir, region_chrom, f"{region_coords}.mlo")
 
     if not os.path.isfile(save_path):
@@ -258,7 +220,7 @@ def get_region_layout(row, silent: bool = True):
         mlobject.kk_cutoff = cutoff
 
         if silent == False:
-            print(f"\tCutoff to be used is: {int(mlobject.kk_cutoff * 100)} %")
+            print(f"\tCutoff: {int(mlobject.kk_cutoff * 100)} %")
 
         # Get submatrix of restraints
         restraints_matrix, mlobject = kk.get_restraints_matrix(mlobject)
@@ -293,6 +255,8 @@ def get_region_layout(row, silent: bool = True):
 
         if len(cutoffs) > 1 or save_plots:
 
+            pathlib.Path(os.path.join(work_dir, region_chrom), "plots", "KK").mkdir(parents=True, exist_ok=True)
+
             kk_plt = plot.get_kk_plot(mlobject)
 
             fig_name = os.path.join(
@@ -306,7 +270,7 @@ def get_region_layout(row, silent: bool = True):
 
         if silent == False:
 
-            print(f"\tdone in {timedelta(seconds=round(time() - time_per_kk))}.")
+            print(f"\tdone in {timedelta(seconds=round(time() - time_per_kk))}.\n")
 
         if len(cutoffs) == 1:
 
@@ -356,58 +320,78 @@ def get_region_layout(row, silent: bool = True):
         #             handler.flush()
 
 
-# Computing
+def run(opts):
 
-start_timer = time()
+    work_dir = opts.work_dir
+    regions = opts.regions
+    multiprocess = opts.multiprocess
+    cores = opts.threads
 
-if os.path.isfile(regions):
+    if not work_dir.endswith("/"):
 
-    df_regions = pd.read_table(regions)
+        work_dir += "/"
 
-else:
+    if multiprocess is None:
 
-    df_regions = pd.DataFrame({"coords": [regions], "symbol": ["symbol"], "id": ["id"]})
+        multiprocess = False
 
-pathlib.Path(os.path.join(work_dir)).mkdir(parents=True, exist_ok=True)
+    if cores is None:
 
-bad_regions = defaultdict(list)
+        cores = mp.cpu_count() - 2
 
-if multiprocess:
+    elif cores > mp.cpu_count():
 
-    if __name__ == "__main__":
+        cores = mp.cpu_count()
+
+    start_timer = time()
+
+    if os.path.isfile(regions):
+
+        df_regions = pd.read_table(regions)
+
+    else:
+
+        df_regions = pd.DataFrame({"coords": [regions], "symbol": ["symbol"], "id": ["id"]})
+
+    pathlib.Path(os.path.join(work_dir)).mkdir(parents=True, exist_ok=True)
+
+    bad_regions = defaultdict(list)
+
+    if multiprocess:
 
         print(f"{len(df_regions)} regions will be computed.\n")
 
         try:
 
-            pool = mp.Pool(processes=cores)
-            process_map(get_region_layout, [row for _, row in df_regions.iterrows()], max_workers=cores, chunksize=1)
-            pool.close()
-            pool.join()
+            with mp.Pool(processes=cores) as pool:
+            
+                pool.starmap(get_region_layout, [(row, opts) for _, row in df_regions.iterrows()])
+                pool.close()
+                pool.join()
 
         except KeyboardInterrupt:
 
             pool.terminate()
 
-else:
+    else:
 
-    for _, row in df_regions.iterrows():
+        for _, row in df_regions.iterrows():
 
-        get_region_layout(row, silent=False)
+            get_region_layout(row, opts, silent=False)
 
-# If there is bad regions, write to a file which is the bad region and why,
-# but only if that region-reason pair does not already exist in the file.
-# bad_regions = pd.DataFrame(bad_regions)
+    # If there is bad regions, write to a file which is the bad region and why,
+    # but only if that region-reason pair does not already exist in the file.
+    # bad_regions = pd.DataFrame(bad_regions)
 
-# if bad_regions.shape[0] > 0:
+    # if bad_regions.shape[0] > 0:
 
-#     with open(f"{work_dir}bad_regions.txt", "a+") as handler:
+    #     with open(f"{work_dir}bad_regions.txt", "a+") as handler:
 
-#         [
-#             handler.write(f"{row.region}\t{row.reason}\n")
-#             for _, row in bad_regions.iterrows()
-#             if not any(f"{row.region}\t{row.reason}" in line for line in handler)
-#         ]
+    #         [
+    #             handler.write(f"{row.region}\t{row.reason}\n")
+    #             for _, row in bad_regions.iterrows()
+    #             if not any(f"{row.region}\t{row.reason}" in line for line in handler)
+    #         ]
 
-print(f"\nTotal time spent: {timedelta(seconds=round(time() - start_timer))}.")
-print("\nall done.")
+    print(f"\nTotal time spent: {timedelta(seconds=round(time() - start_timer))}.")
+    print("\nall done.")

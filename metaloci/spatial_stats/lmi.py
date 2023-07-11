@@ -1,6 +1,5 @@
 import glob
 import os
-import re
 import warnings
 from collections import defaultdict
 from pathlib import Path
@@ -18,6 +17,7 @@ from shapely.ops import polygonize
 
 from metaloci import mlo
 from metaloci.misc import misc
+
 
 warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
 

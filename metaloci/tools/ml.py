@@ -5,168 +5,114 @@ import multiprocessing as mp
 import os
 import pickle
 import re
-import sys
-from argparse import SUPPRESS, ArgumentParser, RawDescriptionHelpFormatter
+from argparse import (SUPPRESS, ArgumentParser, HelpFormatter,
+                      RawDescriptionHelpFormatter)
 from datetime import timedelta
 from time import time
 
 import pandas as pd
-from tqdm.contrib.concurrent import process_map
 
 from metaloci.spatial_stats import lmi
 
-description = (
-    "This script adds signal data to a Kamada-Kawai layout and calculates Local Moran's I "
-    "for every bin in the layout."
+DESCRIPTION = (
+    "Adds signal data to a Kamada-Kawai layout and calculates Local Moran's I for every bin in the layout."
 )
 
 
-parser = ArgumentParser(formatter_class=RawDescriptionHelpFormatter, description=description, add_help=False)
+def populate_args(parser):
 
-input_arg = parser.add_argument_group(title="Input arguments")
+    parser.formatter_class=lambda prog: HelpFormatter(prog, width=120,
+                                                      max_help_position=60)
 
-input_arg.add_argument(
-    "-w",
-    "--work-dir",
-    dest="work_dir",
-    metavar="PATH",
-    type=str,
-    required=True,
-    help="Path to working directory.",
-)
+    input_arg = parser.add_argument_group(title="Input arguments")
+    optional_arg = parser.add_argument_group(title="Optional arguments")
 
-input_arg.add_argument(
-    "-s",
-    "--signal",
-    dest="signal_file",
-    metavar="FILE",
-    type=str,
-    required=True,
-    help="Path to the file with the samples/signals to use.",
-)
+    input_arg.add_argument(
+        "-w",
+        "--work-dir",
+        dest="work_dir",
+        metavar="PATH",
+        type=str,
+        required=True,
+        help="Path to working directory.",
+    )
 
-region_input = parser.add_argument_group(title="Region arguments", description="Choose one of the following options.")
+    input_arg.add_argument(
+        "-s",
+        "--signal",
+        dest="signals",
+        metavar="FILE",
+        type=str,
+        required=True,
+        help="Path to the file with the samples/signals to use.",
+    )
 
-region_input.add_argument(
-    "-g",
-    "--region",
-    dest="region_file",
-    metavar="PATH",
-    type=str,
-    help="Region to apply LMI in format chrN:start-end_midpoint or file with the regions of interest.",
-)
+    input_arg.add_argument(
+        "-g",
+        "--region",
+        dest="region_file",
+        metavar="PATH",
+        type=str,
+        help="Region to apply LMI in format chrN:start-end_midpoint or file with the regions of interest.",
+    )
 
-signal_arg = parser.add_argument_group(title="Signal arguments", description="Choose one of the following options:")
+    optional_arg.add_argument("-f", "--force", dest="force", action="store_true", help="Force rewriting existing data.")
 
-signal_arg.add_argument(
-    "-y",
-    "--types",
-    dest="signals",
-    metavar="STR",
-    type=str,
-    nargs="*",
-    action="extend",
-    help="Space-separated list of signals to plot.",
-)
+    optional_arg.add_argument(
+        "-p",
+        "--permutations",
+        dest="perms",
+        default=9999,
+        metavar="INT",
+        type=int,
+        help="Number of permutations to calculate the Local Moran's I p-value (default: %(default)d).",
+    )
 
-signal_arg.add_argument(
-    "-Y",
-    "--types-file",
-    dest="signals",
-    metavar="PATH",
-    type=str,
-    help="Path to the file with the list of signals to plot, one per line.",
-)
+    optional_arg.add_argument(
+        "-v",
+        "--pval",
+        dest="signipval",
+        default=0.05,
+        metavar="FLOAT",
+        type=float,
+        help="P-value significance threshold (default: %(default)4.2f).",
+    )
 
-optional_arg = parser.add_argument_group(title="Optional arguments")
+    optional_arg.add_argument(
+        "-m",
+        "--mp",
+        dest="multiprocess",
+        action="store_true",
+        help="Flag to set use of multiprocessing.",
+    )
 
-optional_arg.add_argument("-f", "--force", dest="force", action="store_true", help="force rewriting existing data.")
+    optional_arg.add_argument(
+        "-t", "--threads", dest="threads", type=int, action="store", help="Number of threads to use in multiprocessing."
+    )
 
-optional_arg.add_argument("-h", "--help", action="help", help="Show this help message and exit.")
+def get_lmi(region_iter, opts, signal_data, i=None, silent: bool = True):
 
-optional_arg.add_argument(
-    "-c",
-    "--cores",
-    dest="num_cores",
-    default=1,
-    metavar="INT",
-    type=int,
-    help="Number of cores to use in the Local Moran's " "I calculation (default: %(default)d).",
-)
+    INFLUENCE = 1.5
+    BFACT = 2
 
-optional_arg.add_argument(
-    "-p",
-    "--permutations",
-    dest="perms",
-    default=9999,
-    metavar="INT",
-    type=int,
-    help="Number of permutations to calculate the Local Moran's I p-value " "(default: %(default)d).",
-)
+    work_dir = opts.work_dir
+    signals = opts.signals
+    regions = opts.region_file
+    n_permutations = opts.perms
+    signipval = opts.signipval
+    force = opts.force
 
-optional_arg.add_argument(
-    "-v",
-    "--pval",
-    dest="signipval",
-    default=0.05,
-    metavar="FLOAT",
-    type=float,
-    help="P-value significance threshold (default: %(default)4.2f).",
-)
+    if not work_dir.endswith("/"):
 
-optional_arg.add_argument(
-    "-m",
-    "--mp",
-    dest="multiprocess",
-    action="store_true",
-    help="Flag to set use of multiprocessing.",
-)
+        work_dir += "/"
 
-optional_arg.add_argument(
-    "-t", "--threads", dest="threads", type=int, action="store", help="Number of threads to use in multiprocessing."
-)
+    if os.path.isfile(regions):
 
-optional_arg.add_argument("-u", "--debug", dest="debug", action="store_true", help=SUPPRESS)
+        df_regions = pd.read_table(regions)
 
-args = parser.parse_args(None if sys.argv[1:] else ["-h"])
+    else:
 
-work_dir = args.work_dir
-regions = args.region_file
-signal_file = args.signal_file
-signals = args.signals
-n_cores = args.num_cores
-n_permutations = args.perms
-signipval = args.signipval
-multiprocess = args.multiprocess
-cores = args.threads
-force = args.force
-debug = args.debug
-
-if not work_dir.endswith("/"):
-
-    work_dir += "/"
-
-if debug:
-
-    table = [
-        ["work_dir", work_dir],
-        ["gene_file", regions],
-        ["ind_file", signal_file],
-        ["types", signals],
-        ["num_cores", n_cores],
-        ["perms", n_permutations],
-        ["debug", debug],
-        ["signipval", signipval],
-    ]
-
-    print(table)
-    sys.exit()
-
-INFLUENCE = 1.5
-BFACT = 2
-
-
-def get_lmi(region_iter, i=None, silent: bool = True):
+        df_regions = pd.DataFrame({"coords": [regions], "symbol": ["symbol"], "id": ["id"]})
 
     region_timer = time()
 
@@ -218,10 +164,10 @@ def get_lmi(region_iter, i=None, silent: bool = True):
     if silent == False:
 
         print(f"\tAverage distance between consecutive particles: {mean_distance:6.4f} [{buffer:6.4f}]")
-        print(f"\tGeometry information for region {mlobject.region} saved in: {mlobject.save_path}")
+        print(f"\tGeometry information for region {mlobject.region} saved to: {mlobject.save_path}")
 
     # Load only signal for this specific region.
-    mlobject.signals_dict, signal_types = lmi.load_region_signals(mlobject, signal_data, signal_file)
+    mlobject.signals_dict, signal_types = lmi.load_region_signals(mlobject, signal_data, signals)
 
     all_lmi = {}
 
@@ -234,51 +180,62 @@ def get_lmi(region_iter, i=None, silent: bool = True):
     if silent == False:
 
         print(f"\n\tRegion done in {timedelta(seconds=round(time() - region_timer))}")
-        print(f"\tLMI information for region {mlobject.region} will be saved in: {mlobject.save_path}\n")
+        print(f"\tLMI information for region {mlobject.region} will be saved to: {mlobject.save_path}")
 
     with open(mlobject.save_path, "wb") as hamlo_namendle:
 
         mlobject.save(hamlo_namendle)
 
 
-timer = time()
+def run(opts):
 
-# Read region list. If its a region as parameter, create a dataframe.
-# If its a path to a file, read that dataframe.
-if os.path.isfile(regions):
+    work_dir = opts.work_dir
+    regions = opts.region_file
+    multiprocess = opts.multiprocess
+    cores = opts.threads
 
-    df_regions = pd.read_table(regions)
+    if not work_dir.endswith("/"):
 
-else:
+        work_dir += "/"
 
-    df_regions = pd.DataFrame({"coords": [regions], "symbol": ["symbol"], "id": ["id"]})
+    timer = time()
 
-# Read the signal of the chromosomes corresponding to the regions of interest,
-# not to load useless data.
-signal_data = lmi.load_signals(df_regions, work_dir=work_dir)
+    # Read region list. If its a region as parameter, create a dataframe.
+    # If its a path to a file, read that dataframe.
+    if os.path.isfile(regions):
 
-if multiprocess:
+        df_regions = pd.read_table(regions)
 
-    if __name__ == "__main__":
+    else:
+
+        df_regions = pd.DataFrame({"coords": [regions], "symbol": ["symbol"], "id": ["id"]})
+
+    # Read the signal of the chromosomes corresponding to the regions of interest,
+    # not to load useless data.
+    signal_data = lmi.load_signals(df_regions, work_dir=work_dir)
+
+    if multiprocess:
 
         print(f"{len(df_regions)} regions will be computed.\n")
 
         try:
 
-            pool = mp.Pool(processes=cores)
-            process_map(get_lmi, [row for _, row in df_regions.iterrows()], max_workers=cores, chunksize=1)
-            pool.close()
-            pool.join()
+            with mp.Pool(processes=cores) as pool:
+
+                pool.starmap(get_lmi, [(row, opts, signal_data) for _, row in df_regions.iterrows()])
+
+                pool.close()
+                pool.join()
 
         except KeyboardInterrupt:
 
             pool.terminate()
 
-else:
+    else:
 
-    for i, row in df_regions.iterrows():
+        for i, row in df_regions.iterrows():
 
-        get_lmi(row, i, silent=False)
+            get_lmi(row, opts, signal_data, i, silent=False)
 
-print(f"\nTotal time spent: {timedelta(seconds=round(time() - timer))}.")
-print("\nall done.")
+    print(f"\nTotal time spent: {timedelta(seconds=round(time() - timer))}.")
+    print("\nall done.")

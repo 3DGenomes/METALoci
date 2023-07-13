@@ -34,8 +34,8 @@ setup(
     url="https://github.com/3DGenomes/METALoci/",
     long_description=read("README.md"),
     long_description_content_type="text/markdown",
-    author="Iago Maceda, Marc Martí-Renom, Juan Rodríguez and Leo Zuber",
-    author_email="marc.marti@cnag.eu",
+    author="Leo Zuber, Iago Maceda, Juan Antonio Rodríguez and Marc Martí-Renom",
+    author_email="martirenom@cnag.eu",
     packages=find_packages(exclude=["tests", ".github"]),
     install_requires=read_requirements("requirements.txt"),
     entry_points={

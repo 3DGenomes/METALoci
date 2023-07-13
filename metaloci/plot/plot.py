@@ -334,29 +334,37 @@ def get_lmi_scatterplot(
     x = zscore(lmi_geometry.signal)
     y = zscore(y_lag)
 
-    _, _, r_value_scat, p_value_scat, _ = linregress(x, y)
-    scatter, ax = plt.subplots(figsize=(5, 5))  # , subplot_kw={'aspect':'equal'})
+    try:
 
-    alpha_sp = [1.0 if val < signipval else 0.1 for val in lmi_geometry.LMI_pvalue]
-    colors_sp = [colors_lmi[val] for val in lmi_geometry.moran_quadrant]
+        _, _, r_value_scat, p_value_scat, _ = linregress(x, y)
+        scatter, ax = plt.subplots(figsize=(5, 5))  # , subplot_kw={'aspect':'equal'})
 
-    plt.scatter(x=x, y=y, s=100, ec="white", fc=colors_sp, alpha=alpha_sp)
+        alpha_sp = [1.0 if val < signipval else 0.1 for val in lmi_geometry.LMI_pvalue]
+        colors_sp = [colors_lmi[val] for val in lmi_geometry.moran_quadrant]
 
-    sns.scatterplot(
-        x=[x[mlobject.poi]], y=[y[mlobject.poi]], s=150, ec="lime", fc="none", zorder=len(lmi_geometry)
-    )
-    sns.regplot(x=x, y=y, scatter=False, color="k")
-    sns.despine(top=True, right=True, left=False, bottom=False, offset=10, trim=False)
+        plt.scatter(x=x, y=y, s=100, ec="white", fc=colors_sp, alpha=alpha_sp)
 
-    plt.title(f"Moran Local Scatterplot\nr: {r_value_scat:4.2f}   p-value: {p_value_scat:.1e}")
-    plt.axvline(x=0, color="k", linestyle=":")
-    plt.axhline(y=0, color="k", linestyle=":")
+        sns.scatterplot(
+            x=[x[mlobject.poi]], y=[y[mlobject.poi]], s=150, ec="lime", fc="none", zorder=len(lmi_geometry)
+        )
+        sns.regplot(x=x, y=y, scatter=False, color="k")
+        sns.despine(top=True, right=True, left=False, bottom=False, offset=10, trim=False)
 
-    ax.set_xlabel("Z-score(Signal)")
-    ax.set_ylabel("Z-score(Signal Spatial Lag)")
+        plt.title(f"Moran Local Scatterplot\nr: {r_value_scat:4.2f}   p-value: {p_value_scat:.1e}")
+        plt.axvline(x=0, color="k", linestyle=":")
+        plt.axhline(y=0, color="k", linestyle=":")
 
-    r_value_scat = float(r_value_scat)
-    p_value_scat = float(r_value_scat)
+        ax.set_xlabel("Z-score(Signal)")
+        ax.set_ylabel("Z-score(Signal Spatial Lag)")
+
+        r_value_scat = float(r_value_scat)
+        p_value_scat = float(r_value_scat)
+    
+    except ValueError:
+
+        print("\t\tCannot compute lineal regression as all values are identical.")
+
+        return None, None, None
 
     return scatter, r_value_scat, p_value_scat
 

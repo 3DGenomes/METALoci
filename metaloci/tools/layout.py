@@ -7,6 +7,7 @@ from argparse import SUPPRESS, HelpFormatter
 from collections import defaultdict
 from datetime import timedelta
 from time import time
+import subprocess as sp
 
 import cooler
 import hicstraw
@@ -116,9 +117,10 @@ def populate_args(parser):
         help="Set a persistence length for the Kamada-Kawai layout.",
     )
 
-def get_region_layout(row, opts, silent: bool = True):
+def get_region_layout(row, opts, progress=None, silent: bool = True):
 
     work_dir = opts.work_dir
+    regions = opts.regions
     hic_path = opts.hic_file
     resolution = opts.reso
     cutoffs = opts.cutoff
@@ -129,6 +131,14 @@ def get_region_layout(row, opts, silent: bool = True):
     if cutoffs is None:
 
         cutoffs = [0.2] 
+
+    if os.path.isfile(regions):
+
+        df_regions = pd.read_table(regions)
+
+    else:
+
+        df_regions = pd.DataFrame({"coords": [regions], "symbol": ["symbol"], "id": ["id"]})
 
     cutoffs.sort(key=float, reverse=True)
 
@@ -161,6 +171,8 @@ def get_region_layout(row, opts, silent: bool = True):
 
             print(f"\n------> Region {region_coords} already done (no data).")
 
+        if progress is not None: progress["done"] = True
+
         return
 
     else:
@@ -169,13 +181,15 @@ def get_region_layout(row, opts, silent: bool = True):
 
             print(f"\n------> Region {region_coords} already done.")
 
+        if progress is not None: progress["done"] = True
+
         if force:
 
             if silent == False:
 
                 print(
                     "\tForce option (-f) selected, recalculating "
-                    "the Kamada-Kawai layout (files will be overwritten)\n"
+                    "the Kamada-Kawai layout (files will be overwritten)"
                 )
 
             mlobject = mlo.MetalociObject(
@@ -213,9 +227,9 @@ def get_region_layout(row, opts, silent: bool = True):
 
         return
 
-    for cutoff in cutoffs:
+    time_per_region = time()
 
-        time_per_kk = time()
+    for cutoff in cutoffs:
 
         mlobject.kk_cutoff = cutoff
 
@@ -270,14 +284,14 @@ def get_region_layout(row, opts, silent: bool = True):
 
         if silent == False:
 
-            print(f"\tdone in {timedelta(seconds=round(time() - time_per_kk))}.\n")
+            print(f"\tdone in {timedelta(seconds=round(time() - time_per_region))}.\n")
 
         if len(cutoffs) == 1:
 
             if silent == False:
                 print(
-                    f"\tKamada-Kawai layout of region {mlobject.region} saved"
-                    f" at {int(cutoff * 100)} % cutoff to file: {mlobject.save_path}"
+                    f"\tKamada-Kawai layout of region {mlobject.region} "
+                    f"at {int(cutoff * 100)} % cutoff saved to file: {mlobject.save_path}"
                 )
 
             # Save mlobject.
@@ -318,6 +332,18 @@ def get_region_layout(row, opts, silent: bool = True):
         #             # if word not in file then write the word to the file
         #             handler.write(f"{region}\t{reason[0]}\n")
         #             handler.flush()
+        # print(int(timedelta(seconds=round(time() - time_per_region))))
+
+    if progress is not None:
+
+        progress['value'] += 1
+
+        time_spent = time() - progress['timer']
+        time_remaining = int(time_spent / progress['value'] * (len(df_regions) - progress['value']))
+
+        print(f"\033[A{'  '*int(sp.Popen(['tput','cols'], stdout=sp.PIPE).communicate()[0].strip())}\033[A")
+        print(f"\t[{progress['value']}/{len(df_regions)}] | Time spent: {timedelta(seconds=round(time_spent))} | "
+                f"ETR: {timedelta(seconds=round(time_remaining))}", end='\r')
 
 
 def run(opts):
@@ -359,13 +385,21 @@ def run(opts):
 
     if multiprocess:
 
-        print(f"{len(df_regions)} regions will be computed.\n")
+        print(f"\n------> {len(df_regions)} regions will be computed.\n")
 
         try:
 
+            manager = mp.Manager()
+            progress = manager.dict(value=0, timer = start_timer, done = False)
+  
             with mp.Pool(processes=cores) as pool:
             
-                pool.starmap(get_region_layout, [(row, opts) for _, row in df_regions.iterrows()])
+                pool.starmap(get_region_layout, [(row, opts, progress) for _, row in df_regions.iterrows()])
+
+                if progress["done"] == True:
+
+                    print("\tSome regions had already been computed and have been skipped.", end="")
+
                 pool.close()
                 pool.join()
 
@@ -393,5 +427,5 @@ def run(opts):
     #             if not any(f"{row.region}\t{row.reason}" in line for line in handler)
     #         ]
 
-    print(f"\nTotal time spent: {timedelta(seconds=round(time() - start_timer))}.")
+    print(f"\n\nTotal time spent: {timedelta(seconds=round(time() - start_timer))}.")
     print("\nall done.")

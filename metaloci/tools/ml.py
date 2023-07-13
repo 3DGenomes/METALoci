@@ -5,8 +5,8 @@ import multiprocessing as mp
 import os
 import pickle
 import re
-from argparse import (SUPPRESS, ArgumentParser, HelpFormatter,
-                      RawDescriptionHelpFormatter)
+import subprocess as sp
+from argparse import HelpFormatter
 from datetime import timedelta
 from time import time
 
@@ -53,7 +53,7 @@ def populate_args(parser):
         dest="region_file",
         metavar="PATH",
         type=str,
-        help="Region to apply LMI in format chrN:start-end_midpoint or file with the regions of interest.",
+        help="Region to apply LMI in format chrN:start-end_midpoint or file containing the regions of interest.",
     )
 
     optional_arg.add_argument("-f", "--force", dest="force", action="store_true", help="Force rewriting existing data.")
@@ -90,7 +90,7 @@ def populate_args(parser):
         "-t", "--threads", dest="threads", type=int, action="store", help="Number of threads to use in multiprocessing."
     )
 
-def get_lmi(region_iter, opts, signal_data, i=None, silent: bool = True):
+def get_lmi(region_iter, opts, signal_data, progress=None, i=None, silent: bool = True):
 
     INFLUENCE = 1.5
     BFACT = 2
@@ -120,7 +120,7 @@ def get_lmi(region_iter, opts, signal_data, i=None, silent: bool = True):
 
     if silent == False:
 
-        print(f"\n------> Working on region {region} [{i + 1}/{len(df_regions)}]\n")
+        print(f"\n------> Working on region {region} [{i+1}/{len(df_regions)}]\n")
 
     try:
 
@@ -138,7 +138,6 @@ def get_lmi(region_iter, opts, signal_data, i=None, silent: bool = True):
 
         return
 
-    # If the pickle file contains the
     if mlobject.kk_nodes is None:
 
         if silent == False:
@@ -147,13 +146,23 @@ def get_lmi(region_iter, opts, signal_data, i=None, silent: bool = True):
 
         return
 
-    if mlobject.lmi_geometry is not None and force == False:
+    # Load only signal for this specific region.
+    mlobject.signals_dict, signal_types = lmi.load_region_signals(mlobject, signal_data, signals)
 
-        if silent == False:
+    # This checks if every signal you want to process is already computed. If the user works with a few signals 
+    # but decides to add some more later, she can use the same working directory and KK, and the LMI will be
+    # computed again with the new signals. If everything is already computed, does nothing.
+    if mlobject.lmi_info is not None:
 
-            print("\tLMI already computed for this region. \n\tSkipping to next region...")
+        if [k for k, _ in mlobject.lmi_info.items()] == signal_types:
 
-        return
+            if silent == False:
+
+                print("\tLMI already computed for this region. \n\tSkipping to next region...")
+
+            if progress is not None: progress["done"] = True
+
+            return
 
     # Get average distance between consecutive points to define influence,
     # which should be ~2 particles of radius.
@@ -165,9 +174,6 @@ def get_lmi(region_iter, opts, signal_data, i=None, silent: bool = True):
 
         print(f"\tAverage distance between consecutive particles: {mean_distance:6.4f} [{buffer:6.4f}]")
         print(f"\tGeometry information for region {mlobject.region} saved to: {mlobject.save_path}")
-
-    # Load only signal for this specific region.
-    mlobject.signals_dict, signal_types = lmi.load_region_signals(mlobject, signal_data, signals)
 
     all_lmi = {}
 
@@ -186,6 +192,17 @@ def get_lmi(region_iter, opts, signal_data, i=None, silent: bool = True):
 
         mlobject.save(hamlo_namendle)
 
+    if progress is not None:
+
+        progress['value'] += 1
+
+        time_spent = time() - progress['timer']
+        time_remaining = int(time_spent / progress['value'] * (len(df_regions) - progress['value']))
+
+        print(f"\033[A{'  '*int(sp.Popen(['tput','cols'], stdout=sp.PIPE).communicate()[0].strip())}\033[A")
+        print(f"\t[{progress['value']}/{len(df_regions)}] | Time spent: {timedelta(seconds=round(time_spent))} | "
+                f"ETR: {timedelta(seconds=round(time_remaining))}", end='\r')
+
 
 def run(opts):
 
@@ -198,7 +215,7 @@ def run(opts):
 
         work_dir += "/"
 
-    timer = time()
+    start_timer = time()
 
     # Read region list. If its a region as parameter, create a dataframe.
     # If its a path to a file, read that dataframe.
@@ -216,13 +233,20 @@ def run(opts):
 
     if multiprocess:
 
-        print(f"{len(df_regions)} regions will be computed.\n")
+        print(f"\n------> {len(df_regions)} regions will be computed.\n")
 
         try:
-
+            
+            manager = mp.Manager()
+            progress = manager.dict(value=0, timer = start_timer, done = False)
+        
             with mp.Pool(processes=cores) as pool:
 
-                pool.starmap(get_lmi, [(row, opts, signal_data) for _, row in df_regions.iterrows()])
+                pool.starmap(get_lmi, [(row, opts, signal_data, progress) for _, row in df_regions.iterrows()])
+
+                if progress["done"] == True:
+
+                    print("\tSome regions had already been computed and have been skipped.", end="")
 
                 pool.close()
                 pool.join()
@@ -235,7 +259,7 @@ def run(opts):
 
         for i, row in df_regions.iterrows():
 
-            get_lmi(row, opts, signal_data, i, silent=False)
+            get_lmi(row, opts, signal_data, i=i, silent=False)
 
-    print(f"\nTotal time spent: {timedelta(seconds=round(time() - timer))}.")
+    print(f"\n\nTotal time spent: {timedelta(seconds=round(time() - start_timer))}.")
     print("\nall done.")

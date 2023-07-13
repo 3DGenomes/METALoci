@@ -166,9 +166,14 @@ def run(opts):
 
         except FileNotFoundError:
 
-            print("\n\t.mlo file not found for this region. \n\tSkipping to next region.")
+            print("\n\t.mlo file not found for this region. \n\tSkipping to the next one.")
 
             continue
+
+        if mlobject.lmi_info == None:
+
+            print("\n\tLMI not calculated for this region. \n\tSkipping to the next one...")
+            continue        
 
         buffer = mlobject.kk_distances.diagonal(1).mean() * INFLUENCE
 
@@ -246,14 +251,7 @@ def run(opts):
             plt.close()
             print("\t\tGaudi Type plot -> done.")
 
-            print("\t\tLMI Scatter plot", end="\r")
-            lmi_plt, r_value, p_value = plot.get_lmi_scatterplot(
-                mlobject, merged_lmi_geometry, buffer * BFACT, signipval, colors
-            )
-            lmi_plt.savefig(f"{plot_filename}_lmi.pdf", **plot_opt)
-            lmi_plt.savefig(f"{plot_filename}_lmi.png", **plot_opt)
-            plt.close()
-            print("\t\tLMI Scatter plot -> done.")
+            
 
             print("\t\tSignal plot", end="\r")
             bed_data, selmetaloci = plot.signal_bed(
@@ -271,6 +269,31 @@ def run(opts):
             sig_plt.savefig(f"{plot_filename}_signal.png", **plot_opt)
             plt.close()
             print("\t\tSignal plot -> done.")
+            
+            print("\t\tLMI Scatter plot", end="\r")
+            lmi_plt, r_value, p_value = plot.get_lmi_scatterplot(
+                mlobject, merged_lmi_geometry, buffer * BFACT, signipval, colors
+            )
+
+            if lmi_plt is not None:
+
+                lmi_plt.savefig(f"{plot_filename}_lmi.pdf", **plot_opt)
+                lmi_plt.savefig(f"{plot_filename}_lmi.png", **plot_opt)
+                plt.close()
+                
+                print("\t\tLMI Scatter plot -> done.")
+
+            else: 
+
+                if signal == signals[-1]:
+
+                    print("\t\tSkipping to next region...")
+                    continue
+                
+                else:
+
+                    print("\t\tSkipping to next signal...")
+                    continue
 
             print(f"\t\tFinal composite figure for region '{region}' and signal '{signal}'", end="\r")
             img1 = Image.open(f"{plot_filename}_lmi.png")

@@ -1,7 +1,8 @@
 import io
 import os
 import sys
-from argparse import ArgumentParser, RawDescriptionHelpFormatter, HelpFormatter
+from argparse import ArgumentParser, HelpFormatter, RawDescriptionHelpFormatter
+from importlib.metadata import version
 
 from metaloci.tools import figure, layout, ml, prep
 
@@ -27,7 +28,7 @@ def main(arguments) -> None:  # pragma: no cover
 
         if subcommand == "version" or subcommand == "--version":
 
-            print("METALoci v" + read(".", "VERSION"))
+            print("METALoci v" + version("metaloci"))
             return
         
     parser = ArgumentParser()

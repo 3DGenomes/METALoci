@@ -19,7 +19,7 @@ warnings.simplefilter('ignore', category=NumbaPendingDeprecationWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
 
 DESCRIPTION = """
-Takes a bed file (USCS format) of signals and parses it into the format needed for METALoci to work.
+Takes a bed file (UCSC format) of signals and parses it into the format needed for METALoci to work.
 """
 
 def populate_args(parser):
@@ -28,6 +28,8 @@ def populate_args(parser):
                                                       max_help_position=60)
 
     input_arg = parser.add_argument_group(title="Input arguments")
+    optional_arg = parser.add_argument_group(title="Optional arguments")
+
 
     input_arg.add_argument(
         "-w",
@@ -86,6 +88,8 @@ def populate_args(parser):
         "first column and the ending coordinate of the chromosome in the "
         "second column. This can be found in UCSC for your species of interest.",
     )
+
+    optional_arg.add_argument("-h", "--help", action="help", help="Show this help message and exit.")
 
 
 def run(opts):

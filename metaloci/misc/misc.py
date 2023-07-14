@@ -86,7 +86,7 @@ def clean_matrix(mlobject: mlo.MetalociObject, bad_regions: pd.DataFrame) -> np.
     """
     Clean a given HiC matrix. It checks if the matrix has too many zeroes at
     he diagonal, removes values that are zero at the diagonal but are not in
-    the resto of the matrix, adds pseudocounts to zeroes depending on the min
+    the rest of the matrix, adds pseudocounts to zeroes depending on the min
     value, scales all values depending on the min value and computes the log10
     off all values.
 
@@ -108,20 +108,16 @@ def clean_matrix(mlobject: mlo.MetalociObject, bad_regions: pd.DataFrame) -> np.
 
     if total_zeroes == len(diagonal):
 
-        # bad_regions[mlobject.region].append(mlobject.region)
-        bad_regions[mlobject.region].append("empty")
-
-        return None
+        mlobject.bad_region = "empty"
+        return mlobject
 
     if percentage_zeroes >= 50:
 
-        # bad_regions[mlobject.region].append(mlobject.region)
-        bad_regions[mlobject.region].append("percentage_of_zeroes")
+        mlobject.bad_region = "too many zeroes"
 
     if max_stretch >= 20:
 
-        # bad_regions[mlobject.region].append(mlobject.region)
-        bad_regions[mlobject.region].append("stretch")
+        mlobject.bad_region = "stretch"
 
     mlobject.matrix[zero_loc] = 0
     mlobject.matrix[:, zero_loc] = 0
@@ -146,7 +142,7 @@ def clean_matrix(mlobject: mlo.MetalociObject, bad_regions: pd.DataFrame) -> np.
 
     mlobject.matrix = np.log10(mlobject.matrix)
 
-    return mlobject.matrix
+    return mlobject
 
 
 def signal_normalization(region_signal: pd.DataFrame, pseudocounts: float = None, norm=None) -> np.ndarray:
@@ -255,96 +251,3 @@ def check_chromosome_names(hic_file: Path, data: Path, coords: bool):
             "\nYou may want to rename the chromosome names in a cooler file with cooler.rename_chroms() in python. "
             "\n\nExiting..."
         )
-
-    
-def bed_to_metaloci(data, coords, resolution):
-
-    boundaries_dictionary = defaultdict(dict)
-
-    # Open centromeres and telomeres coordinates file and assign the corresponding values to variables.
-    with open(file=coords, mode="r", encoding="utf-8") as chrom:
-
-        for l in chrom:
-
-            line = l.rstrip().split("\t")
-            boundaries_dictionary[line[0]]["end"] = int(line[1])  # tl_st: end of the initial telomere
-
-    file_info = pd.read_table(data[0])
-
-    for i in range(1, len(data)):
-
-        temp = pd.read_table(data[i])
-        file_info = pd.merge(file_info, temp, on=["chrom", "start", "end"], how="inner")
-
-    col_names = file_info.columns.tolist()
-
-    bad_col_names = []
-
-    for i in range(3, len(col_names)):
-
-        if len(re.findall("_", col_names[i])) != 1:
-
-            bad_col_names.append(col_names[i])
-
-    if len(bad_col_names) > 0:
-
-        print("Problems with the following signal names:")
-        print(", ".join(str(x) for x in bad_col_names))
-        print("Names for signal must be in the following format: CLASS_NAME.")
-        print("Class refers to data that can be potentially merged in downstream analysis.")
-
-        sys.exit("Exiting due to improper signal names.")
-
-    for chrm, chrm_value in boundaries_dictionary.items():
-
-        print(f"chromosome {chrm.rsplit('r', 1)[1]} in progress.")
-
-        pbar = tqdm(total=int(chrm_value["end"] / resolution) + 1)
-
-        if chrm not in file_info["chrom"].unique():
-
-            print(f"chromosome {chrm.rsplit('r', 1)[1]} not found in the signal file(s), skipping...")
-            continue
-
-        bin_start = 0
-        bin_end = bin_start + resolution
-
-        info = defaultdict(list)
-
-        while bin_start <= chrm_value["end"]:
-
-            pbar.update()
-
-            info["Chr"].append(chrm)
-            info["St"].append(bin_start)
-            info["Sp"].append(bin_end)
-
-            tmp_bin = file_info[
-                (file_info["start"] >= int(bin_start))
-                & (file_info["end"] <= int(bin_end))
-                & (file_info["chrom"] == chrm)
-            ]
-
-            # Go over the columns to get all the signals.
-            for j in range(3, tmp_bin.shape[1]):
-
-                if tmp_bin.shape[0] == 0:
-
-                    info[col_names[j]].append(np.nan)
-
-                else:
-
-                    info[col_names[j]].append(np.nanmedian(tmp_bin.iloc[:, j].tolist()))
-
-            # If the end of the current bin is the start of the terminal telomere, stop
-            if bin_end == boundaries_dictionary[f"{chrm}"]["end"]:
-
-                break
-
-            # Creating tmp variables for an easier check of overlap with centromeres and telomeres.
-            bin_start = bin_end
-            bin_end = bin_start + resolution
-
-        pbar.close()
-
-    return info

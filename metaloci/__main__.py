@@ -7,17 +7,6 @@ from importlib.metadata import version
 from metaloci.tools import figure, layout, ml, prep
 
 
-def read(*paths, **kwargs):
-
-    content = ""
-    with io.open(
-        os.path.join(os.path.dirname(__file__), *paths),
-        encoding=kwargs.get("encoding", "utf8"),
-    ) as open_file:
-        content = open_file.read().strip()
-    return content
-
-
 def main(arguments) -> None:  # pragma: no cover
 
     DESCRIPTION = "METALoci: spatially auto-correlated signals in 3D genomes.\n"
@@ -44,6 +33,7 @@ def main(arguments) -> None:  # pragma: no cover
     args_pp["prep"] = subparser.add_parser("prep",
                                           description=prep.DESCRIPTION,
                                           help=prep.DESCRIPTION,
+                                          add_help=False,
                                           formatter_class=RawDescriptionHelpFormatter)
     args_pp["prep"].set_defaults(func=prep.run)
     prep.populate_args(args_pp["prep"])
@@ -52,6 +42,7 @@ def main(arguments) -> None:  # pragma: no cover
     args_pp["layout"] = subparser.add_parser("layout",
                                           description=layout.DESCRIPTION,
                                           help=layout.DESCRIPTION,
+                                          add_help=False,
                                           formatter_class=RawDescriptionHelpFormatter)
     args_pp["layout"].set_defaults(func=layout.run)
     layout.populate_args(args_pp["layout"])
@@ -60,6 +51,7 @@ def main(arguments) -> None:  # pragma: no cover
     args_pp["lm"] = subparser.add_parser("lm",
                                           description=ml.DESCRIPTION,
                                           help=ml.DESCRIPTION,
+                                          add_help=False,
                                           formatter_class=RawDescriptionHelpFormatter)
     args_pp["lm"].set_defaults(func=ml.run)
     ml.populate_args(args_pp["lm"])
@@ -68,6 +60,7 @@ def main(arguments) -> None:  # pragma: no cover
     args_pp["figure"] = subparser.add_parser("figure",
                                           description=figure.DESCRIPTION,
                                           help=figure.DESCRIPTION,
+                                          add_help=False,
                                           formatter_class=RawDescriptionHelpFormatter)
     args_pp["figure"].set_defaults(func=figure.run)
     figure.populate_args(args_pp["figure"])

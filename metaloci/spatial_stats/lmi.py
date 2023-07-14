@@ -284,7 +284,7 @@ def compute_lmi(
 
     # Calculate Local Moran's I
     moran_local_object = Moran_Local(
-        y, weights, permutations=n_permutations
+        y, weights, permutations=n_permutations, n_jobs=1
     )  # geoda_quadsbool (default=False) If False use PySAL Scheme: HH=1, LH=2, LL=3, HL=4
     lags = lag_spatial(moran_local_object.w, moran_local_object.z)
 
@@ -317,7 +317,7 @@ def compute_lmi(
         df_lmi["LMI_score"].append(round(moran_local_object.Is[row.moran_index], 9))
         df_lmi["LMI_pvalue"].append(round(moran_local_object.p_sim[row.moran_index], 9))
         df_lmi["LMI_inv_pval"].append(round((1 - moran_local_object.p_sim[row.moran_index]), 9))
-        df_lmi["ZSig"].append(y[row.moran_index])  ## MAYBE IT'S MORAN_INDEX INSTED OF BIN_INDEX. CHECK
+        df_lmi["ZSig"].append(y[row.moran_index]) 
         df_lmi["ZLag"].append(lags[row.moran_index])
 
     df_lmi = pd.DataFrame(df_lmi)

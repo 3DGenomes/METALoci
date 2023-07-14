@@ -408,11 +408,9 @@ def signal_bed(
     # Make a big polygon from the small poligons that are significant.
     metalocis = lmi_geometry[lmi_geometry.bin_index.isin(ml_indexes)].unary_union
 
-    if metalocis:
+    if metalocis and metalocis.geom_type == "Polygon":
 
-        if metalocis.geom_type == "Polygon":
-
-            metalocis = MultiPolygon([metalocis])  # Need a multipolygon in order for the code to work.
+        metalocis = MultiPolygon([metalocis])  # Need a multipolygon in order for the code to work.
 
     poi_point = Point(
         (lmi_geometry[lmi_geometry.bin_index == mlobject.poi].X, lmi_geometry[lmi_geometry.bin_index == mlobject.poi].Y)
@@ -420,7 +418,7 @@ def signal_bed(
 
     metalocis_bed = []
 
-    beddata = defaultdict(list)
+    bed_data = defaultdict(list)
 
     try:
 
@@ -445,17 +443,17 @@ def signal_bed(
 
                 for point in metalocis_bed:
 
-                    beddata["chr"].append(lmi_geometry.bin_chr[point])
-                    beddata["start"].append(lmi_geometry.bin_start[point])
-                    beddata["end"].append(lmi_geometry.bin_end[point])
-                    beddata["bin"].append(point)
+                    bed_data["chr"].append(lmi_geometry.bin_chr[point])
+                    bed_data["start"].append(lmi_geometry.bin_start[point])
+                    bed_data["end"].append(lmi_geometry.bin_end[point])
+                    bed_data["bin"].append(point)
     except:
 
         pass
 
-    beddata = pd.DataFrame(beddata)
+    bed_data = pd.DataFrame(bed_data)
 
-    return beddata, metalocis_bed
+    return bed_data, metalocis_bed
 
 
 def signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, metalocis, bins_sig, coords_sig):

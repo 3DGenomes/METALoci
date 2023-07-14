@@ -75,6 +75,14 @@ def populate_args(parser):
     )
 
     optional_arg.add_argument(
+        "-l",
+        "--log",
+        dest="log",
+        action="store_true",
+        help="Flag to write bed with metaloci, for each region.",
+    )
+
+    optional_arg.add_argument(
         "-a",
         "--aggregated",
         dest="agg",
@@ -109,11 +117,15 @@ def populate_args(parser):
         help="P-value significance threshold (default: %(default)s).",
     )
 
+    optional_arg.add_argument("-h", "--help", action="help", help="Show this help message and exit.")
+
+
 def run(opts):
         
     work_dir = opts.work_dir
     regions = opts.regions
     signals = opts.signals
+    metaloci_bed = opts.log
     quadrants = opts.quart
     signipval = opts.signipval
     rmtypes = opts.rm_types
@@ -251,8 +263,6 @@ def run(opts):
             plt.close()
             print("\t\tGaudi Type plot -> done.")
 
-            
-
             print("\t\tSignal plot", end="\r")
             bed_data, selmetaloci = plot.signal_bed(
                 mlobject,
@@ -262,7 +272,7 @@ def run(opts):
                 signipval,
             )
 
-            selmetaloci = []
+            # selmetaloci = []
 
             sig_plt = plot.signal_plot(mlobject, merged_lmi_geometry, selmetaloci, bins, coords_b)
             sig_plt.savefig(f"{plot_filename}_signal.pdf", **plot_opt)
@@ -309,7 +319,7 @@ def run(opts):
             composite_image = plot.place_composite(composite_image, f"{plot_filename}_kk.png", 0.3, 1300, 50)  # KK image
             composite_image = plot.place_composite(composite_image, f"{plot_filename}_lmi.png", 0.4, 75, 900)  # LMI scatter image
             composite_image = plot.place_composite(composite_image, f"{plot_filename}_gsp.png", 0.25, 900, 900)  # Gaudi signal image
-            composite_image = plot.place_composite(composite_image, f"{plot_filename}_gtp.png", 0.25, 1600, 900)  # Gaudi signi image
+            composite_image = plot.place_composite(composite_image, f"{plot_filename}_gtp.png", 0.25, 1600, 900)  # Gaudi signal image
 
             composite_image.save(f"{plot_filename}.png")
 
@@ -320,7 +330,17 @@ def run(opts):
             plt.close()
             print(f"\t\tFinal composite figure for region '{region}' and signal '{signal}' -> done.")
 
-            for signal, df in mlobject.lmi_info.items():
+            if metaloci_bed and len(bed_data) > 0:
+
+                metaloci_bed_path = f"{work_dir}{mlobject.chrom}/metalocis_log/{signal}"
+                pathlib.Path(metaloci_bed_path).mkdir(parents=True, exist_ok=True) 
+
+                bed_data.to_csv(f"{metaloci_bed_path}/{mlobject.region}_{mlobject.poi}_{signal}_metalocis.txt", sep="\t", index=False)
+                print(f"\t\tBed file with metalocis location saved to: "
+                      f"{metaloci_bed_path}/{mlobject.region}_{mlobject.poi}_{signal}.txt")
+
+            # Log
+            for signal_key, df in mlobject.lmi_info.items():
 
                 sq = [0] * 4
                 q = [0] * 4
@@ -340,7 +360,7 @@ def run(opts):
 
                 with open(f"{work_dir}moran_info.txt", "a+") as handler:
 
-                    log = f"{region}\t{region_iter.name}\t{region_iter.id}\t{signal}\t{r_value}\t{p_value}\t{q_string}\n"
+                    log = f"{region}\t{region_iter.name}\t{region_iter.id}\t{signal_key}\t{r_value}\t{p_value}\t{q_string}\n"
 
                     handler.seek(0)
 
@@ -352,6 +372,7 @@ def run(opts):
 
                         handler.write(log)
 
+            # Remove image used for composite figure.
             if rmtypes:
 
                 for ext in rmtypes:

@@ -117,6 +117,9 @@ def populate_args(parser):
         help="Set a persistence length for the Kamada-Kawai layout.",
     )
 
+    optional_arg.add_argument("-h", "--help", action="help", help="Show this help message and exit.")
+
+
 def get_region_layout(row, opts, progress=None, silent: bool = True):
 
     work_dir = opts.work_dir
@@ -127,6 +130,10 @@ def get_region_layout(row, opts, progress=None, silent: bool = True):
     force = opts.force
     save_plots = opts.save_plots
     persistence_length = opts.persistence_length
+
+    if not work_dir.endswith("/"):
+
+        work_dir += "/"
 
     if cutoffs is None:
 
@@ -219,10 +226,10 @@ def get_region_layout(row, opts, progress=None, silent: bool = True):
         chrm, start, end = re.split(':|-', mlobject.region)
         mlobject.matrix = hicstraw.HiCFile(hic_path).getMatrixZoomData(chrm, chrm, 'observed', 'VC_SQRT', 'BP', mlobject.resolution).getRecordsAsMatrix(int(start), int(end), int(start), int(end))      
     
-    mlobject.matrix = misc.clean_matrix(mlobject, bad_regions)
+    mlobject = misc.clean_matrix(mlobject, bad_regions)
 
     # This if statement is for detecting empty arrays. If the array is too empty,
-    # clean_matrix() would return mlobject.matrix as None.
+    # clean_matrix() will return mlobject.matrix as None.
     if mlobject.matrix is None:
 
         return
@@ -294,45 +301,21 @@ def get_region_layout(row, opts, progress=None, silent: bool = True):
                     f"at {int(cutoff * 100)} % cutoff saved to file: {mlobject.save_path}"
                 )
 
+            # Write to file a list of bad regions, according to the filters defined in clean_matrix().
+            with open(f"{work_dir}bad_regions.txt", "a+") as handler:
+
+                log = f"{mlobject.region}\t{mlobject.bad_region}\n"
+
+                handler.seek(0)
+
+                if not any(log in line for line in handler) and mlobject.bad_region != None:
+
+                    handler.write(log)
+
             # Save mlobject.
             with open(mlobject.save_path, "wb") as hamlo_namendle:
 
                 mlobject.save(hamlo_namendle)
-
-        # with open(f"{work_dir}bad_regions.txt", "a+") as handler:
-
-        #     for region, reason in bad_regions.items():
-
-        #         if not any(f"{region}\t{reason[0]}" in line for line in handler):
-
-        #             handler.write(f"{region}\t{reason[0]}\n")
-        #             handler.flush()
-
-        # with open(f"{work_dir}bad_regions.txt", "a+") as handler:
-
-        #     lines = [line.rstrip("\n") for line in handler]
-
-        #     for region, reason in bad_regions.items():
-
-        #         if f"{region}\t{reason[0]}" not in lines:
-        #             # inserts on top, elsewise use lines.append(name) to append at the end of the file.
-        #             lines.insert(0, f"{region}\t{reason[0]}\n")
-
-        #     handler.seek(0)  # move to first position in the file, to overwrite !
-        #     handler.write("\n".join(lines))
-        #     handler.flush()
-
-        # with open(f"{work_dir}bad_regions.txt", "a+") as handler:
-
-        #     x = handler.readlines()  # reading all the lines in a list, no worry about '\n'
-
-        #     for region, reason in bad_regions.items():
-
-        #         if f"{region}\t{reason[0]}" not in x:
-        #             # if word not in file then write the word to the file
-        #             handler.write(f"{region}\t{reason[0]}\n")
-        #             handler.flush()
-        # print(int(timedelta(seconds=round(time() - time_per_region))))
 
     if progress is not None:
 
@@ -415,17 +398,7 @@ def run(opts):
 
     # If there is bad regions, write to a file which is the bad region and why,
     # but only if that region-reason pair does not already exist in the file.
-    # bad_regions = pd.DataFrame(bad_regions)
-
-    # if bad_regions.shape[0] > 0:
-
-    #     with open(f"{work_dir}bad_regions.txt", "a+") as handler:
-
-    #         [
-    #             handler.write(f"{row.region}\t{row.reason}\n")
-    #             for _, row in bad_regions.iterrows()
-    #             if not any(f"{row.region}\t{row.reason}" in line for line in handler)
-    #         ]
+    
 
     print(f"\n\nTotal time spent: {timedelta(seconds=round(time() - start_timer))}.")
     print("\nall done.")

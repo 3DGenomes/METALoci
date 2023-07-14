@@ -122,6 +122,7 @@ def run(opts):
     quadrants = [int(x) for x in quadrants]
 
     if not work_dir.endswith("/"):
+
         work_dir += "/"
 
     INFLUENCE = 1.5
@@ -147,7 +148,6 @@ def run(opts):
             signals = [line.strip() for line in handler]
 
     plot_opt = {"bbox_inches": "tight", "dpi": 300, "transparent": True}
-    data_moran = {"Coords": [], "Symbol": [], "Gene_id": [], "Signal": [], "R_value": [], "P_value": []}
 
     for i, region_iter in df_regions.iterrows():
 
@@ -313,19 +313,44 @@ def run(opts):
 
             composite_image.save(f"{plot_filename}.png")
 
-            fig = plt.figure(figsize=(15, 15))
+            plt.figure(figsize=(15, 15))
             plt.imshow(composite_image)
             plt.axis("off")
             plt.savefig(f"{plot_filename}.pdf", **plot_opt)
             plt.close()
             print(f"\t\tFinal composite figure for region '{region}' and signal '{signal}' -> done.")
 
-            data_moran["Coords"].append(region)
-            data_moran["Symbol"].append(region_iter.name)
-            data_moran["Gene_id"].append(region_iter.id)
-            data_moran["Signal"].append(signal)
-            data_moran["R_value"].append(r_value)
-            data_moran["P_value"].append(p_value)
+            for signal, df in mlobject.lmi_info.items():
+
+                sq = [0] * 4
+                q = [0] * 4
+
+                for i, row in df.iterrows():
+
+                    quadrant = row["moran_quadrant"]
+                    lmi_pvalue = row["LMI_pvalue"]
+
+                    q[quadrant - 1] += 1
+
+                    if lmi_pvalue <= signipval:
+
+                        sq[quadrant - 1] += 1
+
+                q_string = "\t".join([f"{sq[i]}\t{q[i]}" for i in range(4)])
+
+                with open(f"{work_dir}moran_info.txt", "a+") as handler:
+
+                    log = f"{region}\t{region_iter.name}\t{region_iter.id}\t{signal}\t{r_value}\t{p_value}\t{q_string}\n"
+
+                    handler.seek(0)
+
+                    if os.stat(f"{work_dir}moran_info.txt").st_size == 0:
+
+                        handler.write("region\tsymbol\tgene_id\tsignal\tr_value\tp_value\tsq1\tq1\tsq2\tq2\tsq3\tq3\tsq4\tq4\n")
+
+                    if not any(log in line for line in handler):
+
+                        handler.write(log)
 
             if rmtypes:
 
@@ -337,9 +362,6 @@ def run(opts):
                     os.remove(f"{plot_filename}_lmi.{ext}")
                     os.remove(f"{plot_filename}_gsp.{ext}")
                     os.remove(f"{plot_filename}_gtp.{ext}")
-
-    data_moran = pd.DataFrame(data_moran)
-    data_moran.to_csv(f"{os.path.join(work_dir, 'moran_info.txt')}", sep="\t", index=False, mode="a")
 
     print(f"\nInformation saved to {os.path.join(work_dir, 'moran_info.txt')}")
     print(f"\nTotal time spent: {timedelta(seconds=round(time() - start_timer))}")

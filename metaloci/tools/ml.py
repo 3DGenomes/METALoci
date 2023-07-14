@@ -9,6 +9,7 @@ import subprocess as sp
 from argparse import HelpFormatter
 from datetime import timedelta
 from time import time
+import pathlib
 
 import pandas as pd
 
@@ -79,6 +80,14 @@ def populate_args(parser):
     )
 
     optional_arg.add_argument(
+        "-l",
+        "--log",
+        dest="log",
+        action="store_true",
+        help="Flag to unpickle LMI log.",
+    )
+
+    optional_arg.add_argument(
         "-m",
         "--mp",
         dest="multiprocess",
@@ -87,8 +96,13 @@ def populate_args(parser):
     )
 
     optional_arg.add_argument(
-        "-t", "--threads", dest="threads", type=int, action="store", help="Number of threads to use in multiprocessing."
+        "-t", "--threads", dest="threads", default=int(mp.cpu_count() / 3), type=int, action="store", help="Number" 
+        " of threads to use in multiprocessing. Recommended value is one third of your total cpu count, although"
+        " increasing this number may improve performance in machines with few cores. (default: %(default)s)"
     )
+
+    optional_arg.add_argument("-h", "--help", action="help", help="Show this help message and exit.")
+
 
 def get_lmi(region_iter, opts, signal_data, progress=None, i=None, silent: bool = True):
 
@@ -100,6 +114,7 @@ def get_lmi(region_iter, opts, signal_data, progress=None, i=None, silent: bool 
     regions = opts.region_file
     n_permutations = opts.perms
     signipval = opts.signipval
+    moran_log = opts.log
     force = opts.force
 
     if not work_dir.endswith("/"):
@@ -152,9 +167,10 @@ def get_lmi(region_iter, opts, signal_data, progress=None, i=None, silent: bool 
     # This checks if every signal you want to process is already computed. If the user works with a few signals 
     # but decides to add some more later, she can use the same working directory and KK, and the LMI will be
     # computed again with the new signals. If everything is already computed, does nothing.
-    if mlobject.lmi_info is not None:
+    # TODO compute only the missing signals instead of all the signals again.
+    if mlobject.lmi_info is not None and force is False:
 
-        if [k for k, _ in mlobject.lmi_info.items()] == signal_types:
+        if [signal for signal, _ in mlobject.lmi_info.items()] == signal_types:
 
             if silent == False:
 
@@ -162,13 +178,29 @@ def get_lmi(region_iter, opts, signal_data, progress=None, i=None, silent: bool 
 
             if progress is not None: progress["done"] = True
 
+            if moran_log:
+
+                for signal, df in mlobject.lmi_info.items():
+
+                    moran_log_path = f"{work_dir}{mlobject.chrom}/moran_log/{signal}"
+                    pathlib.Path(moran_log_path).mkdir(parents=True, exist_ok=True)
+
+                    df.to_csv(f"{moran_log_path}/{mlobject.region}_{mlobject.poi}_{signal}.txt", sep="\t", index=False)
+
+                    if silent == False:
+                        
+                        print(f"\tLog saved to: {moran_log_path}/{mlobject.region}_{mlobject.poi}_{signal}.txt")
+
             return
 
     # Get average distance between consecutive points to define influence,
     # which should be ~2 particles of radius.
     mean_distance = mlobject.kk_distances.diagonal(1).mean()
     buffer = mean_distance * INFLUENCE
-    mlobject.lmi_geometry = lmi.construct_voronoi(mlobject, buffer)
+    
+    if mlobject.lmi_geometry is None:
+
+        mlobject.lmi_geometry = lmi.construct_voronoi(mlobject, buffer)
 
     if silent == False:
 
@@ -192,6 +224,19 @@ def get_lmi(region_iter, opts, signal_data, progress=None, i=None, silent: bool 
 
         mlobject.save(hamlo_namendle)
 
+    if moran_log:
+
+        for signal, df in mlobject.lmi_info.items():
+
+            moran_log_path = f"{work_dir}{mlobject.chrom}/moran_log/{signal}"
+            pathlib.Path(moran_log_path).mkdir(parents=True, exist_ok=True) 
+
+            df.to_csv(f"{moran_log_path}/{mlobject.region}_{mlobject.poi}_{signal}.txt", sep="\t", index=False)
+
+            if silent == False:
+                        
+                        print(f"\tLog saved to: {moran_log_path}/{mlobject.region}_{mlobject.poi}_{signal}.txt")
+
     if progress is not None:
 
         progress['value'] += 1
@@ -210,6 +255,11 @@ def run(opts):
     regions = opts.region_file
     multiprocess = opts.multiprocess
     cores = opts.threads
+    moran_log = opts.log
+
+    if opts.threads is None:
+
+        cores = int(mp.cpu_count() / 3)
 
     if not work_dir.endswith("/"):
 
@@ -247,6 +297,10 @@ def run(opts):
                 if progress["done"] == True:
 
                     print("\tSome regions had already been computed and have been skipped.", end="")
+                
+                    if moran_log:
+
+                        print(f"\n\tLog saved to: {work_dir}chrN/moran_log", end="")
 
                 pool.close()
                 pool.join()

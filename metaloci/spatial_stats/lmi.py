@@ -201,16 +201,23 @@ def load_region_signals(mlobject: mlo.MetalociObject, signal_data: dict, signal_
 
         signal_types = [line.rstrip() for line in signals_handler]
 
+    # region_signal = signal_data[mlobject.chrom][
+    #     (signal_data[mlobject.chrom]["start"] >= int(mlobject.start / mlobject.resolution) * mlobject.resolution)
+    #     & (signal_data[mlobject.chrom]["end"] <= int(mlobject.end / mlobject.resolution) * mlobject.resolution)
+    # ]
+
     region_signal = signal_data[mlobject.chrom][
-        (signal_data[mlobject.chrom]["start"] >= int(mlobject.start / mlobject.resolution) * mlobject.resolution)
-        & (signal_data[mlobject.chrom]["end"] <= int(mlobject.end / mlobject.resolution) * mlobject.resolution)
-    ]
+        (signal_data[mlobject.chrom]["start"] >= int(np.floor(mlobject.start / mlobject.resolution)) * mlobject.resolution) 
+        & (signal_data[mlobject.chrom]["end"] <= int(np.ceil(mlobject.end / mlobject.resolution)) * mlobject.resolution)
+    ] # jfm: fix
 
     if len(region_signal) != len(mlobject.kk_coords):
 
         tmp = len(mlobject.kk_coords) - len(region_signal)
         tmp = np.empty((tmp, len(region_signal.columns)))
-        tmp[:] = 0
+        # tmp[:] = 0
+        tmp[:] = np.nan # jfm: leave NAs in for now. (in misc.signal_normalization() those NaNS will be substituted for 
+        # the median of the signal of the region)
 
         region_signal = pd.concat([region_signal, pd.DataFrame(tmp, columns=list(region_signal))], ignore_index=True)
 
@@ -218,7 +225,13 @@ def load_region_signals(mlobject: mlo.MetalociObject, signal_data: dict, signal_
 
     for signal_type in signal_types:
 
-        signals_dict[signal_type] = misc.signal_normalization(region_signal[signal_type])
+        try:
+
+            signals_dict[signal_type] = misc.signal_normalization(region_signal[signal_type])
+
+        except KeyError:
+            
+            return None, signal_type    
 
     return signals_dict, signal_types
 

@@ -82,7 +82,7 @@ def check_diagonal(diagonal: np.ndarray) -> tuple[int, float, float, list]:
     return total, percentage_stretch, percentage_zeroes, zero_loc
 
 
-def clean_matrix(mlobject: mlo.MetalociObject, bad_regions: pd.DataFrame) -> np.ndarray:
+def clean_matrix(mlobject: mlo.MetalociObject) -> np.ndarray:
     """
     Clean a given HiC matrix. It checks if the matrix has too many zeroes at
     he diagonal, removes values that are zero at the diagonal but are not in
@@ -94,8 +94,6 @@ def clean_matrix(mlobject: mlo.MetalociObject, bad_regions: pd.DataFrame) -> np.
     ----------
     mlo : np.ndarray
         METALoci object with a matrix in it.
-    bad_regions : dict
-        Dictionay {"region": [], "reason": []} in which to append bad regions.
 
     Returns
     -------
@@ -169,7 +167,9 @@ def signal_normalization(region_signal: pd.DataFrame, pseudocounts: float = None
 
     if pseudocounts is None:
 
-        signal = [0.0 if np.isnan(index) else index for index in region_signal]
+        # signal = [0.0 if np.isnan(index) else index for index in region_signal]
+        median_default = np.nanmedian(region_signal) # jfk fix
+        signal = [median_default if np.isnan(index) else index for index in region_signal] # jfk fix
 
     else:
 
@@ -194,7 +194,7 @@ def signal_normalization(region_signal: pd.DataFrame, pseudocounts: float = None
     return np.array(signal)
 
 
-def check_chromosome_names(hic_file: Path, data: Path, coords: bool):
+def check_cooler_names(hic_file: Path, data: Path, coords: bool):
 
     with open(data[0], "r") as handler:
 
@@ -206,28 +206,16 @@ def check_chromosome_names(hic_file: Path, data: Path, coords: bool):
 
             signal_chr_nom = "N"
 
-    try:
+    hic_file = cooler.Cooler(hic_file)
 
-        hic_file = cooler.Cooler(hic_file)
+    if "chr" in [hic_file.chromnames][0][0]:
 
-        if "chr" in [hic_file.chromnames][0][0]:
+        cooler_chr_nom = "chrN"
 
-            cooler_chr_nom = "chrN"
+    else:
 
-        else:
-
-            cooler_chr_nom = "N"
-
-    except OSError: #CHECK EXCEPTION
-
-        if "chr" in hicstraw.HiCFile(hic_file).getChromosomes()[1].name:
-
-            cooler_chr_nom = "chrN"
-
-        else:
-
-            cooler_chr_nom = "N"
-
+        cooler_chr_nom = "N"
+    
     del hic_file
 
     with open(coords, "r") as handler:
@@ -249,5 +237,49 @@ def check_chromosome_names(hic_file: Path, data: Path, coords: bool):
             f"\n\tChromosome sizes nomenclature is '{coords_chr_nom}'. "
             "\n\nPlease, rename the chromosome names. "
             "\nYou may want to rename the chromosome names in a cooler file with cooler.rename_chroms() in python. "
+            "\n\nExiting..."
+        )
+
+
+def check_hic_names(hic_file: Path, data: Path, coords: bool):
+
+    with open(data[0], "r") as handler:
+
+        if [line.strip() for line in handler][1].startswith("chr"):
+
+            signal_chr_nom = "chrN"
+
+        else:
+
+            signal_chr_nom = "N"
+
+    if "chr" in hicstraw.HiCFile(hic_file).getChromosomes()[1].name:
+
+        hic_chr_nom = "chrN"
+
+    else:
+
+        hic_chr_nom = "N"
+
+    del hic_file
+
+    with open(coords, "r") as handler:
+
+        if [line.strip() for line in handler][1].startswith("chr"):
+
+            coords_chr_nom = "chrN"
+
+        else:
+
+            coords_chr_nom = "N"
+
+    if not signal_chr_nom == hic_chr_nom == coords_chr_nom:
+
+        exit(
+            "\nThe signal, cooler and chromosome sizes files do not have the same nomenclature for chromosomes:\n"
+            f"\n\tSignal chromosomes nomenclature is '{signal_chr_nom}'. "
+            f"\n\tHi-C chromosomes nomenclature is '{hic_chr_nom}'. "
+            f"\n\tChromosome sizes nomenclature is '{coords_chr_nom}'. "
+            "\n\nPlease, rename the chromosome names. "
             "\n\nExiting..."
         )

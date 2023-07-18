@@ -13,6 +13,8 @@ import pandas as pd
 from metaloci.misc import misc
 from numba.core.errors import NumbaDeprecationWarning, NumbaPendingDeprecationWarning
 import warnings
+import h5py
+import hicstraw
 
 warnings.simplefilter('ignore', category=NumbaDeprecationWarning)
 warnings.simplefilter('ignore', category=NumbaPendingDeprecationWarning)
@@ -91,7 +93,6 @@ def populate_args(parser):
 
     optional_arg.add_argument("-h", "--help", action="help", help="Show this help message and exit.")
 
-
 def run(opts):
     
     if not opts.work_dir.endswith("/"):
@@ -108,10 +109,22 @@ def run(opts):
     pathlib.Path(tmp_dir).mkdir(parents=True, exist_ok=True)
 
     if hic_path.endswith(".cool") or hic_path.endswith(".mcool"):
+        
+        if resolution not in sorted([int(x) for x in list(h5py.File(hic_path)["resolutions"].keys())]):
+
+            exit("The given resolution is not in the provided cooler file. Exiting...")
 
         hic_path = hic_path + "::/resolutions/" + str(resolution)
 
-    misc.check_chromosome_names(hic_path, data, coords)
+        misc.check_cooler_names(hic_path, data, coords)
+
+    elif hic_path.endswith(".hic"):
+
+        if resolution not in hicstraw.HiCFile(hic_path).getResolutions():
+             
+            exit("The given resolution is not in the provided Hi-C file. Exiting...")
+
+        misc.check_hic_names(hic_path, data, coords)
 
     column_dict = {}
 

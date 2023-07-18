@@ -156,13 +156,20 @@ def get_lmi(region_iter, opts, signal_data, progress=None, i=None, silent: bool 
     if mlobject.kk_nodes is None:
 
         if silent == False:
-
-            print("Kamada-Kawai layout has not been calculated for this region. \n\tSkipping to next region...")
+            print("\tKamada-Kawai layout has not been calculated for this region. \n\tSkipping to next region...")
 
         return
 
     # Load only signal for this specific region.
     mlobject.signals_dict, signal_types = lmi.load_region_signals(mlobject, signal_data, signals)
+
+    # If the signal is not present in the signals folder (has not been processed with prep) but it is in 
+    # the list of signal to process, raise an exception and print which signals need to be processed.
+    if mlobject.signals_dict == None and progress is not None:
+
+        progress["missing_signal"] = signal_types    
+
+        raise Exception()
 
     # This checks if every signal you want to process is already computed. If the user works with a few signals 
     # but decides to add some more later, she can use the same working directory and KK, and the LMI will be
@@ -173,7 +180,6 @@ def get_lmi(region_iter, opts, signal_data, progress=None, i=None, silent: bool 
         if [signal for signal, _ in mlobject.lmi_info.items()] == signal_types:
 
             if silent == False:
-
                 print("\tLMI already computed for this region. \n\tSkipping to next region...")
 
             if progress is not None: progress["done"] = True
@@ -188,7 +194,6 @@ def get_lmi(region_iter, opts, signal_data, progress=None, i=None, silent: bool 
                     df.to_csv(f"{moran_log_path}/{mlobject.region}_{mlobject.poi}_{signal}.txt", sep="\t", index=False)
 
                     if silent == False:
-                        
                         print(f"\tLog saved to: {moran_log_path}/{mlobject.region}_{mlobject.poi}_{signal}.txt")
 
             return
@@ -288,19 +293,31 @@ def run(opts):
         try:
             
             manager = mp.Manager()
-            progress = manager.dict(value=0, timer = start_timer, done = False)
+            progress = manager.dict(value=0, timer = start_timer, done = False, missing_signal = None)
         
             with mp.Pool(processes=cores) as pool:
 
-                pool.starmap(get_lmi, [(row, opts, signal_data, progress) for _, row in df_regions.iterrows()])
+                try:
 
-                if progress["done"] == True:
+                    pool.starmap(get_lmi, [(row, opts, signal_data, progress) for _, row in df_regions.iterrows()])
 
-                    print("\tSome regions had already been computed and have been skipped.", end="")
+                    if progress["done"] == True:
+
+                        print("\tSome regions had already been computed and have been skipped.", end="")
+                    
+                        if moran_log:
+
+                            print(f"\n\tLog saved to: {work_dir}chrN/moran_log", end="")
+
+                except Exception:
+
+                    if progress["missing_signal"] is not None:
+
+                        print(f"\tSignal {progress['missing_signal']} is in the signal list but has not been processed with prep.\n"
+                              "\tprocess that signal or remove it from the signal list.\nExiting...")
                 
-                    if moran_log:
-
-                        print(f"\n\tLog saved to: {work_dir}chrN/moran_log", end="")
+                    pool.close()
+                    pool.join()
 
                 pool.close()
                 pool.join()

@@ -21,7 +21,7 @@ from metaloci import mlo
 from metaloci.graph_layout import kk
 from metaloci.misc import misc
 from metaloci.plot import plot
-
+import pickle
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 DESCRIPTION = """ Creates a Kamada-Kawai layout from a Hi-C for a given region.
@@ -84,7 +84,7 @@ def populate_args(parser):
         nargs="*",
         type=float,
         action="extend",
-        help="Percentage of top interactions to keep, space separated (default: 0.2)",
+        help="Fraction of top interactions to keep, space separated (default: 0.2)",
     )
 
     optional_arg.add_argument("-f", "--force", dest="force", action="store_true", help="force rewriting existing data.")
@@ -149,46 +149,75 @@ def get_region_layout(row, opts, progress=None, silent: bool = True):
 
     cutoffs.sort(key=float, reverse=True)
 
-    bad_regions = defaultdict(list) # does not belong here, this is to prevent an error TODO
-
     region_chrom, region_start, region_end, poi = re.split(":|-|_", row.coords)
     region_coords = f"{region_chrom}_{region_start}_{region_end}_{poi}"
     pathlib.Path(os.path.join(work_dir, region_chrom)).mkdir(parents=True, exist_ok=True)
     save_path = os.path.join(work_dir, region_chrom, f"{region_coords}.mlo")
 
-    if not os.path.isfile(save_path):
+    # if not os.path.isfile(save_path):
 
-        mlobject = mlo.MetalociObject(
-            f"{region_chrom}:{region_start}-{region_end}",
-            str(region_chrom),
-            int(region_start),
-            int(region_end),
-            resolution,
-            int(poi),
-            persistence_length,
-            save_path,
-        )
+    #     mlobject = mlo.MetalociObject(
+    #         f"{region_chrom}:{region_start}-{region_end}",
+    #         str(region_chrom),
+    #         int(region_start),
+    #         int(region_end),
+    #         resolution,
+    #         int(poi),
+    #         persistence_length,
+    #         save_path,
+    #     )
+        
+    # elif mlobject.bad_region == "empty":
 
-    elif (
-        region_coords in bad_regions["region"]
-        and bad_regions["reason"][bad_regions["region"].index(region_coords)] == "empty"
-    ):
+    #     if silent == False:
 
-        if silent == False:
+    #         print(f"\n------> Region {region_coords} already done (Hi-C empty in that region).")
 
-            print(f"\n------> Region {region_coords} already done (no data).")
+    #     if progress is not None: progress["done"] = True
 
-        if progress is not None: progress["done"] = True
+    #     return
 
-        return
+    # else:
 
-    else:
+    #     if silent == False:
+
+    #         print(f"\n------> Region {region_coords} already done.")
+
+    #     if progress is not None: progress["done"] = True
+
+    #     if force:
+
+    #         if silent == False:
+
+    #             print(
+    #                 "\tForce option (-f) selected, recalculating "
+    #                 "the Kamada-Kawai layout (files will be overwritten)"
+    #             )
+
+    #         mlobject = mlo.MetalociObject(
+    #             f"{region_chrom}:{region_start}-{region_end}",
+    #             str(region_chrom),
+    #             int(region_start),
+    #             int(region_end),
+    #             resolution,
+    #             int(poi),
+    #             persistence_length,
+    #             save_path,
+    #         )
+
+    #     else:
+
+    #         return
+        
+    if os.path.isfile(save_path):
+
+        with open(save_path, "rb") as mlobject_handler:
+
+            mlobject = pickle.load(mlobject_handler)
 
         if silent == False:
 
             print(f"\n------> Region {region_coords} already done.")
-
-        if progress is not None: progress["done"] = True
 
         if force:
 
@@ -198,8 +227,43 @@ def get_region_layout(row, opts, progress=None, silent: bool = True):
                     "\tForce option (-f) selected, recalculating "
                     "the Kamada-Kawai layout (files will be overwritten)"
                 )
+            
+            os.remove(f"{save_path}")
 
-            mlobject = mlo.MetalociObject(
+        else:
+
+            if save_plots:
+                
+                if silent == False: print(f"\tPlotting Kamada-Kawai...")
+
+                pathlib.Path(os.path.join(work_dir, region_chrom), "plots", "KK").mkdir(parents=True, exist_ok=True)
+
+                kk_plt = plot.get_kk_plot(mlobject)
+
+                fig_save_path = os.path.join(
+                    work_dir,
+                    region_chrom,
+                    f"plots/KK/{region_coords}_" f"{mlobject.kk_cutoff}_KK.pdf",
+                )
+
+                kk_plt.savefig(fig_save_path, dpi=300)
+                plt.close()
+
+                if progress is not None: progress["plots"] = True
+
+            if progress is not None: progress["done"] = True
+                        
+        if mlobject.bad_region == "empty":
+
+            if silent == False:
+
+                print(f"\n------> Region {region_coords} already done (Hi-C empty in that region).")
+
+            if progress is not None: progress["done"] = True
+        
+    if not os.path.isfile(save_path):
+    
+        mlobject = mlo.MetalociObject(
                 f"{region_chrom}:{region_start}-{region_end}",
                 str(region_chrom),
                 int(region_start),
@@ -210,112 +274,110 @@ def get_region_layout(row, opts, progress=None, silent: bool = True):
                 save_path,
             )
 
-        else:
+        if silent == False:
+            print(f"\n------> Working on region: {mlobject.region}\n")
+
+        if hic_path.endswith(".cool") or hic_path.endswith(".mcool"):
+
+            mlobject.matrix = cooler.Cooler(hic_path + "::/resolutions/" + str(mlobject.resolution)).matrix(sparse=True).fetch(mlobject.region).toarray()
+
+        elif hic_path.endswith(".hic"):
+
+            chrm, start, end = re.split(':|-', mlobject.region)
+            mlobject.matrix = hicstraw.HiCFile(hic_path).getMatrixZoomData(chrm, chrm, 'observed', 'VC_SQRT', 'BP', mlobject.resolution).getRecordsAsMatrix(int(start), int(end), int(start), int(end))      
+        
+        mlobject = misc.clean_matrix(mlobject)
+
+        # This if statement is for detecting empty arrays. If the array is too empty,
+        # clean_matrix() will return mlobject.matrix as None.
+        if mlobject.matrix is None:
 
             return
 
-    if silent == False:
-        print(f"\n------> Working on region: {mlobject.region}\n")
+        time_per_region = time()
 
-    if hic_path.endswith(".cool") or hic_path.endswith(".mcool"):
+        for cutoff in cutoffs:
 
-        mlobject.matrix = cooler.Cooler(hic_path + "::/resolutions/" + str(mlobject.resolution)).matrix(sparse=True).fetch(mlobject.region).toarray()
-
-    elif hic_path.endswith(".hic"):
-
-        chrm, start, end = re.split(':|-', mlobject.region)
-        mlobject.matrix = hicstraw.HiCFile(hic_path).getMatrixZoomData(chrm, chrm, 'observed', 'VC_SQRT', 'BP', mlobject.resolution).getRecordsAsMatrix(int(start), int(end), int(start), int(end))      
-    
-    mlobject = misc.clean_matrix(mlobject, bad_regions)
-
-    # This if statement is for detecting empty arrays. If the array is too empty,
-    # clean_matrix() will return mlobject.matrix as None.
-    if mlobject.matrix is None:
-
-        return
-
-    time_per_region = time()
-
-    for cutoff in cutoffs:
-
-        mlobject.kk_cutoff = cutoff
-
-        if silent == False:
-            print(f"\tCutoff: {int(mlobject.kk_cutoff * 100)} %")
-
-        # Get submatrix of restraints
-        restraints_matrix, mlobject = kk.get_restraints_matrix(mlobject)
-
-        if save_plots:
-
-            mixed_matrices_plot = plot.mixed_matrices_plot(mlobject)
-
-            pathlib.Path(os.path.join(work_dir, region_chrom), "plots", "mixed_matrices").mkdir(
-                parents=True, exist_ok=True
-            )
-
-            mixed_matrices_plot.savefig(
-                os.path.join(
-                    work_dir,
-                    region_chrom,
-                    f"plots/mixed_matrices/{region_coords}_" f"{mlobject.kk_cutoff}_mixed-matrices.pdf",
-                ),
-                dpi=300,
-            )
-
-            plt.close()
-
-        if silent == False:
-
-            print("\tLayouting Kamada-Kawai...")
-
-        mlobject.kk_graph = nx.from_scipy_sparse_array(csr_matrix(restraints_matrix))
-        mlobject.kk_nodes = nx.kamada_kawai_layout(mlobject.kk_graph)
-        mlobject.kk_coords = list(mlobject.kk_nodes.values())
-        mlobject.kk_distances = distance.cdist(mlobject.kk_coords, mlobject.kk_coords, "euclidean")
-
-        if len(cutoffs) > 1 or save_plots:
-
-            pathlib.Path(os.path.join(work_dir, region_chrom), "plots", "KK").mkdir(parents=True, exist_ok=True)
-
-            kk_plt = plot.get_kk_plot(mlobject)
-
-            fig_name = os.path.join(
-                work_dir,
-                region_chrom,
-                f"plots/KK/{region_coords}_" f"{mlobject.kk_cutoff}_KK.pdf",
-            )
-
-            kk_plt.savefig(fig_name, dpi=300)
-            plt.close()
-
-        if silent == False:
-
-            print(f"\tdone in {timedelta(seconds=round(time() - time_per_region))}.\n")
-
-        if len(cutoffs) == 1:
+            mlobject.kk_cutoff = cutoff
 
             if silent == False:
-                print(
-                    f"\tKamada-Kawai layout of region {mlobject.region} "
-                    f"at {int(cutoff * 100)} % cutoff saved to file: {mlobject.save_path}"
+                print(f"\tCutoff: {int(mlobject.kk_cutoff * 100)} %")
+
+            # Get submatrix of restraints
+            restraints_matrix, mlobject = kk.get_restraints_matrix(mlobject)
+
+            if save_plots:
+
+                mixed_matrices_plot = plot.mixed_matrices_plot(mlobject)
+
+                pathlib.Path(os.path.join(work_dir, region_chrom), "plots", "mixed_matrices").mkdir(
+                    parents=True, exist_ok=True
                 )
 
-            # Write to file a list of bad regions, according to the filters defined in clean_matrix().
-            with open(f"{work_dir}bad_regions.txt", "a+") as handler:
+                mixed_matrices_plot.savefig(
+                    os.path.join(
+                        work_dir,
+                        region_chrom,
+                        f"plots/mixed_matrices/{region_coords}_" f"{mlobject.kk_cutoff}_mixed-matrices.pdf",
+                    ),
+                    dpi=300,
+                )
 
-                log = f"{mlobject.region}\t{mlobject.bad_region}\n"
+                plt.close()
 
-                handler.seek(0)
+            if silent == False:
 
-                if not any(log in line for line in handler) and mlobject.bad_region != None:
+                print("\tLayouting Kamada-Kawai...")
 
-                    handler.write(log)
+            mlobject.kk_graph = nx.from_scipy_sparse_array(csr_matrix(restraints_matrix))
+            mlobject.kk_nodes = nx.kamada_kawai_layout(mlobject.kk_graph)
+            mlobject.kk_coords = list(mlobject.kk_nodes.values())
+            mlobject.kk_distances = distance.cdist(mlobject.kk_coords, mlobject.kk_coords, "euclidean")
 
-            # Save mlobject.
-            with open(mlobject.save_path, "wb") as hamlo_namendle:
+            if len(cutoffs) > 1 or save_plots:
 
-                mlobject.save(hamlo_namendle)
+                pathlib.Path(os.path.join(work_dir, region_chrom), "plots", "KK").mkdir(parents=True, exist_ok=True)
+
+                kk_plt = plot.get_kk_plot(mlobject)
+
+                fig_save_path = os.path.join(
+                    work_dir,
+                    region_chrom,
+                    f"plots/KK/{region_coords}_" f"{mlobject.kk_cutoff}_KK.pdf",
+                )
+
+                kk_plt.savefig(fig_save_path, dpi=300)
+                plt.close()
+
+                if progress is not None: progress["plots"] = True
+
+            if silent == False:
+
+                print(f"\tdone in {timedelta(seconds=round(time() - time_per_region))}.\n")
+
+            if len(cutoffs) == 1:
+
+                if silent == False:
+                    print(
+                        f"\tKamada-Kawai layout of region {mlobject.region} "
+                        f"at {int(cutoff * 100)} % cutoff saved to file: {mlobject.save_path}"
+                    )
+
+                # Write to file a list of bad regions, according to the filters defined in clean_matrix().
+                with open(f"{work_dir}bad_regions.txt", "a+") as handler:
+
+                    log = f"{mlobject.region}\t{mlobject.bad_region}\n"
+
+                    handler.seek(0)
+
+                    if not any(log in line for line in handler) and mlobject.bad_region != None:
+
+                        handler.write(log)
+
+                # Save mlobject.
+                with open(mlobject.save_path, "wb") as hamlo_namendle:
+
+                    mlobject.save(hamlo_namendle)
 
     if progress is not None:
 
@@ -364,8 +426,6 @@ def run(opts):
 
     pathlib.Path(os.path.join(work_dir)).mkdir(parents=True, exist_ok=True)
 
-    bad_regions = defaultdict(list)
-
     if multiprocess:
 
         print(f"\n------> {len(df_regions)} regions will be computed.\n")
@@ -373,7 +433,7 @@ def run(opts):
         try:
 
             manager = mp.Manager()
-            progress = manager.dict(value=0, timer = start_timer, done = False)
+            progress = manager.dict(value=0, timer=start_timer, done=False, plots=False)
   
             with mp.Pool(processes=cores) as pool:
             
@@ -382,6 +442,10 @@ def run(opts):
                 if progress["done"] == True:
 
                     print("\tSome regions had already been computed and have been skipped.", end="")
+
+                if progress["plots"] == True:
+
+                    print(f"\n\tKamada-Kawai layout plots saved to {work_dir}chr/plots/KK.", end="")
 
                 pool.close()
                 pool.join()
@@ -395,10 +459,6 @@ def run(opts):
         for _, row in df_regions.iterrows():
 
             get_region_layout(row, opts, silent=False)
-
-    # If there is bad regions, write to a file which is the bad region and why,
-    # but only if that region-reason pair does not already exist in the file.
     
-
     print(f"\n\nTotal time spent: {timedelta(seconds=round(time() - start_timer))}.")
     print("\nall done.")

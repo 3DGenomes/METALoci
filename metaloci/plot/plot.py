@@ -447,6 +447,7 @@ def signal_bed(
                     bed_data["start"].append(lmi_geometry.bin_start[point])
                     bed_data["end"].append(lmi_geometry.bin_end[point])
                     bed_data["bin"].append(point)
+
     except:
 
         pass
@@ -465,7 +466,7 @@ def signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, metalo
 
     for p in metalocis:
 
-        plt.axvline(x=p, color="red", linestyle=":", lw=1.5)
+        plt.axvline(x=p, color="red", linestyle=":", lw=1, zorder=0, alpha=0.3)
 
     plt.axvline(x=mlobject.poi, color="lime", linestyle="--", lw=1.5)
 
@@ -479,7 +480,7 @@ def signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, metalo
 
     sns.despine(top=True, right=True, left=False, bottom=True, offset=None, trim=False)
 
-    return sig_plt
+    return sig_plt, g
 
 
 def place_composite(new_PI, ifile, ifactor, ixloc, iyloc):

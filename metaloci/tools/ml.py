@@ -3,13 +3,13 @@ Script to "paint" the Kamada-Kawai layaouts using a signal, grouping individuals
 """
 import multiprocessing as mp
 import os
+import pathlib
 import pickle
 import re
 import subprocess as sp
 from argparse import HelpFormatter
 from datetime import timedelta
 from time import time
-import pathlib
 
 import pandas as pd
 
@@ -80,11 +80,11 @@ def populate_args(parser):
     )
 
     optional_arg.add_argument(
-        "-l",
-        "--log",
-        dest="log",
+        "-i",
+        "--info",
+        dest="info",
         action="store_true",
-        help="Flag to unpickle LMI log.",
+        help="Flag to unpickle LMI info.",
     )
 
     optional_arg.add_argument(
@@ -114,7 +114,7 @@ def get_lmi(region_iter, opts, signal_data, progress=None, i=None, silent: bool 
     regions = opts.region_file
     n_permutations = opts.perms
     signipval = opts.signipval
-    moran_log = opts.log
+    moran_info = opts.info
     force = opts.force
 
     if not work_dir.endswith("/"):
@@ -184,7 +184,7 @@ def get_lmi(region_iter, opts, signal_data, progress=None, i=None, silent: bool 
 
             if progress is not None: progress["done"] = True
 
-            if moran_log:
+            if moran_info:
 
                 for signal, df in mlobject.lmi_info.items():
 
@@ -229,7 +229,7 @@ def get_lmi(region_iter, opts, signal_data, progress=None, i=None, silent: bool 
 
         mlobject.save(hamlo_namendle)
 
-    if moran_log:
+    if moran_info:
 
         for signal, df in mlobject.lmi_info.items():
 
@@ -260,7 +260,7 @@ def run(opts):
     regions = opts.region_file
     multiprocess = opts.multiprocess
     cores = opts.threads
-    moran_log = opts.log
+    moran_info = opts.info
 
     if opts.threads is None:
 
@@ -305,15 +305,15 @@ def run(opts):
 
                         print("\tSome regions had already been computed and have been skipped.", end="")
                     
-                        if moran_log:
+                        if moran_info:
 
-                            print(f"\n\tLog saved to: {work_dir}chrN/moran_log", end="")
+                            print(f"\n\tLog saved to: '{work_dir}chr/moran_log/'", end="")
 
                 except Exception:
 
                     if progress["missing_signal"] is not None:
 
-                        print(f"\tSignal {progress['missing_signal']} is in the signal list but has not been processed with prep.\n"
+                        print(f"\tSignal '{progress['missing_signal']}' is in the signal list but has not been processed with prep.\n"
                               "\tprocess that signal or remove it from the signal list.\nExiting...")
                 
                     pool.close()

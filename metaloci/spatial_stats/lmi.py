@@ -18,7 +18,6 @@ from shapely.ops import polygonize
 from metaloci import mlo
 from metaloci.misc import misc
 
-
 warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
 
 
@@ -85,8 +84,8 @@ def construct_voronoi(mlobject: mlo.MetalociObject, buffer: float):
 
         df_geometry["bin_index"].append(x)
         df_geometry["moran_index"].append(i)
-        df_geometry["X"].append(mlobject.kk_coords[i][0])
-        df_geometry["Y"].append(mlobject.kk_coords[i][1])
+        df_geometry["X"].append(mlobject.kk_coords[x][0])
+        df_geometry["Y"].append(mlobject.kk_coords[x][1])
         df_geometry["geometry"].append(geometry_data.loc[i, "geometry"])
 
     df_geometry = pd.DataFrame(df_geometry)
@@ -197,9 +196,16 @@ def load_region_signals(mlobject: mlo.MetalociObject, signal_data: dict, signal_
     """
 
     # Read signal file. Will only process the signals present in this list.
-    with open(signal_file) as signals_handler:
 
-        signal_types = [line.rstrip() for line in signals_handler]
+    if os.path.isfile(signal_file):
+
+        with open(signal_file) as signals_handler:
+
+            signal_types = [line.rstrip() for line in signals_handler]
+
+    else:
+
+        signal_types = [signal_file]
 
     # region_signal = signal_data[mlobject.chrom][
     #     (signal_data[mlobject.chrom]["start"] >= int(mlobject.start / mlobject.resolution) * mlobject.resolution)

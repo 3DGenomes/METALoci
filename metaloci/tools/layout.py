@@ -237,16 +237,28 @@ def get_region_layout(row, opts, progress=None, silent: bool = True):
                 if silent == False: print(f"\tPlotting Kamada-Kawai...")
 
                 pathlib.Path(os.path.join(work_dir, region_chrom), "plots", "KK").mkdir(parents=True, exist_ok=True)
+                pathlib.Path(os.path.join(work_dir, region_chrom), "plots", "mixed_matrices").mkdir(
+                    parents=True, exist_ok=True
+                )
 
-                kk_plt = plot.get_kk_plot(mlobject)
-
-                fig_save_path = os.path.join(
+                plot.get_kk_plot(mlobject).savefig(os.path.join(
                     work_dir,
                     region_chrom,
                     f"plots/KK/{region_coords}_" f"{mlobject.kk_cutoff}_KK.pdf",
+                ),
+                dpi=300)
+
+                plt.close()
+
+                plot.mixed_matrices_plot(mlobject).savefig(
+                    os.path.join(
+                        work_dir,
+                        region_chrom,
+                        f"plots/mixed_matrices/{region_coords}_" f"{mlobject.kk_cutoff}_mixed-matrices.pdf",
+                    ),
+                    dpi=300,
                 )
 
-                kk_plt.savefig(fig_save_path, dpi=300)
                 plt.close()
 
                 if progress is not None: progress["plots"] = True
@@ -306,24 +318,6 @@ def get_region_layout(row, opts, progress=None, silent: bool = True):
             # Get submatrix of restraints
             restraints_matrix, mlobject = kk.get_restraints_matrix(mlobject)
 
-            if save_plots:
-
-                mixed_matrices_plot = plot.mixed_matrices_plot(mlobject)
-
-                pathlib.Path(os.path.join(work_dir, region_chrom), "plots", "mixed_matrices").mkdir(
-                    parents=True, exist_ok=True
-                )
-
-                mixed_matrices_plot.savefig(
-                    os.path.join(
-                        work_dir,
-                        region_chrom,
-                        f"plots/mixed_matrices/{region_coords}_" f"{mlobject.kk_cutoff}_mixed-matrices.pdf",
-                    ),
-                    dpi=300,
-                )
-
-                plt.close()
 
             if silent == False:
 
@@ -336,17 +330,31 @@ def get_region_layout(row, opts, progress=None, silent: bool = True):
 
             if len(cutoffs) > 1 or save_plots:
 
+                if silent == False: print(f"\tPlotting Kamada-Kawai...")
+
                 pathlib.Path(os.path.join(work_dir, region_chrom), "plots", "KK").mkdir(parents=True, exist_ok=True)
+                pathlib.Path(os.path.join(work_dir, region_chrom), "plots", "mixed_matrices").mkdir(
+                    parents=True, exist_ok=True
+                )
 
-                kk_plt = plot.get_kk_plot(mlobject)
-
-                fig_save_path = os.path.join(
+                plot.get_kk_plot(mlobject).savefig(os.path.join(
                     work_dir,
                     region_chrom,
                     f"plots/KK/{region_coords}_" f"{mlobject.kk_cutoff}_KK.pdf",
+                ),
+                dpi=300)
+
+                plt.close()
+
+                plot.mixed_matrices_plot(mlobject).savefig(
+                    os.path.join(
+                        work_dir,
+                        region_chrom,
+                        f"plots/mixed_matrices/{region_coords}_" f"{mlobject.kk_cutoff}_mixed-matrices.pdf",
+                    ),
+                    dpi=300,
                 )
 
-                kk_plt.savefig(fig_save_path, dpi=300)
                 plt.close()
 
                 if progress is not None: progress["plots"] = True
@@ -359,8 +367,8 @@ def get_region_layout(row, opts, progress=None, silent: bool = True):
 
                 if silent == False:
                     print(
-                        f"\tKamada-Kawai layout of region {mlobject.region} "
-                        f"at {int(cutoff * 100)} % cutoff saved to file: {mlobject.save_path}"
+                        f"\tKamada-Kawai layout of region '{mlobject.region}' "
+                        f"at {int(cutoff * 100)} % cutoff saved to file: '{mlobject.save_path}'"
                     )
 
                 # Write to file a list of bad regions, according to the filters defined in clean_matrix().

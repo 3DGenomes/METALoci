@@ -7,14 +7,15 @@ import pathlib
 import subprocess as sp
 import warnings
 from argparse import HelpFormatter
-from pybedtools import BedTool
-import pandas as pd
 
-from metaloci.misc import misc
-from numba.core.errors import NumbaDeprecationWarning, NumbaPendingDeprecationWarning
-import warnings
 import h5py
 import hicstraw
+import pandas as pd
+from numba.core.errors import (NumbaDeprecationWarning,
+                               NumbaPendingDeprecationWarning)
+from pybedtools import BedTool
+
+from metaloci.misc import misc
 
 warnings.simplefilter('ignore', category=NumbaDeprecationWarning)
 warnings.simplefilter('ignore', category=NumbaPendingDeprecationWarning)

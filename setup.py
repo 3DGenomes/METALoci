@@ -36,6 +36,10 @@ setup(
     long_description_content_type="text/markdown",
     author="Leo Zuber, Iago Maceda, Juan Antonio Rodríguez and Marc Martí-Renom",
     author_email="martirenom@cnag.eu",
+    classifiers=["Programming Language :: Python :: 3.9",
+                 "License :: OSI Approved :: GNU General Public License v3 (GPLv3)", 
+                 "Topic :: Scientific/Engineering :: Bio-Informatics",
+                 "Operating System :: POSIX :: Linux",],
     packages=find_packages(exclude=["tests", ".github"]),
     install_requires=read_requirements("requirements.txt"),
     entry_points={

@@ -5,7 +5,7 @@ import os
 import pathlib
 import pickle
 import re
-from argparse import (ArgumentParser, HelpFormatter, RawTextHelpFormatter)
+from argparse import HelpFormatter
 from datetime import timedelta
 from time import time
 
@@ -75,11 +75,13 @@ def populate_args(parser):
     )
 
     optional_arg.add_argument(
-        "-l",
-        "--log",
-        dest="log",
+        "-m",
+        "--metalocis",
+        dest="metalocis",
         action="store_true",
-        help="Flag to write bed with metaloci, for each region.",
+        help="Flag to select highlightning of the signal plots. If True, only the neighbouring bins from the point of interest will be "
+        "highlighted (independently of the quadrant and significance of those bins, but only if the point of interest is significant). "
+        "If False, all significant regions that correspond to the quadrant selected with -q will be highlighted (default: False).",
     )
 
     optional_arg.add_argument(
@@ -125,7 +127,7 @@ def run(opts):
     work_dir = opts.work_dir
     regions = opts.regions
     signals = opts.signals
-    metaloci_bed = opts.log
+    metaloci_bed = opts.metalocis
     quadrants = opts.quart
     signipval = opts.signipval
     rmtypes = opts.rm_types
@@ -270,6 +272,7 @@ def run(opts):
                 buffer * BFACT,
                 quadrants,
                 signipval,
+                metaloci_bed
             )
 
             # selmetaloci = []
@@ -314,7 +317,7 @@ def run(opts):
 
             yticks_signal = ax.get_yticks()[1:-1]
             max_chr_yax = max(len(str(max(yticks_signal))), len(str(min(yticks_signal))))
-            signal_left = {3 : 45, 4 : 30, 5 : 20, 6 : 9}
+            signal_left = {3 : 41, 4 : 30, 5 : 20, 6 : 9}
             
             if max_chr_yax not in signal_left.keys():
 
@@ -338,14 +341,14 @@ def run(opts):
             plt.close()
             print(f"\t\tFinal composite figure for region '{region}' and signal '{signal}' -> done.")
 
-            if metaloci_bed and len(bed_data) > 0:
+            if len(bed_data) > 0:
 
                 metaloci_bed_path = f"{work_dir}{mlobject.chrom}/metalocis_log/{signal}"
                 pathlib.Path(metaloci_bed_path).mkdir(parents=True, exist_ok=True) 
 
-                bed_data.to_csv(f"{metaloci_bed_path}/{mlobject.region}_{mlobject.poi}_{signal}_metalocis.txt", sep="\t", index=False)
+                bed_data.to_csv(f"{metaloci_bed_path}/{mlobject.region}_{mlobject.poi}_{signal}_metalocis.bed", sep="\t", index=False)
                 print(f"\t\tBed file with metalocis location saved to: "
-                      f"{metaloci_bed_path}/{mlobject.region}_{mlobject.poi}_{signal}.txt")
+                      f"{metaloci_bed_path}/{mlobject.region}_{mlobject.poi}_{signal}.bed")
 
             # Log
             for signal_key, df in mlobject.lmi_info.items():
@@ -392,6 +395,6 @@ def run(opts):
                     os.remove(f"{plot_filename}_gsp.{ext}")
                     os.remove(f"{plot_filename}_gtp.{ext}")
 
-    print(f"\nInformation saved to {os.path.join(work_dir, 'moran_info.txt')}")
+    print(f"\nInformation saved to: '{os.path.join(work_dir, 'moran_info.txt')}'")
     print(f"\nTotal time spent: {timedelta(seconds=round(time() - start_timer))}")
     print("\nall done.")

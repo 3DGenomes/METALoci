@@ -14,6 +14,7 @@ class MetalociObject:
         self.save_path = save_path
         self.subset_matrix = None
         self.matrix = None
+        self.bad_region = None
         self.mixed_matrices = None
         self.signals_dict = None
         self.flat_matrix = None

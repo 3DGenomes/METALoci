@@ -3,170 +3,131 @@ Script to "paint" the Kamada-Kawai layaouts using a signal, grouping individuals
 """
 import multiprocessing as mp
 import os
+import pathlib
 import pickle
 import re
-import sys
-from argparse import SUPPRESS, ArgumentParser, RawDescriptionHelpFormatter
+import subprocess as sp
+from argparse import HelpFormatter
 from datetime import timedelta
 from time import time
 
 import pandas as pd
-from tqdm.contrib.concurrent import process_map
 
 from metaloci.spatial_stats import lmi
 
-description = (
-    "This script adds signal data to a Kamada-Kawai layout and calculates Local Moran's I "
-    "for every bin in the layout."
+DESCRIPTION = (
+    "Adds signal data to a Kamada-Kawai layout and calculates Local Moran's I for every bin in the layout."
 )
 
 
-parser = ArgumentParser(formatter_class=RawDescriptionHelpFormatter, description=description, add_help=False)
+def populate_args(parser):
 
-input_arg = parser.add_argument_group(title="Input arguments")
+    parser.formatter_class=lambda prog: HelpFormatter(prog, width=120,
+                                                      max_help_position=60)
 
-input_arg.add_argument(
-    "-w",
-    "--work-dir",
-    dest="work_dir",
-    metavar="PATH",
-    type=str,
-    required=True,
-    help="Path to working directory.",
-)
+    input_arg = parser.add_argument_group(title="Input arguments")
+    optional_arg = parser.add_argument_group(title="Optional arguments")
 
-input_arg.add_argument(
-    "-s",
-    "--signal",
-    dest="signal_file",
-    metavar="FILE",
-    type=str,
-    required=True,
-    help="Path to the file with the samples/signals to use.",
-)
+    input_arg.add_argument(
+        "-w",
+        "--work-dir",
+        dest="work_dir",
+        metavar="PATH",
+        type=str,
+        required=True,
+        help="Path to working directory.",
+    )
 
-region_input = parser.add_argument_group(title="Region arguments", description="Choose one of the following options.")
+    input_arg.add_argument(
+        "-s",
+        "--signal",
+        dest="signals",
+        metavar="FILE",
+        type=str,
+        required=True,
+        help="Path to the file with the samples/signals to use.",
+    )
 
-region_input.add_argument(
-    "-g",
-    "--region",
-    dest="region_file",
-    metavar="PATH",
-    type=str,
-    help="Region to apply LMI in format chrN:start-end_midpoint or file with the regions of interest.",
-)
+    input_arg.add_argument(
+        "-g",
+        "--region",
+        dest="region_file",
+        metavar="PATH",
+        type=str,
+        help="Region to apply LMI in format chrN:start-end_midpoint or file containing the regions of interest.",
+    )
 
-signal_arg = parser.add_argument_group(title="Signal arguments", description="Choose one of the following options:")
+    optional_arg.add_argument("-f", "--force", dest="force", action="store_true", help="Force rewriting existing data.")
 
-signal_arg.add_argument(
-    "-y",
-    "--types",
-    dest="signals",
-    metavar="STR",
-    type=str,
-    nargs="*",
-    action="extend",
-    help="Space-separated list of signals to plot.",
-)
+    optional_arg.add_argument(
+        "-p",
+        "--permutations",
+        dest="perms",
+        default=9999,
+        metavar="INT",
+        type=int,
+        help="Number of permutations to calculate the Local Moran's I p-value (default: %(default)d).",
+    )
 
-signal_arg.add_argument(
-    "-Y",
-    "--types-file",
-    dest="signals",
-    metavar="PATH",
-    type=str,
-    help="Path to the file with the list of signals to plot, one per line.",
-)
+    optional_arg.add_argument(
+        "-v",
+        "--pval",
+        dest="signipval",
+        default=0.05,
+        metavar="FLOAT",
+        type=float,
+        help="P-value significance threshold (default: %(default)4.2f).",
+    )
 
-optional_arg = parser.add_argument_group(title="Optional arguments")
+    optional_arg.add_argument(
+        "-i",
+        "--info",
+        dest="info",
+        action="store_true",
+        help="Flag to unpickle LMI info.",
+    )
 
-optional_arg.add_argument("-f", "--force", dest="force", action="store_true", help="force rewriting existing data.")
+    optional_arg.add_argument(
+        "-m",
+        "--mp",
+        dest="multiprocess",
+        action="store_true",
+        help="Flag to set use of multiprocessing.",
+    )
 
-optional_arg.add_argument("-h", "--help", action="help", help="Show this help message and exit.")
+    optional_arg.add_argument(
+        "-t", "--threads", dest="threads", default=int(mp.cpu_count() / 3), type=int, action="store", help="Number" 
+        " of threads to use in multiprocessing. Recommended value is one third of your total cpu count, although"
+        " increasing this number may improve performance in machines with few cores. (default: %(default)s)"
+    )
 
-optional_arg.add_argument(
-    "-c",
-    "--cores",
-    dest="num_cores",
-    default=1,
-    metavar="INT",
-    type=int,
-    help="Number of cores to use in the Local Moran's " "I calculation (default: %(default)d).",
-)
-
-optional_arg.add_argument(
-    "-p",
-    "--permutations",
-    dest="perms",
-    default=9999,
-    metavar="INT",
-    type=int,
-    help="Number of permutations to calculate the Local Moran's I p-value " "(default: %(default)d).",
-)
-
-optional_arg.add_argument(
-    "-v",
-    "--pval",
-    dest="signipval",
-    default=0.05,
-    metavar="FLOAT",
-    type=float,
-    help="P-value significance threshold (default: %(default)4.2f).",
-)
-
-optional_arg.add_argument(
-    "-m",
-    "--mp",
-    dest="multiprocess",
-    action="store_true",
-    help="Flag to set use of multiprocessing.",
-)
-
-optional_arg.add_argument(
-    "-t", "--threads", dest="threads", type=int, action="store", help="Number of threads to use in multiprocessing."
-)
-
-optional_arg.add_argument("-u", "--debug", dest="debug", action="store_true", help=SUPPRESS)
-
-args = parser.parse_args(None if sys.argv[1:] else ["-h"])
-
-work_dir = args.work_dir
-regions = args.region_file
-signal_file = args.signal_file
-signals = args.signals
-n_cores = args.num_cores
-n_permutations = args.perms
-signipval = args.signipval
-multiprocess = args.multiprocess
-cores = args.threads
-force = args.force
-debug = args.debug
-
-if not work_dir.endswith("/"):
-
-    work_dir += "/"
-
-if debug:
-
-    table = [
-        ["work_dir", work_dir],
-        ["gene_file", regions],
-        ["ind_file", signal_file],
-        ["types", signals],
-        ["num_cores", n_cores],
-        ["perms", n_permutations],
-        ["debug", debug],
-        ["signipval", signipval],
-    ]
-
-    print(table)
-    sys.exit()
-
-INFLUENCE = 1.5
-BFACT = 2
+    optional_arg.add_argument("-h", "--help", action="help", help="Show this help message and exit.")
 
 
-def get_lmi(region_iter, i=None, silent: bool = True):
+def get_lmi(region_iter, opts, signal_data, progress=None, i=None, silent: bool = True):
+
+    INFLUENCE = 1.5
+    BFACT = 2
+
+    work_dir = opts.work_dir
+    signals = opts.signals
+    regions = opts.region_file
+    n_permutations = opts.perms
+    signipval = opts.signipval
+    moran_info = opts.info
+    force = opts.force
+
+    if not work_dir.endswith("/"):
+
+        work_dir += "/"
+
+    if os.path.isfile(regions):
+
+        df_regions = pd.read_table(regions)
+
+    else:
+
+        df_regions = pd.DataFrame({"coords": [regions], "symbol": ["symbol"], "id": ["id"]})
 
     region_timer = time()
 
@@ -174,7 +135,7 @@ def get_lmi(region_iter, i=None, silent: bool = True):
 
     if silent == False:
 
-        print(f"\n------> Working on region {region} [{i + 1}/{len(df_regions)}]\n")
+        print(f"\n------> Working on region {region} [{i+1}/{len(df_regions)}]\n")
 
     try:
 
@@ -192,36 +153,64 @@ def get_lmi(region_iter, i=None, silent: bool = True):
 
         return
 
-    # If the pickle file contains the
     if mlobject.kk_nodes is None:
 
         if silent == False:
-
-            print("Kamada-Kawai layout has not been calculated for this region. \n\tSkipping to next region...")
-
-        return
-
-    if mlobject.lmi_geometry is not None and force == False:
-
-        if silent == False:
-
-            print("\tLMI already computed for this region. \n\tSkipping to next region...")
+            print("\tKamada-Kawai layout has not been calculated for this region. \n\tSkipping to next region...")
 
         return
+
+    # Load only signal for this specific region.
+    mlobject.signals_dict, signal_types = lmi.load_region_signals(mlobject, signal_data, signals)
+
+    # If the signal is not present in the signals folder (has not been processed with prep) but it is in 
+    # the list of signal to process, raise an exception and print which signals need to be processed.
+    if mlobject.signals_dict == None and progress is not None:
+
+        progress["missing_signal"] = signal_types    
+
+        raise Exception()
+
+    # This checks if every signal you want to process is already computed. If the user works with a few signals 
+    # but decides to add some more later, she can use the same working directory and KK, and the LMI will be
+    # computed again with the new signals. If everything is already computed, does nothing.
+    # TODO compute only the missing signals instead of all the signals again.
+    if mlobject.lmi_info is not None and force is False:
+
+        if [signal for signal, _ in mlobject.lmi_info.items()] == signal_types:
+
+            if silent == False:
+                print("\tLMI already computed for this region. \n\tSkipping to next region...")
+
+            if progress is not None: progress["done"] = True
+
+            if moran_info:
+
+                for signal, df in mlobject.lmi_info.items():
+
+                    moran_log_path = f"{work_dir}{mlobject.chrom}/moran_log/{signal}"
+                    pathlib.Path(moran_log_path).mkdir(parents=True, exist_ok=True)
+
+                    df.to_csv(f"{moran_log_path}/{mlobject.region}_{mlobject.poi}_{signal}.txt", sep="\t", index=False)
+
+                    if silent == False:
+                        print(f"\tLog saved to: {moran_log_path}/{mlobject.region}_{mlobject.poi}_{signal}.txt")
+
+            return
 
     # Get average distance between consecutive points to define influence,
     # which should be ~2 particles of radius.
     mean_distance = mlobject.kk_distances.diagonal(1).mean()
     buffer = mean_distance * INFLUENCE
-    mlobject.lmi_geometry = lmi.construct_voronoi(mlobject, buffer)
+    
+    if mlobject.lmi_geometry is None:
+
+        mlobject.lmi_geometry = lmi.construct_voronoi(mlobject, buffer)
 
     if silent == False:
 
         print(f"\tAverage distance between consecutive particles: {mean_distance:6.4f} [{buffer:6.4f}]")
-        print(f"\tGeometry information for region {mlobject.region} saved in: {mlobject.save_path}")
-
-    # Load only signal for this specific region.
-    mlobject.signals_dict, signal_types = lmi.load_region_signals(mlobject, signal_data, signal_file)
+        print(f"\tGeometry information for region {mlobject.region} saved to: {mlobject.save_path}")
 
     all_lmi = {}
 
@@ -234,51 +223,114 @@ def get_lmi(region_iter, i=None, silent: bool = True):
     if silent == False:
 
         print(f"\n\tRegion done in {timedelta(seconds=round(time() - region_timer))}")
-        print(f"\tLMI information for region {mlobject.region} will be saved in: {mlobject.save_path}\n")
+        print(f"\tLMI information for region {mlobject.region} will be saved to: {mlobject.save_path}")
 
     with open(mlobject.save_path, "wb") as hamlo_namendle:
 
         mlobject.save(hamlo_namendle)
 
+    if moran_info:
 
-timer = time()
+        for signal, df in mlobject.lmi_info.items():
 
-# Read region list. If its a region as parameter, create a dataframe.
-# If its a path to a file, read that dataframe.
-if os.path.isfile(regions):
+            moran_log_path = f"{work_dir}{mlobject.chrom}/moran_log/{signal}"
+            pathlib.Path(moran_log_path).mkdir(parents=True, exist_ok=True) 
 
-    df_regions = pd.read_table(regions)
+            df.to_csv(f"{moran_log_path}/{mlobject.region}_{mlobject.poi}_{signal}.txt", sep="\t", index=False)
 
-else:
+            if silent == False:
+                        
+                        print(f"\tLog saved to: {moran_log_path}/{mlobject.region}_{mlobject.poi}_{signal}.txt")
 
-    df_regions = pd.DataFrame({"coords": [regions], "symbol": ["symbol"], "id": ["id"]})
+    if progress is not None:
 
-# Read the signal of the chromosomes corresponding to the regions of interest,
-# not to load useless data.
-signal_data = lmi.load_signals(df_regions, work_dir=work_dir)
+        progress['value'] += 1
 
-if multiprocess:
+        time_spent = time() - progress['timer']
+        time_remaining = int(time_spent / progress['value'] * (len(df_regions) - progress['value']))
 
-    if __name__ == "__main__":
+        print(f"\033[A{'  '*int(sp.Popen(['tput','cols'], stdout=sp.PIPE).communicate()[0].strip())}\033[A")
+        print(f"\t[{progress['value']}/{len(df_regions)}] | Time spent: {timedelta(seconds=round(time_spent))} | "
+                f"ETR: {timedelta(seconds=round(time_remaining))}", end='\r')
 
-        print(f"{len(df_regions)} regions will be computed.\n")
+
+def run(opts):
+
+    work_dir = opts.work_dir
+    regions = opts.region_file
+    multiprocess = opts.multiprocess
+    cores = opts.threads
+    moran_info = opts.info
+
+    if opts.threads is None:
+
+        cores = int(mp.cpu_count() / 3)
+
+    if not work_dir.endswith("/"):
+
+        work_dir += "/"
+
+    start_timer = time()
+
+    # Read region list. If its a region as parameter, create a dataframe.
+    # If its a path to a file, read that dataframe.
+    if os.path.isfile(regions):
+
+        df_regions = pd.read_table(regions)
+
+    else:
+
+        df_regions = pd.DataFrame({"coords": [regions], "symbol": ["symbol"], "id": ["id"]})
+
+    # Read the signal of the chromosomes corresponding to the regions of interest,
+    # not to load useless data.
+    signal_data = lmi.load_signals(df_regions, work_dir=work_dir)
+
+    if multiprocess:
+
+        print(f"\n------> {len(df_regions)} regions will be computed.\n")
 
         try:
+            
+            manager = mp.Manager()
+            progress = manager.dict(value=0, timer = start_timer, done = False, missing_signal = None)
+        
+            with mp.Pool(processes=cores) as pool:
 
-            pool = mp.Pool(processes=cores)
-            process_map(get_lmi, [row for _, row in df_regions.iterrows()], max_workers=cores, chunksize=1)
-            pool.close()
-            pool.join()
+                try:
+
+                    pool.starmap(get_lmi, [(row, opts, signal_data, progress) for _, row in df_regions.iterrows()])
+
+                    if progress["done"] == True:
+
+                        print("\tSome regions had already been computed and have been skipped.", end="")
+                    
+                        if moran_info:
+
+                            print(f"\n\tLog saved to: '{work_dir}chr/moran_log/'", end="")
+
+                except Exception:
+
+                    if progress["missing_signal"] is not None:
+
+                        print(f"\tSignal '{progress['missing_signal']}' is in the signal list but has not been processed with prep.\n"
+                              "\tprocess that signal or remove it from the signal list.\nExiting...")
+                
+                    pool.close()
+                    pool.join()
+
+                pool.close()
+                pool.join()
 
         except KeyboardInterrupt:
 
             pool.terminate()
 
-else:
+    else:
 
-    for i, row in df_regions.iterrows():
+        for i, row in df_regions.iterrows():
 
-        get_lmi(row, i, silent=False)
+            get_lmi(row, opts, signal_data, i=i, silent=False)
 
-print(f"\nTotal time spent: {timedelta(seconds=round(time() - timer))}.")
-print("\nall done.")
+    print(f"\n\nTotal time spent: {timedelta(seconds=round(time() - start_timer))}.")
+    print("\nall done.")

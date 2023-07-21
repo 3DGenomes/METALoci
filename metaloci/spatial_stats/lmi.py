@@ -1,6 +1,5 @@
 import glob
 import os
-import re
 import warnings
 from collections import defaultdict
 from pathlib import Path
@@ -85,8 +84,8 @@ def construct_voronoi(mlobject: mlo.MetalociObject, buffer: float):
 
         df_geometry["bin_index"].append(x)
         df_geometry["moran_index"].append(i)
-        df_geometry["X"].append(mlobject.kk_coords[i][0])
-        df_geometry["Y"].append(mlobject.kk_coords[i][1])
+        df_geometry["X"].append(mlobject.kk_coords[x][0])
+        df_geometry["Y"].append(mlobject.kk_coords[x][1])
         df_geometry["geometry"].append(geometry_data.loc[i, "geometry"])
 
     df_geometry = pd.DataFrame(df_geometry)
@@ -197,20 +196,34 @@ def load_region_signals(mlobject: mlo.MetalociObject, signal_data: dict, signal_
     """
 
     # Read signal file. Will only process the signals present in this list.
-    with open(signal_file) as signals_handler:
 
-        signal_types = [line.rstrip() for line in signals_handler]
+    if os.path.isfile(signal_file):
+
+        with open(signal_file) as signals_handler:
+
+            signal_types = [line.rstrip() for line in signals_handler]
+
+    else:
+
+        signal_types = [signal_file]
+
+    # region_signal = signal_data[mlobject.chrom][
+    #     (signal_data[mlobject.chrom]["start"] >= int(mlobject.start / mlobject.resolution) * mlobject.resolution)
+    #     & (signal_data[mlobject.chrom]["end"] <= int(mlobject.end / mlobject.resolution) * mlobject.resolution)
+    # ]
 
     region_signal = signal_data[mlobject.chrom][
-        (signal_data[mlobject.chrom]["start"] >= int(mlobject.start / mlobject.resolution) * mlobject.resolution)
-        & (signal_data[mlobject.chrom]["end"] <= int(mlobject.end / mlobject.resolution) * mlobject.resolution)
-    ]
+        (signal_data[mlobject.chrom]["start"] >= int(np.floor(mlobject.start / mlobject.resolution)) * mlobject.resolution) 
+        & (signal_data[mlobject.chrom]["end"] <= int(np.ceil(mlobject.end / mlobject.resolution)) * mlobject.resolution)
+    ] # jfm: fix
 
     if len(region_signal) != len(mlobject.kk_coords):
 
         tmp = len(mlobject.kk_coords) - len(region_signal)
         tmp = np.empty((tmp, len(region_signal.columns)))
-        tmp[:] = 0
+        # tmp[:] = 0
+        tmp[:] = np.nan # jfm: leave NAs in for now. (in misc.signal_normalization() those NaNS will be substituted for 
+        # the median of the signal of the region)
 
         region_signal = pd.concat([region_signal, pd.DataFrame(tmp, columns=list(region_signal))], ignore_index=True)
 
@@ -218,7 +231,13 @@ def load_region_signals(mlobject: mlo.MetalociObject, signal_data: dict, signal_
 
     for signal_type in signal_types:
 
-        signals_dict[signal_type] = misc.signal_normalization(region_signal[signal_type])
+        try:
+
+            signals_dict[signal_type] = misc.signal_normalization(region_signal[signal_type])
+
+        except KeyError:
+            
+            return None, signal_type    
 
     return signals_dict, signal_types
 
@@ -284,7 +303,7 @@ def compute_lmi(
 
     # Calculate Local Moran's I
     moran_local_object = Moran_Local(
-        y, weights, permutations=n_permutations
+        y, weights, permutations=n_permutations, n_jobs=1
     )  # geoda_quadsbool (default=False) If False use PySAL Scheme: HH=1, LH=2, LL=3, HL=4
     lags = lag_spatial(moran_local_object.w, moran_local_object.z)
 
@@ -317,7 +336,7 @@ def compute_lmi(
         df_lmi["LMI_score"].append(round(moran_local_object.Is[row.moran_index], 9))
         df_lmi["LMI_pvalue"].append(round(moran_local_object.p_sim[row.moran_index], 9))
         df_lmi["LMI_inv_pval"].append(round((1 - moran_local_object.p_sim[row.moran_index]), 9))
-        df_lmi["ZSig"].append(y[row.moran_index])  ## MAYBE IT'S MORAN_INDEX INSTED OF BIN_INDEX. CHECK
+        df_lmi["ZSig"].append(y[row.moran_index]) 
         df_lmi["ZLag"].append(lags[row.moran_index])
 
     df_lmi = pd.DataFrame(df_lmi)

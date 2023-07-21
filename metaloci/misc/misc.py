@@ -82,11 +82,11 @@ def check_diagonal(diagonal: np.ndarray) -> tuple[int, float, float, list]:
     return total, percentage_stretch, percentage_zeroes, zero_loc
 
 
-def clean_matrix(mlobject: mlo.MetalociObject, bad_regions: pd.DataFrame) -> np.ndarray:
+def clean_matrix(mlobject: mlo.MetalociObject) -> np.ndarray:
     """
     Clean a given HiC matrix. It checks if the matrix has too many zeroes at
     he diagonal, removes values that are zero at the diagonal but are not in
-    the resto of the matrix, adds pseudocounts to zeroes depending on the min
+    the rest of the matrix, adds pseudocounts to zeroes depending on the min
     value, scales all values depending on the min value and computes the log10
     off all values.
 
@@ -94,8 +94,6 @@ def clean_matrix(mlobject: mlo.MetalociObject, bad_regions: pd.DataFrame) -> np.
     ----------
     mlo : np.ndarray
         METALoci object with a matrix in it.
-    bad_regions : dict
-        Dictionay {"region": [], "reason": []} in which to append bad regions.
 
     Returns
     -------
@@ -108,20 +106,16 @@ def clean_matrix(mlobject: mlo.MetalociObject, bad_regions: pd.DataFrame) -> np.
 
     if total_zeroes == len(diagonal):
 
-        # bad_regions[mlobject.region].append(mlobject.region)
-        bad_regions[mlobject.region].append("empty")
-
-        return None
+        mlobject.bad_region = "empty"
+        return mlobject
 
     if percentage_zeroes >= 50:
 
-        # bad_regions[mlobject.region].append(mlobject.region)
-        bad_regions[mlobject.region].append("percentage_of_zeroes")
+        mlobject.bad_region = "too many zeroes"
 
     if max_stretch >= 20:
 
-        # bad_regions[mlobject.region].append(mlobject.region)
-        bad_regions[mlobject.region].append("stretch")
+        mlobject.bad_region = "stretch"
 
     mlobject.matrix[zero_loc] = 0
     mlobject.matrix[:, zero_loc] = 0
@@ -146,7 +140,7 @@ def clean_matrix(mlobject: mlo.MetalociObject, bad_regions: pd.DataFrame) -> np.
 
     mlobject.matrix = np.log10(mlobject.matrix)
 
-    return mlobject.matrix
+    return mlobject
 
 
 def signal_normalization(region_signal: pd.DataFrame, pseudocounts: float = None, norm=None) -> np.ndarray:
@@ -173,7 +167,9 @@ def signal_normalization(region_signal: pd.DataFrame, pseudocounts: float = None
 
     if pseudocounts is None:
 
-        signal = [0.0 if np.isnan(index) else index for index in region_signal]
+        # signal = [0.0 if np.isnan(index) else index for index in region_signal]
+        median_default = np.nanmedian(region_signal) # jfk fix
+        signal = [median_default if np.isnan(index) else index for index in region_signal] # jfk fix
 
     else:
 
@@ -198,7 +194,7 @@ def signal_normalization(region_signal: pd.DataFrame, pseudocounts: float = None
     return np.array(signal)
 
 
-def check_chromosome_names(hic_file: Path, data: Path, coords: bool):
+def check_cooler_names(hic_file: Path, data: Path, coords: bool):
 
     with open(data[0], "r") as handler:
 
@@ -210,28 +206,16 @@ def check_chromosome_names(hic_file: Path, data: Path, coords: bool):
 
             signal_chr_nom = "N"
 
-    try:
+    hic_file = cooler.Cooler(hic_file)
 
-        hic_file = cooler.Cooler(hic_file)
+    if "chr" in [hic_file.chromnames][0][0]:
 
-        if "chr" in [hic_file.chromnames][0][0]:
+        cooler_chr_nom = "chrN"
 
-            cooler_chr_nom = "chrN"
+    else:
 
-        else:
-
-            cooler_chr_nom = "N"
-
-    except OSError: #CHECK EXCEPTION
-
-        if "chr" in hicstraw.HiCFile(hic_file).getChromosomes()[1].name:
-
-            cooler_chr_nom = "chrN"
-
-        else:
-
-            cooler_chr_nom = "N"
-
+        cooler_chr_nom = "N"
+    
     del hic_file
 
     with open(coords, "r") as handler:
@@ -256,95 +240,46 @@ def check_chromosome_names(hic_file: Path, data: Path, coords: bool):
             "\n\nExiting..."
         )
 
-    
-def bed_to_metaloci(data, coords, resolution):
 
-    boundaries_dictionary = defaultdict(dict)
+def check_hic_names(hic_file: Path, data: Path, coords: bool):
 
-    # Open centromeres and telomeres coordinates file and assign the corresponding values to variables.
-    with open(file=coords, mode="r", encoding="utf-8") as chrom:
+    with open(data[0], "r") as handler:
 
-        for l in chrom:
+        if [line.strip() for line in handler][1].startswith("chr"):
 
-            line = l.rstrip().split("\t")
-            boundaries_dictionary[line[0]]["end"] = int(line[1])  # tl_st: end of the initial telomere
+            signal_chr_nom = "chrN"
 
-    file_info = pd.read_table(data[0])
+        else:
 
-    for i in range(1, len(data)):
+            signal_chr_nom = "N"
 
-        temp = pd.read_table(data[i])
-        file_info = pd.merge(file_info, temp, on=["chrom", "start", "end"], how="inner")
+    if "chr" in hicstraw.HiCFile(hic_file).getChromosomes()[1].name:
 
-    col_names = file_info.columns.tolist()
+        hic_chr_nom = "chrN"
 
-    bad_col_names = []
+    else:
 
-    for i in range(3, len(col_names)):
+        hic_chr_nom = "N"
 
-        if len(re.findall("_", col_names[i])) != 1:
+    del hic_file
 
-            bad_col_names.append(col_names[i])
+    with open(coords, "r") as handler:
 
-    if len(bad_col_names) > 0:
+        if [line.strip() for line in handler][1].startswith("chr"):
 
-        print("Problems with the following signal names:")
-        print(", ".join(str(x) for x in bad_col_names))
-        print("Names for signal must be in the following format: CLASS_NAME.")
-        print("Class refers to data that can be potentially merged in downstream analysis.")
+            coords_chr_nom = "chrN"
 
-        sys.exit("Exiting due to improper signal names.")
+        else:
 
-    for chrm, chrm_value in boundaries_dictionary.items():
+            coords_chr_nom = "N"
 
-        print(f"chromosome {chrm.rsplit('r', 1)[1]} in progress.")
+    if not signal_chr_nom == hic_chr_nom == coords_chr_nom:
 
-        pbar = tqdm(total=int(chrm_value["end"] / resolution) + 1)
-
-        if chrm not in file_info["chrom"].unique():
-
-            print(f"chromosome {chrm.rsplit('r', 1)[1]} not found in the signal file(s), skipping...")
-            continue
-
-        bin_start = 0
-        bin_end = bin_start + resolution
-
-        info = defaultdict(list)
-
-        while bin_start <= chrm_value["end"]:
-
-            pbar.update()
-
-            info["Chr"].append(chrm)
-            info["St"].append(bin_start)
-            info["Sp"].append(bin_end)
-
-            tmp_bin = file_info[
-                (file_info["start"] >= int(bin_start))
-                & (file_info["end"] <= int(bin_end))
-                & (file_info["chrom"] == chrm)
-            ]
-
-            # Go over the columns to get all the signals.
-            for j in range(3, tmp_bin.shape[1]):
-
-                if tmp_bin.shape[0] == 0:
-
-                    info[col_names[j]].append(np.nan)
-
-                else:
-
-                    info[col_names[j]].append(np.nanmedian(tmp_bin.iloc[:, j].tolist()))
-
-            # If the end of the current bin is the start of the terminal telomere, stop
-            if bin_end == boundaries_dictionary[f"{chrm}"]["end"]:
-
-                break
-
-            # Creating tmp variables for an easier check of overlap with centromeres and telomeres.
-            bin_start = bin_end
-            bin_end = bin_start + resolution
-
-        pbar.close()
-
-    return info
+        exit(
+            "\nThe signal, cooler and chromosome sizes files do not have the same nomenclature for chromosomes:\n"
+            f"\n\tSignal chromosomes nomenclature is '{signal_chr_nom}'. "
+            f"\n\tHi-C chromosomes nomenclature is '{hic_chr_nom}'. "
+            f"\n\tChromosome sizes nomenclature is '{coords_chr_nom}'. "
+            "\n\nPlease, rename the chromosome names. "
+            "\n\nExiting..."
+        )

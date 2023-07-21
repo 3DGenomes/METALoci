@@ -1,379 +1,400 @@
 """
 This script generates METALoci plots.
 """
-import argparse
 import os
 import pathlib
 import pickle
 import re
-import sys
+from argparse import HelpFormatter
 from datetime import timedelta
 from time import time
 
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import pandas as pd
-from matplotlib.lines import Line2D
 from PIL import Image
 
 from metaloci.plot import plot
 
-description = "This script outputs the different plots to show METALoci.\n"
-description += "It creates the following plots:\n"
-description += "    - HiC matrix\n"
-description += "    - Signal plot\n"
-description += "    - Kamada-Kawai layout\n"
-description += "    - Local Moran's I scatterplot\n"
-description += "    - Gaudí plot for signal\n"
-description += "    - Gaudí plot for LMI quadrant\n"
+DESCRIPTION = "Outputs the different plots to show METALoci."
+DESCRIPTION += " It creates the following plots:\n"
+DESCRIPTION += "HiC matrix"
+DESCRIPTION += ", Signal plot"
+DESCRIPTION += ", Kamada-Kawai layout"
+DESCRIPTION += ", Local Moran's I scatterplot"
+DESCRIPTION += ", Gaudí plot for signal"
+DESCRIPTION += ", Gaudí plot for LMI quadrant"
+DESCRIPTION += " and a composite image with all the above."
 
 
-parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter, description=description, add_help=False)
+def populate_args(parser):
 
-# The script will create a folder called 'datasets' and a subfolder for the signal,
-# with subfolders for every chromosome and region of choice.
-input_arg = parser.add_argument_group(title="Input arguments")
+    parser.formatter_class=lambda prog: HelpFormatter(prog, width=120,
+                                                      max_help_position=60)
 
-input_arg.add_argument(
-    "-w", "--work-dir", dest="work_dir", required=True, metavar="PATH", type=str, help="Path to working directory."
-)
+    input_arg = parser.add_argument_group(title="Input arguments")
+    optional_arg = parser.add_argument_group(title="Optional arguments")
 
-signal_arg = parser.add_argument_group(title="Signal arguments", description="Choose one of the following options:")
+    input_arg.add_argument(
+        "-w", "--work-dir", dest="work_dir", required=True, metavar="PATH", type=str, help="Path to working directory."
+    )
 
-signal_arg.add_argument(
-    "-s",
-    "--types",
-    dest="signals",
-    metavar="STR",
-    type=str,
-    nargs="*",
-    action="extend",
-    help="Space-separated list of signals to plot.",
-)
+    input_arg.add_argument(
+        "-s",
+        "--types",
+        dest="signals",
+        metavar="STR",
+        type=str,
+        nargs="*",
+        action="extend",
+        help="Space-separated list of signals to plot or path to the file with the list of signals to plot, one per line.",
+    )
 
-signal_arg.add_argument(
-    "-S",
-    "--types-file",
-    dest="signals",
-    metavar="STR",
-    type=str,
-    help="Path to the file with the list of signals to plot, one per line.",
-)
+    input_arg.add_argument(
+        "-g",
+        "--region",
+        dest="regions",
+        metavar="PATH",
+        type=str,
+        required=True,
+        help="Region to apply LMI in format chrN:start-end_midpoint or file with the regions of interest. If a file is provided, "
+        "it must contain as a header 'coords', 'symbol' and 'id', and one region per line, tab separated.",
+    
+    )
 
-region_input = parser.add_argument_group(title="Region arguments", description="Choose one of the following options:")
+    optional_arg.add_argument(
+        "-e",
+        "--delete",
+        dest="rm_types",
+        required=False,
+        metavar="STR",
+        type=str,
+        nargs="*",
+        default=["png"],
+        help="Delete temporal image files, determined by extension " "(default: %(default)s)",
+    )
 
-region_input.add_argument(
-    "-g",
-    "--region",
-    dest="region_file",
-    metavar="FILE",
-    type=str,
-    nargs="*",
-    action="extend",
-    help="Region to apply LMI in the format chrN:start-end_midpoint " "gene_symbol gene_id.\n" "Space separated ",
-)
+    optional_arg.add_argument(
+        "-m",
+        "--metalocis",
+        dest="metalocis",
+        action="store_true",
+        help="Flag to select highlightning of the signal plots. If True, only the neighbouring bins from the point of interest will be "
+        "highlighted (independently of the quadrant and significance of those bins, but only if the point of interest is significant). "
+        "If False, all significant regions that correspond to the quadrant selected with -q will be highlighted (default: False).",
+    )
 
-region_input.add_argument(
-    "-G",
-    "--region-file",
-    dest="region_file",
-    metavar="FILE",
-    type=str,
-    help="Path to the file with the regions of interest.",
-)
+    optional_arg.add_argument(
+        "-a",
+        "--aggregated",
+        dest="agg",
+        required=False,
+        action="store_true",
+        help="Use the file with aggregated signals (*_LMI_byType.pkl)",
+    )
 
-optional_arg = parser.add_argument_group(title="Optional arguments")
+    optional_arg.add_argument(
+        "-q",
+        "--quarts",
+        dest="quart",
+        default=[1, 3],
+        metavar="INT",
+        nargs="*",
+        help="Space-separated list with the LMI quadrants to highlight "
+        "(default: %(default)s) "
+        "1: High-high (signal in bin is high, signal on neighbours is "
+        "high) "
+        "2: Low-High (signal in bin is low, signal on neighbours is high) "
+        "3: Low-Low (signal in bin is low, signal on neighbours is low) "
+        "4: High-Low (signal in bin is high, signal on neighbours is low).",
+    )
 
-optional_arg.add_argument("-h", "--help", action="help", help="Show this help message and exit.")
+    optional_arg.add_argument(
+        "-v",
+        "--pval",
+        dest="signipval",
+        default=0.05,
+        metavar="FLOAT",
+        type=float,
+        help="P-value significance threshold (default: %(default)s).",
+    )
 
-optional_arg.add_argument(
-    "-e",
-    "--delete",
-    dest="rm_types",
-    required=False,
-    metavar="STR",
-    type=str,
-    nargs="*",
-    default=["png"],
-    help="Delete temporal image files, determined by extension " "(default: %(default)s)",
-)
+    optional_arg.add_argument("-h", "--help", action="help", help="Show this help message and exit.")
 
-optional_arg.add_argument(
-    "-a",
-    "--aggregated",
-    dest="agg",
-    required=False,
-    action="store_true",
-    help="Use the file with aggregated signals (*_LMI_byType.pkl)",
-)
 
-optional_arg.add_argument(
-    "-q",
-    "--quarts",
-    dest="quart",
-    default=[1, 3],
-    metavar="INT",
-    nargs="*",
-    help="Space-separated list with the LMI quadrants to highlight "
-    "(default: %(default)s)\n"
-    "1: High-high (signal in bin is high, signal on neighbours is "
-    "high)\n"
-    "2: Low-High (signal in bin is low, signal on neighbours is high)\n"
-    "3: Low-Low (signal in bin is low, signal on neighbours is low)\n"
-    "4: High-Low (signal in bin is high, signal on neighbours is low)",
-)
+def run(opts):
+        
+    work_dir = opts.work_dir
+    regions = opts.regions
+    signals = opts.signals
+    metaloci_bed = opts.metalocis
+    quadrants = opts.quart
+    signipval = opts.signipval
+    rmtypes = opts.rm_types
+    agg = opts.agg
 
-optional_arg.add_argument(
-    "-v",
-    "--pval",
-    dest="signipval",
-    default=0.05,
-    metavar="FLOAT",
-    type=float,
-    help="P-value significance threshold (default: %(default)d).",
-)
+    quadrants = [int(x) for x in quadrants]
 
-optional_arg.add_argument("-u", "--debug", dest="debug", action="store_true", help=argparse.SUPPRESS)
+    if not work_dir.endswith("/"):
 
-args = parser.parse_args(None if sys.argv[1:] else ["-h"])
+        work_dir += "/"
 
-work_dir = args.work_dir
-regions = args.region_file
-signals = args.signals
-quadrants = args.quart
-signipval = args.signipval
-rmtypes = args.rm_types
-debug = args.debug
-agg = args.agg
+    INFLUENCE = 1.5
+    BFACT = 2
 
-quadrants = [int(x) for x in quadrants]
+    colors = {1: "firebrick", 2: "lightskyblue", 3: "steelblue", 4: "orange"}
 
-if not work_dir.endswith("/"):
-    work_dir += "/"
+    start_timer = time()
 
-if debug:
+    if os.path.isfile(regions):
 
-    table = [
-        ["work_dir", work_dir],
-        ["rfile", regions],
-        ["signals", signals],
-        ["quart", quadrants],
-        ["rmtypes", rmtypes],
-        ["debug", debug],
-    ]
-    print(table)
-    sys.exit()
+        df_regions = pd.read_table(regions)
 
-INFLUENCE = 1.5
-BFACT = 2
+    else:
 
-colors = {1: "firebrick", 2: "lightskyblue", 3: "steelblue", 4: "orange"}
+        df_regions = pd.DataFrame({"coords": [regions], "symbol": ["symbol"], "id": ["id"]})
 
-legend_elements = [
-    Line2D([0], [0], marker="o", color="w", markerfacecolor=colors[1], label="HH", markersize=20),
-    Line2D([0], [0], marker="o", color="w", markerfacecolor=colors[2], label="LH", markersize=20),
-    Line2D([0], [0], marker="o", color="w", markerfacecolor=colors[3], label="LL", markersize=20),
-    Line2D([0], [0], marker="o", color="w", markerfacecolor=colors[4], label="HL", markersize=20),
-]
+    # Parse list of signals to plot. If it is a file, strip it, if there are 
+    if os.path.isfile(signals[0]) and os.access(signals[0], os.R_OK):
 
-start_timer = time()
+        with open(signals[0], "r", encoding="utf-8") as handler:
 
-if os.path.isfile(regions):
+            signals = [line.strip() for line in handler]
 
-    df_regions = pd.read_table(regions)
+    plot_opt = {"bbox_inches": "tight", "dpi": 300, "transparent": True}
 
-else:
+    for i, region_iter in df_regions.iterrows():
 
-    df_regions = pd.DataFrame({"coords": [regions], "symbol": ["symbol"], "id": ["id"]})
+        region = region_iter.coords
 
-# hacer que un archivo de señales sera una lista. cambia esta lógica que es super enrevesada.
-if os.path.isfile(signals[0]) and os.access(signals[0], os.R_OK):
+        print(f"\n------> Working on region {region} [{i + 1}/{len(df_regions)}]")
 
-    with open(signals[0], "r", encoding="utf-8") as handler:
+        try:
 
-        signals = [line.strip() for line in handler]
+            with open(
+                f"{work_dir}{region.split(':', 1)[0]}/{re.sub(':|-', '_', region)}.mlo",
+                "rb",
+            ) as mlobject_handler:
 
-plot_opt = {"bbox_inches": "tight", "dpi": 300, "transparent": True}
-data_moran = {"Coords": [], "Symbol": [], "Gene_id": [], "Signal": [], "R_value": [], "P_value": []}
+                mlobject = pickle.load(mlobject_handler)
 
-for i, region_iter in df_regions.iterrows():
+        except FileNotFoundError:
 
-    region = region_iter.coords
-
-    print(f"\n------> Working on region {region} [{i + 1}/{len(df_regions)}]")
-
-    try:
-
-        with open(
-            f"{work_dir}{region.split(':', 1)[0]}/{re.sub(':|-', '_', region)}.mlo",
-            "rb",
-        ) as mlobject_handler:
-
-            mlobject = pickle.load(mlobject_handler)
-
-    except FileNotFoundError:
-
-        print(".mlo file not found for this region. \nSkipping to next region.")
-
-        continue
-
-    buffer = mlobject.kk_distances.diagonal(1).mean() * INFLUENCE
-    bbfact = buffer * BFACT
-
-    bins = []
-    coords_b = []
-
-    for i in range(1, 4):
-
-        if i == 1:
-
-            bins.append(int(0))
-
-        elif i == 4:
-
-            bins.append(len(mlobject.lmi_geometry) - 1)
-
-        else:
-
-            bins.append(int(((i - 1) / 2) * len(mlobject.lmi_geometry)) - 1)
-
-        coords_b.append(f"{mlobject.start + bins[i - 1] * mlobject.resolution:,}")
-
-    for signal in signals:
-
-        if len(signal) == 0:
+            print("\n\t.mlo file not found for this region. \n\tSkipping to the next one.")
 
             continue
 
-        print(f"\n\tPlotting signal: {signal}")
+        if mlobject.lmi_info == None:
 
-        plot_filename = os.path.join(work_dir, mlobject.chrom, "plots", signal, mlobject.region)
-        pathlib.Path(plot_filename).mkdir(parents=True, exist_ok=True)
+            print("\n\tLMI not calculated for this region. \n\tSkipping to the next one...")
+            continue        
 
-        plot_filename = os.path.join(
-            plot_filename,
-            f"{mlobject.chrom}_{mlobject.start}_{mlobject.end}_{mlobject.poi}_{mlobject.resolution}_{signal}",
-        )
+        buffer = mlobject.kk_distances.diagonal(1).mean() * INFLUENCE
 
-        merged_lmi_geometry = pd.merge(
-            mlobject.lmi_info[signal],
-            mlobject.lmi_geometry,
-            on=["bin_index", "moran_index"],
-            how="inner",
-        )
+        bins = []
+        coords_b = []
 
-        merged_lmi_geometry = gpd.GeoDataFrame(merged_lmi_geometry, geometry=merged_lmi_geometry.geometry)
+        for i in range(1, 4):
 
-        # The creation of the merged dataframe should be a function in misc. Put there the coditions of aggregation.
+            if i == 1:
 
-        print("\t\tHiC plot", end="\r")
-        hic_plt = plot.get_hic_plot(mlobject)
-        hic_plt.savefig(f"{plot_filename}_hic.pdf", **plot_opt)
-        hic_plt.savefig(f"{plot_filename}_hic.png", **plot_opt)
-        plt.close()
-        print("\t\tHiC plot -> done.")
+                bins.append(int(0))
 
-        print("\t\tKamada-Kawai plot", end="\r")
-        kk_plt = plot.get_kk_plot(mlobject)
-        kk_plt.savefig(f"{plot_filename}_kk.pdf", **plot_opt)
-        kk_plt.savefig(f"{plot_filename}_kk.png", **plot_opt)
-        plt.close()
-        print("\t\tKamada-Kawai plot -> done.")  #
+            elif i == 4:
 
-        print("\t\tGaudi Signal plot", end="\r")
-        gs_plt = plot.get_gaudi_signal_plot(mlobject, merged_lmi_geometry)
-        gs_plt.savefig(f"{plot_filename}_gsp.pdf", **plot_opt)
-        gs_plt.savefig(f"{plot_filename}_gsp.png", **plot_opt)
-        plt.close()
-        print("\t\tGaudi Signal plot -> done.")
+                bins.append(len(mlobject.lmi_geometry) - 1)
 
-        print("\t\tGaudi Type plot", end="\r")
-        gt_plt = plot.get_gaudi_type_plot(mlobject, merged_lmi_geometry, signipval, colors)
-        gt_plt.savefig(f"{plot_filename}_gtp.pdf", **plot_opt)
-        gt_plt.savefig(f"{plot_filename}_gtp.png", **plot_opt)
-        plt.close()
-        print("\t\tGaudi Type plot -> done.")
+            else:
 
-        print("\t\tLMI Scatter plot", end="\r")
-        lmi_plt, r_value, p_value = plot.get_lmi_scatterplot(
-            mlobject, merged_lmi_geometry, buffer * BFACT, signipval, colors
-        )
-        lmi_plt.savefig(f"{plot_filename}_lmi.pdf", **plot_opt)
-        lmi_plt.savefig(f"{plot_filename}_lmi.png", **plot_opt)
-        plt.close()
-        print("\t\tLMI Scatter plot -> done.")
+                bins.append(int(((i - 1) / 2) * len(mlobject.lmi_geometry)) - 1)
 
-        print("\t\tSignal plot", end="\r")
-        bed_data, selmetaloci = plot.signal_bed(
-            mlobject,
-            merged_lmi_geometry,
-            buffer * BFACT,
-            quadrants,
-            signipval,
-        )
+            coords_b.append(f"{mlobject.start + bins[i - 1] * mlobject.resolution:,}")
 
-        selmetaloci = []
+        for signal in signals:
 
-        sig_plt = plot.signal_plot(mlobject, merged_lmi_geometry, selmetaloci, bins, coords_b)
-        sig_plt.savefig(f"{plot_filename}_signal.pdf", **plot_opt)
-        sig_plt.savefig(f"{plot_filename}_signal.png", **plot_opt)
-        plt.close()
-        print("\t\tSignal plot -> done.")
+            if len(signal) == 0:
 
-        print(f"\t\tFinal composite figure for region of interest: {region} and signal: {signal}", end="\r")
-        img1 = Image.open(f"{plot_filename}_lmi.png")
-        img2 = Image.open(f"{plot_filename}_gsp.png")
-        img3 = Image.open(f"{plot_filename}_gtp.png")
+                continue
 
-        maxx = int((img1.size[1] * 0.4 + img2.size[1] * 0.25 + img3.size[1] * 0.25) * 1.3)
+            print(f"\n\tPlotting signal: {signal}")
 
-        composite_image = Image.new(mode="RGBA", size=(maxx, 1550))
+            plot_filename = os.path.join(work_dir, mlobject.chrom, "plots", signal, mlobject.region)
+            pathlib.Path(plot_filename).mkdir(parents=True, exist_ok=True)
 
-        # HiC image
-        composite_image = plot.place_composite(composite_image, f"{plot_filename}_hic.png", 0.5, 100, 50)
-        # Singal image
-        composite_image = plot.place_composite(composite_image, f"{plot_filename}_signal.png", 0.4, 42, 660)
-        # KK image
-        composite_image = plot.place_composite(composite_image, f"{plot_filename}_kk.png", 0.3, 1300, 50)
-        # MLI scatter image
-        composite_image = plot.place_composite(composite_image, f"{plot_filename}_lmi.png", 0.4, 75, 900)
-        # Gaudi signal image
-        composite_image = plot.place_composite(composite_image, f"{plot_filename}_gsp.png", 0.25, 900, 900)
-        # Gaudi signi image
-        composite_image = plot.place_composite(composite_image, f"{plot_filename}_gtp.png", 0.25, 1600, 900)
+            plot_filename = os.path.join(
+                plot_filename,
+                f"{mlobject.chrom}_{mlobject.start}_{mlobject.end}_{mlobject.poi}_{mlobject.resolution}_{signal}",
+            )
 
-        composite_image.save(f"{plot_filename}.png")
+            merged_lmi_geometry = pd.merge(
+                mlobject.lmi_info[signal],
+                mlobject.lmi_geometry,
+                on=["bin_index", "moran_index"],
+                how="inner",
+            )
 
-        fig = plt.figure(figsize=(15, 15))
-        plt.imshow(composite_image)
-        plt.axis("off")
-        plt.savefig(f"{plot_filename}.pdf", **plot_opt)
-        plt.close()
-        print(f"\t\tFinal composite figure for region of interest: {region} and signal: {signal} -> done.")
+            merged_lmi_geometry = gpd.GeoDataFrame(merged_lmi_geometry, geometry=merged_lmi_geometry.geometry)
 
-        data_moran["Coords"].append(region)
-        data_moran["Symbol"].append(region_iter.name)
-        data_moran["Gene_id"].append(region_iter.id)
-        data_moran["Signal"].append(signal)
-        data_moran["R_value"].append(r_value)
-        data_moran["P_value"].append(p_value)
+            # TODO The creation of the merged dataframe should be a function in misc. Put there the coditions of aggregation.
 
-        if rmtypes:
+            print("\t\tHiC plot", end="\r")
+            hic_plt = plot.get_hic_plot(mlobject)
+            hic_plt.savefig(f"{plot_filename}_hic.pdf", **plot_opt)
+            hic_plt.savefig(f"{plot_filename}_hic.png", **plot_opt)
+            plt.close()
+            print("\t\tHiC plot -> done.")
 
-            for ext in rmtypes:
+            print("\t\tKamada-Kawai plot", end="\r")
+            kk_plt = plot.get_kk_plot(mlobject)
+            kk_plt.savefig(f"{plot_filename}_kk.pdf", **plot_opt)
+            kk_plt.savefig(f"{plot_filename}_kk.png", **plot_opt)
+            plt.close()
+            print("\t\tKamada-Kawai plot -> done.")  #
 
-                os.remove(f"{plot_filename}_hic.{ext}")
-                os.remove(f"{plot_filename}_signal.{ext}")
-                os.remove(f"{plot_filename}_kk.{ext}")
-                os.remove(f"{plot_filename}_lmi.{ext}")
-                os.remove(f"{plot_filename}_gsp.{ext}")
-                os.remove(f"{plot_filename}_gtp.{ext}")
+            print("\t\tGaudi Signal plot", end="\r")
+            gs_plt = plot.get_gaudi_signal_plot(mlobject, merged_lmi_geometry)
+            gs_plt.savefig(f"{plot_filename}_gsp.pdf", **plot_opt)
+            gs_plt.savefig(f"{plot_filename}_gsp.png", **plot_opt)
+            plt.close()
+            print("\t\tGaudi Signal plot -> done.")
 
-data_moran = pd.DataFrame(data_moran)
-data_moran.to_csv(f"{os.path.join(work_dir, 'moran_info.txt')}", sep="\t", index=False, mode="a")
+            print("\t\tGaudi Type plot", end="\r")
+            gt_plt = plot.get_gaudi_type_plot(mlobject, merged_lmi_geometry, signipval, colors)
+            gt_plt.savefig(f"{plot_filename}_gtp.pdf", **plot_opt)
+            gt_plt.savefig(f"{plot_filename}_gtp.png", **plot_opt)
+            plt.close()
+            print("\t\tGaudi Type plot -> done.")
 
-print(f"\nInformation saved to {os.path.join(work_dir, 'moran_info.txt')}")
+            print("\t\tSignal plot", end="\r")
+            bed_data, selmetaloci = plot.signal_bed(
+                mlobject,
+                merged_lmi_geometry,
+                buffer * BFACT,
+                quadrants,
+                signipval,
+                metaloci_bed
+            )
 
-print(f"\nTotal time spent: {timedelta(seconds=round(time() - start_timer))}")
+            # selmetaloci = []
 
-print("\nall done.")
+            sig_plt, ax = plot.signal_plot(mlobject, merged_lmi_geometry, selmetaloci, bins, coords_b)
+            sig_plt.savefig(f"{plot_filename}_signal.pdf", **plot_opt)
+            sig_plt.savefig(f"{plot_filename}_signal.png", **plot_opt)
+            plt.close()
+            print("\t\tSignal plot -> done.")
+            
+            print("\t\tLMI Scatter plot", end="\r")
+            lmi_plt, r_value, p_value = plot.get_lmi_scatterplot(
+                mlobject, merged_lmi_geometry, buffer * BFACT, signipval, colors
+            )
+
+            if lmi_plt is not None:
+
+                lmi_plt.savefig(f"{plot_filename}_lmi.pdf", **plot_opt)
+                lmi_plt.savefig(f"{plot_filename}_lmi.png", **plot_opt)
+                plt.close()
+                
+                print("\t\tLMI Scatter plot -> done.")
+
+            else: 
+
+                if signal == signals[-1]:
+
+                    print("\t\tSkipping to next region...")
+                    continue
+                
+                else:
+
+                    print("\t\tSkipping to next signal...")
+                    continue
+
+            print(f"\t\tFinal composite figure for region '{region}' and signal '{signal}'", end="\r")
+            img1 = Image.open(f"{plot_filename}_lmi.png")
+            img2 = Image.open(f"{plot_filename}_gsp.png")
+            img3 = Image.open(f"{plot_filename}_gtp.png")
+
+            maxx = int((img1.size[1] * 0.4 + img2.size[1] * 0.25 + img3.size[1] * 0.25) * 1.3)
+
+            yticks_signal = ax.get_yticks()[1:-1]
+            max_chr_yax = max(len(str(max(yticks_signal))), len(str(min(yticks_signal))))
+            signal_left = {3 : 41, 4 : 30, 5 : 20, 6 : 9}
+            
+            if max_chr_yax not in signal_left.keys():
+
+                signal_left[max_chr_yax] = 0
+
+            composite_image = Image.new(mode="RGBA", size=(maxx, 1550))
+
+            composite_image = plot.place_composite(composite_image, f"{plot_filename}_hic.png", 0.5, 100, 50)  # HiC image            
+            composite_image = plot.place_composite(composite_image, f"{plot_filename}_signal.png", 0.4, signal_left[max_chr_yax], 660)  # Signal image
+            composite_image = plot.place_composite(composite_image, f"{plot_filename}_kk.png", 0.3, 1300, 50)  # KK image
+            composite_image = plot.place_composite(composite_image, f"{plot_filename}_lmi.png", 0.4, 75, 900)  # LMI scatter image
+            composite_image = plot.place_composite(composite_image, f"{plot_filename}_gsp.png", 0.25, 900, 900)  # Gaudi signal image
+            composite_image = plot.place_composite(composite_image, f"{plot_filename}_gtp.png", 0.25, 1600, 900)  # Gaudi signal image
+
+            composite_image.save(f"{plot_filename}.png")
+
+            plt.figure(figsize=(15, 15))
+            plt.imshow(composite_image)
+            plt.axis("off")
+            plt.savefig(f"{plot_filename}.pdf", **plot_opt)
+            plt.close()
+            print(f"\t\tFinal composite figure for region '{region}' and signal '{signal}' -> done.")
+
+            if len(bed_data) > 0:
+
+                metaloci_bed_path = f"{work_dir}{mlobject.chrom}/metalocis_log/{signal}"
+                pathlib.Path(metaloci_bed_path).mkdir(parents=True, exist_ok=True) 
+
+                bed_data.to_csv(f"{metaloci_bed_path}/{mlobject.region}_{mlobject.poi}_{signal}_metalocis.bed", sep="\t", index=False)
+                print(f"\t\tBed file with metalocis location saved to: "
+                      f"{metaloci_bed_path}/{mlobject.region}_{mlobject.poi}_{signal}.bed")
+
+            # Log
+            for signal_key, df in mlobject.lmi_info.items():
+
+                sq = [0] * 4
+                q = [0] * 4
+
+                for i, row in df.iterrows():
+
+                    quadrant = row["moran_quadrant"]
+                    lmi_pvalue = row["LMI_pvalue"]
+
+                    q[quadrant - 1] += 1
+
+                    if lmi_pvalue <= signipval:
+
+                        sq[quadrant - 1] += 1
+
+                q_string = "\t".join([f"{sq[i]}\t{q[i]}" for i in range(4)])
+
+                with open(f"{work_dir}moran_info.txt", "a+") as handler:
+
+                    log = f"{region}\t{region_iter.name}\t{region_iter.id}\t{signal_key}\t{r_value}\t{p_value}\t{q_string}\n"
+
+                    handler.seek(0)
+
+                    if os.stat(f"{work_dir}moran_info.txt").st_size == 0:
+
+                        handler.write("region\tsymbol\tgene_id\tsignal\tr_value\tp_value\tsq1\tq1\tsq2\tq2\tsq3\tq3\tsq4\tq4\n")
+
+                    if not any(log in line for line in handler):
+
+                        handler.write(log)
+
+            # Remove image used for composite figure.
+            if rmtypes:
+
+                for ext in rmtypes:
+
+                    os.remove(f"{plot_filename}_hic.{ext}")
+                    os.remove(f"{plot_filename}_signal.{ext}")
+                    os.remove(f"{plot_filename}_kk.{ext}")
+                    os.remove(f"{plot_filename}_lmi.{ext}")
+                    os.remove(f"{plot_filename}_gsp.{ext}")
+                    os.remove(f"{plot_filename}_gtp.{ext}")
+
+    print(f"\nInformation saved to: '{os.path.join(work_dir, 'moran_info.txt')}'")
+    print(f"\nTotal time spent: {timedelta(seconds=round(time() - start_timer))}")
+    print("\nall done.")

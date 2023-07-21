@@ -14,13 +14,12 @@ from PIL import Image
 from scipy.ndimage import rotate
 from scipy.stats import linregress, zscore
 from shapely.geometry import Point
-from shapely.geometry.multipolygon import MultiPolygon
 
 from metaloci import mlo
 from metaloci.misc import misc
 
 
-def get_kk_plot(mlobject: mlo.MetalociObject, restraints: bool = True):
+def get_kk_plot(mlobject: mlo.MetalociObject, restraints: bool = True, neighbourhood: float = None):
     """
     Generate Kamada-Kawai plot from pre-calculated restraints.
 
@@ -36,7 +35,6 @@ def get_kk_plot(mlobject: mlo.MetalociObject, restraints: bool = True):
     matplotlib.pyplot.figure.Figure
         Kamada-Kawai layout plot object.
     """
-
     PLOTSIZE = 10
     POINTSIZE = PLOTSIZE * 5
 
@@ -48,7 +46,7 @@ def get_kk_plot(mlobject: mlo.MetalociObject, restraints: bool = True):
     options = {"node_size": 50, "edge_color": "black", "linewidths": 0.1, "width": 0.05}
 
     if restraints == True:
-
+        
         nx.draw(
             mlobject.kk_graph,
             mlobject.kk_nodes,
@@ -69,8 +67,15 @@ def get_kk_plot(mlobject: mlo.MetalociObject, restraints: bool = True):
     g.annotate(f"      {mlobject.chrom}:{mlobject.start}", (xs[0], ys[0]), size=8)
     g.annotate(f"      {mlobject.chrom}:{mlobject.end}", (xs[len(xs) - 1], ys[len(ys) - 1]), size=8)
 
+    poi_x, poi_y = xs[mlobject.poi], ys[mlobject.poi]
+
+    if neighbourhood:
+
+        circle = plt.Circle((poi_x, poi_y), neighbourhood, color="red", fill=False, lw=1, zorder=3)
+        plt.gca().add_patch(circle)
+
     sns.scatterplot(
-        x=[xs[mlobject.poi]], y=[ys[mlobject.poi]], s=POINTSIZE * 1.5, ec="lime", fc="none", zorder=3
+        x=[poi_x], y=[poi_y], s=POINTSIZE * 1.5, ec="lime", fc="none", zorder=4
     )
 
     return kk_plt
@@ -207,8 +212,6 @@ def get_gaudi_signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFra
         matplotlib figure containing the Gaudi signal plot.
     """
 
-    poi = lmi_geometry.loc[lmi_geometry["moran_index"] == mlobject.poi, "bin_index"].iloc[0]
-
     cmap = "PuOr_r"
     min_value = lmi_geometry.signal.min()
     max_value = lmi_geometry.signal.max()
@@ -216,8 +219,7 @@ def get_gaudi_signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFra
     gsp, ax = plt.subplots(figsize=(12, 10), subplot_kw={"aspect": "equal"})
     lmi_geometry.plot(column="signal", cmap=cmap, linewidth=2, edgecolor="white", ax=ax)
 
-    sns.scatterplot(x=[lmi_geometry.X[poi]], y=[lmi_geometry.Y[poi]], s=50, ec="none", fc="lime")
-
+    sns.scatterplot(x=[lmi_geometry.X[mlobject.poi]], y=[lmi_geometry.Y[mlobject.poi]], s=50, ec="none", fc="lime")
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=min_value, vmax=max_value))
     sm.set_array([1, 2, 3, 4])
 
@@ -262,7 +264,6 @@ def get_gaudi_type_plot(
     gtp : matplotlib.pyplot.figure.Figure
         matplotlib figure containing the Gaudi type plot.
     """
-    poi = lmi_geometry.loc[lmi_geometry["moran_index"] == mlobject.poi, "bin_index"].iloc[0]
 
     legend_elements = [
         Line2D([0], [0], marker="o", color="w", markerfacecolor=colors[1], label="HH", markersize=20),
@@ -272,15 +273,15 @@ def get_gaudi_type_plot(
     ]
 
     cmap = LinearSegmentedColormap.from_list("Custom cmap", [colors[nu] for nu in colors], len(colors))
-    alpha = [1.0 if quad <= signipval else 0.3 for quad in lmi_geometry.LMI_pvalue]
+    alpha = [1.0 if pval <= signipval else 0.3 for pval in lmi_geometry.LMI_pvalue]
 
     gtp, ax = plt.subplots(figsize=(12, 10), subplot_kw={"aspect": "equal"})
     lmi_geometry.plot(column="moran_quadrant", cmap=cmap, alpha=alpha, linewidth=2, edgecolor="white", ax=ax)
     plt.axis("off")
 
     sns.scatterplot(
-        x=[lmi_geometry.X[poi]],
-        y=[lmi_geometry.Y[poi]],
+        x=[lmi_geometry.X[mlobject.poi]],
+        y=[lmi_geometry.Y[mlobject.poi]],
         s=50,
         ec="none",
         fc="lime",
@@ -334,31 +335,127 @@ def get_lmi_scatterplot(
     x = zscore(lmi_geometry.signal)
     y = zscore(y_lag)
 
-    _, _, r_value_scat, p_value_scat, _ = linregress(x, y)
-    scatter, ax = plt.subplots(figsize=(5, 5))  # , subplot_kw={'aspect':'equal'})
+    try:
 
-    alpha_sp = [1.0 if val < signipval else 0.1 for val in lmi_geometry.LMI_pvalue]
-    colors_sp = [colors_lmi[val] for val in lmi_geometry.moran_quadrant]
+        _, _, r_value_scat, p_value_scat, _ = linregress(x, y)
+        scatter, ax = plt.subplots(figsize=(5, 5))  # , subplot_kw={'aspect':'equal'})
 
-    plt.scatter(x=x, y=y, s=100, ec="white", fc=colors_sp, alpha=alpha_sp)
+        alpha_sp = [1.0 if val < signipval else 0.1 for val in lmi_geometry.LMI_pvalue]
+        colors_sp = [colors_lmi[val] for val in lmi_geometry.moran_quadrant]
 
-    sns.scatterplot(
-        x=[x[mlobject.poi]], y=[y[mlobject.poi]], s=150, ec="lime", fc="none", zorder=len(lmi_geometry)
-    )
-    sns.regplot(x=x, y=y, scatter=False, color="k")
-    sns.despine(top=True, right=True, left=False, bottom=False, offset=10, trim=False)
+        plt.scatter(x=x, y=y, s=100, ec="white", fc=colors_sp, alpha=alpha_sp)
 
-    plt.title(f"Moran Local Scatterplot\nr: {r_value_scat:4.2f}   p-value: {p_value_scat:.1e}")
-    plt.axvline(x=0, color="k", linestyle=":")
-    plt.axhline(y=0, color="k", linestyle=":")
+        sns.scatterplot(
+            x=[x[mlobject.poi]], y=[y[mlobject.poi]], s=150, ec="lime", fc="none", zorder=len(lmi_geometry)
+        )
+        sns.regplot(x=x, y=y, scatter=False, color="k")
+        sns.despine(top=True, right=True, left=False, bottom=False, offset=10, trim=False)
 
-    ax.set_xlabel("Z-score(Signal)")
-    ax.set_ylabel("Z-score(Signal Spatial Lag)")
+        plt.title(f"Moran Local Scatterplot\nr: {r_value_scat:4.2f}   p-value: {p_value_scat:.1e}")
+        plt.axvline(x=0, color="k", linestyle=":")
+        plt.axhline(y=0, color="k", linestyle=":")
 
-    r_value_scat = float(r_value_scat)
-    p_value_scat = float(r_value_scat)
+        ax.set_xlabel("Z-score(Signal)")
+        ax.set_ylabel("Z-score(Signal Spatial Lag)")
+
+        r_value_scat = float(r_value_scat)
+        p_value_scat = float(r_value_scat)
+    
+    except ValueError:
+
+        print("\t\tCannot compute lineal regression as all values are identical.")
+
+        return None, None, None
 
     return scatter, r_value_scat, p_value_scat
+
+# def signal_bed(
+#     mlobject: mlo.MetalociObject,
+#     lmi_geometry: pd.DataFrame,
+#     neighbourhood: float,
+#     quadrants: list = [1, 3],
+#     signipval: float = 0.05,
+# ):
+#     """
+#     signal_bed _summary_
+
+#     Parameters
+#     ----------
+#     mlobject : mlo.MetalociObject
+#         _description_
+#     lmi_geometry : pd.DataFrame
+#         _description_
+#     neighbourhood : float
+#         _description_
+#     quadrants : list, optional
+#         _description_, by default [1, 3]
+#     signipval : float, optional
+#         _description_, by default 0.05
+
+#     Returns
+#     -------
+#     _type_
+#         _description_
+#     """
+
+#     poi_distance = mlobject.kk_distances[mlobject.poi]
+
+#     # Select the polygons that are in the quadrant of interest and are significative.
+#     ml_indexes = lmi_geometry[
+#         (lmi_geometry.moran_quadrant.isin(quadrants)) & (lmi_geometry.LMI_pvalue <= signipval)
+#     ].bin_index.values.tolist()
+
+#     # Make a big polygon from the small poligons that are significant.
+#     metalocis = lmi_geometry[lmi_geometry.bin_index.isin(ml_indexes)].unary_union
+
+#     if metalocis and metalocis.geom_type == "Polygon":
+
+#         metalocis = MultiPolygon([metalocis])  # Need a multipolygon in order for the code to work.
+
+#     poi_point = Point(
+#         (lmi_geometry[lmi_geometry.moran_index == mlobject.poi].X, lmi_geometry[lmi_geometry.moran_index == mlobject.poi].Y)
+#     )
+
+#     metalocis_bed = []
+
+#     bed_data = defaultdict(list)
+
+#     try:
+
+#         for metaloci in metalocis.geoms:
+
+#             metaloci = gpd.GeoSeries(metaloci)
+
+#             if poi_point.within(metaloci[0]):
+
+#                 for _, row_ml in lmi_geometry.iterrows():
+
+#                     adjacent_point = Point((row_ml.X, row_ml.Y))
+
+#                     if adjacent_point.within(metaloci[0]):
+
+#                         metalocis_bed.append(row_ml.bin_index)
+
+#                 # Add close particles
+#                 metalocis_bed.sort()
+#                 close_bins = [i for i, distance in enumerate(poi_distance) if distance <= neighbourhood / 2]
+#                 metalocis_bed = np.sort(list(set(close_bins + metalocis_bed)))
+
+#                 for point in metalocis_bed:
+
+#                     bed_data["chr"].append(lmi_geometry.bin_chr[point])
+#                     bed_data["start"].append(lmi_geometry.bin_start[point])
+#                     bed_data["end"].append(lmi_geometry.bin_end[point])
+#                     bed_data["bin"].append(point)
+
+#     except:
+
+#         pass
+
+#     bed_data = pd.DataFrame(bed_data)
+
+#     return bed_data, metalocis_bed
+
 
 
 def signal_bed(
@@ -367,6 +464,7 @@ def signal_bed(
     neighbourhood: float,
     quadrants: list = [1, 3],
     signipval: float = 0.05,
+    metaloci_only: bool = False,
 ):
     """
     signal_bed _summary_
@@ -383,6 +481,8 @@ def signal_bed(
         _description_, by default [1, 3]
     signipval : float, optional
         _description_, by default 0.05
+    metaloci_only : bool, optional
+        _description_, by default False
 
     Returns
     -------
@@ -390,65 +490,56 @@ def signal_bed(
         _description_
     """
 
-    poi_distance = mlobject.kk_distances[mlobject.poi]
-
-    # Select the polygons that are in the quadrant of interest and are significative.
-    ml_indexes = lmi_geometry[
-        (lmi_geometry.moran_quadrant.isin(quadrants)) & (lmi_geometry.LMI_pvalue <= signipval)
-    ].bin_index.values.tolist()
-
-    # Make a big polygon from the small poligons that are significant.
-    metalocis = lmi_geometry[lmi_geometry.bin_index.isin(ml_indexes)].unary_union
-
-    if metalocis:
-
-        if metalocis.geom_type == "Polygon":
-
-            metalocis = MultiPolygon([metalocis])  # Need a multipolygon in order for the code to work.
-
-    poi_point = Point(
-        (lmi_geometry[lmi_geometry.bin_index == mlobject.poi].X, lmi_geometry[lmi_geometry.bin_index == mlobject.poi].Y)
-    )
-
     metalocis_bed = []
 
-    beddata = defaultdict(list)
+    bed_data = defaultdict(list)
 
-    try:
+    if metaloci_only == False:
 
-        for metaloci in metalocis.geoms:
+        for _, row_ml in lmi_geometry.iterrows():
 
-            metaloci = gpd.GeoSeries(metaloci)
+            if row_ml.LMI_pvalue <= signipval and row_ml.moran_quadrant in quadrants:
 
-            if poi_point.within(metaloci[0]):
+                metalocis_bed.append(row_ml.bin_index)
 
-                for _, row_ml in lmi_geometry.iterrows():
+    else:
 
-                    adjacent_point = Point((row_ml.X, row_ml.Y))
+        poi_row = lmi_geometry[lmi_geometry.bin_index == mlobject.poi].squeeze()
 
-                    if adjacent_point.within(metaloci[0]):
+        # print(lmi_geometry[lmi_geometry.bin_index == mlobject.poi])
 
-                        metalocis_bed.append(row_ml.bin_index)
+        if poi_row.LMI_pvalue <= signipval and poi_row.moran_quadrant in quadrants:
 
-                # Add close particles
-                metalocis_bed.sort()
-                close_bins = [i for i, distance in enumerate(poi_distance) if distance <= neighbourhood / 2]
-                metalocis_bed = np.sort(list(set(close_bins + metalocis_bed)))
+            poi_point = Point(
+            (lmi_geometry[lmi_geometry.bin_index == mlobject.poi].X, lmi_geometry[lmi_geometry.bin_index == mlobject.poi].Y)
+            )
 
-                for point in metalocis_bed:
+            poi_point = Point(lmi_geometry.loc[lmi_geometry["bin_index"] == mlobject.poi, ["X", "Y"]].iloc[0])
 
-                    beddata["chr"].append(lmi_geometry.bin_chr[point])
-                    beddata["start"].append(lmi_geometry.bin_start[point])
-                    beddata["end"].append(lmi_geometry.bin_end[point])
-                    beddata["bin"].append(point)
-    except:
+            for _, row_ml in lmi_geometry.iterrows():
 
-        pass
+                adjacent_point = Point((row_ml.X, row_ml.Y))
 
-    beddata = pd.DataFrame(beddata)
+                if adjacent_point.distance(poi_point) <= neighbourhood:
 
-    return beddata, metalocis_bed
+                    metalocis_bed.append(row_ml.bin_index)
 
+        metalocis_bed.sort()
+
+        # print(metalocis_bed)
+
+    for point in metalocis_bed:
+
+        bed_data["chr"].append(lmi_geometry.bin_chr[point])
+        bed_data["start"].append(lmi_geometry.bin_start[point])
+        bed_data["end"].append(lmi_geometry.bin_end[point])
+        bed_data["bin"].append(point)
+        bed_data["quadrant"].append(lmi_geometry.moran_quadrant[point])
+
+
+    bed_data = pd.DataFrame(bed_data)
+
+    return bed_data, metalocis_bed
 
 def signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, metalocis, bins_sig, coords_sig):
 
@@ -459,7 +550,7 @@ def signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, metalo
 
     for p in metalocis:
 
-        plt.axvline(x=p, color="red", linestyle=":", lw=1.5)
+        plt.axvline(x=p, color="red", linestyle=":", lw=1, zorder=0, alpha=0.3)
 
     plt.axvline(x=mlobject.poi, color="lime", linestyle="--", lw=1.5)
 
@@ -473,7 +564,7 @@ def signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, metalo
 
     sns.despine(top=True, right=True, left=False, bottom=True, offset=None, trim=False)
 
-    return sig_plt
+    return sig_plt, g
 
 
 def place_composite(new_PI, ifile, ifactor, ixloc, iyloc):

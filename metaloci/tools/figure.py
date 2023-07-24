@@ -1,6 +1,8 @@
 """
 This script generates METALoci plots.
 """
+from collections import defaultdict
+
 import os
 import pathlib
 import pickle
@@ -127,7 +129,7 @@ def run(opts):
     work_dir = opts.work_dir
     regions = opts.regions
     signals = opts.signals
-    metaloci_bed = opts.metalocis
+    metaloci_only = opts.metalocis
     quadrants = opts.quart
     signipval = opts.signipval
     rmtypes = opts.rm_types
@@ -191,25 +193,6 @@ def run(opts):
 
         buffer = mlobject.kk_distances.diagonal(1).mean() * INFLUENCE
 
-        bins = []
-        coords_b = []
-
-        for i in range(1, 4):
-
-            if i == 1:
-
-                bins.append(int(0))
-
-            elif i == 4:
-
-                bins.append(len(mlobject.lmi_geometry) - 1)
-
-            else:
-
-                bins.append(int(((i - 1) / 2) * len(mlobject.lmi_geometry)) - 1)
-
-            coords_b.append(f"{mlobject.start + bins[i - 1] * mlobject.resolution:,}")
-
         for signal in signals:
 
             if len(signal) == 0:
@@ -245,7 +228,18 @@ def run(opts):
             print("\t\tHiC plot -> done.")
 
             print("\t\tKamada-Kawai plot", end="\r")
-            kk_plt = plot.get_kk_plot(mlobject)
+
+
+            
+            """If metaloci_bed is True and the LMI p-value of the mlobject.poi is significant and the quadrant is in quadrants,"""
+            if metaloci_only and merged_lmi_geometry.loc[merged_lmi_geometry["bin_index"] == mlobject.poi, "LMI_pvalue"].values[0] <= signipval and merged_lmi_geometry.loc[merged_lmi_geometry["bin_index"] == mlobject.poi, "moran_quadrant"].values[0] in quadrants:
+
+                kk_plt = plot.get_kk_plot(mlobject, neighbourhood=buffer * BFACT)
+
+            else:
+
+                kk_plt = plot.get_kk_plot(mlobject)
+
             kk_plt.savefig(f"{plot_filename}_kk.pdf", **plot_opt)
             kk_plt.savefig(f"{plot_filename}_kk.png", **plot_opt)
             plt.close()
@@ -266,18 +260,7 @@ def run(opts):
             print("\t\tGaudi Type plot -> done.")
 
             print("\t\tSignal plot", end="\r")
-            bed_data, selmetaloci = plot.signal_bed(
-                mlobject,
-                merged_lmi_geometry,
-                buffer * BFACT,
-                quadrants,
-                signipval,
-                metaloci_bed
-            )
-
-            # selmetaloci = []
-
-            sig_plt, ax = plot.signal_plot(mlobject, merged_lmi_geometry, selmetaloci, bins, coords_b)
+            sig_plt, ax, metalocis = plot.signal_plot(mlobject, merged_lmi_geometry, buffer * BFACT, quadrants, signipval, metaloci_only)
             sig_plt.savefig(f"{plot_filename}_signal.pdf", **plot_opt)
             sig_plt.savefig(f"{plot_filename}_signal.png", **plot_opt)
             plt.close()
@@ -340,6 +323,18 @@ def run(opts):
             plt.savefig(f"{plot_filename}.pdf", **plot_opt)
             plt.close()
             print(f"\t\tFinal composite figure for region '{region}' and signal '{signal}' -> done.")
+
+            bed_data = defaultdict(list)
+
+            for point in metalocis:
+
+                bed_data["chr"].append(merged_lmi_geometry.bin_chr[point])
+                bed_data["start"].append(merged_lmi_geometry.bin_start[point])
+                bed_data["end"].append(merged_lmi_geometry.bin_end[point])
+                bed_data["bin"].append(point)
+                bed_data["quadrant"].append(merged_lmi_geometry.moran_quadrant[point])
+
+            bed_data = pd.DataFrame(bed_data)
 
             if len(bed_data) > 0:
 

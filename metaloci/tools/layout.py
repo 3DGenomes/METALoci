@@ -453,7 +453,7 @@ def run(opts):
 
                 if progress["plots"] == True:
 
-                    print(f"\n\tKamada-Kawai layout plots saved to {work_dir}chr/plots/KK.", end="")
+                    print(f"\n\tKamada-Kawai layout plots saved to '{work_dir}chr/plots/KK'", end="")
 
                 pool.close()
                 pool.join()

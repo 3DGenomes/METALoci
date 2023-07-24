@@ -350,7 +350,7 @@ def compute_lmi(
     df_lmi["bin_start"] = df_lmi["bin_start"].astype(np.uintc)
     df_lmi["bin_end"] = df_lmi["bin_end"].astype(np.uintc)
 
-    df_lmi["signal"] = df_lmi["signal"].astype(np.half)
+    df_lmi["signal"] = df_lmi["signal"].astype(np.float64)
 
     df_lmi["moran_index"] = df_lmi["moran_index"].astype(np.uintc)
     df_lmi["moran_quadrant"] = df_lmi["moran_quadrant"].astype(np.uintc)

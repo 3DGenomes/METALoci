@@ -240,8 +240,7 @@ def run(opts):
 
             final_intersect = pd.merge(final_intersect, tmp_intersect, on=["chrom", "start", "end"], how="inner")
 
-    # For each chromosome, create a directory and save the information for that chromosome in .csv and
-    # .pkl.
+    # For each chromosome, create a directory and save the information for that chromosome in .csv and .pkl.
     for chrom in sorted(final_intersect["chrom"].unique()):
 
         pathlib.Path(f"{work_dir}signal/{chrom}").mkdir(parents=True, exist_ok=True)

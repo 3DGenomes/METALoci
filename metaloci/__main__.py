@@ -1,5 +1,3 @@
-import io
-import os
 import sys
 from argparse import ArgumentParser, HelpFormatter, RawDescriptionHelpFormatter
 from importlib.metadata import version
@@ -7,7 +5,7 @@ from importlib.metadata import version
 from metaloci.tools import figure, layout, ml, prep
 
 
-def main(arguments) -> None:  # pragma: no cover
+def main(arguments) -> None: 
 
     DESCRIPTION = "METALoci: spatially auto-correlated signals in 3D genomes.\n"
 

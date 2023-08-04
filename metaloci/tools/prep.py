@@ -121,9 +121,13 @@ def run(opts):
 
     elif hic_path.endswith(".hic"):
 
-        if resolution not in hicstraw.HiCFile(hic_path).getResolutions():
+        aval_resolutions = hicstraw.HiCFile(hic_path).getResolutions()
+
+        if resolution not in aval_resolutions:
              
-            exit("The given resolution is not in the provided Hi-C file. Exiting...")
+            print("The given resolution is not in the provided Hi-C file. Exiting...")
+            print("The available resolutions are: " + ", ".join([str(x) for x in aval_resolutions]))
+            exit()
 
         misc.check_hic_names(hic_path, data, coords)
 
@@ -171,22 +175,46 @@ def run(opts):
 
             header = True
 
-        # Intersect the sorted files and the binnarized file.
-        BedTool(f"{tmp_dir}/{resolution}bp_bin.bed").intersect(BedTool(f"{tmp_dir}/sorted_{f.rsplit('/', 1)[1]}"), wo=True, sorted=True).saveas(f"{tmp_dir}/intersected_{f.rsplit('/', 1)[1]}")
+        # If you do not know what is going on here, ask LZ
+        awk_com = f"tail -n +2 {f} | " + ("awk '{print $1}' | uniq")
+        chroms = sp.getoutput(awk_com).split(sep="\n")
+        input_file = f"{tmp_dir}/sorted_{f.rsplit('/', 1)[1]}"
 
-        awk_com = (
-            "awk '{print $0\"\t\"$7*($8/($6-$5))}' "
-            + f"{tmp_dir}/intersected_{f.rsplit('/', 1)[1]} > {tmp_dir}/intersected_ok_{f.rsplit('/', 1)[1]}"
-        )
+        for chrom in chroms:
+
+            awk_com = """awk '{{if($1=="%s") {{print}}}}' """ % f"{chrom}" + f"{input_file}" + f" > {tmp_dir}/{chrom}_sorted_{f.rsplit('/', 1)[1]}"
+            sp.call(awk_com, shell=True)
+
+            awk_com = """awk '{{if($1=="%s") {{print}}}}' """ % f"{chrom}" + f"{tmp_dir}/{resolution}bp_bin.bed" + f" > {tmp_dir}/{chrom}_{resolution}bp_bin.bed"
+            sp.call(awk_com, shell=True)
+
+            BedTool(f"{tmp_dir}/{chrom}_{resolution}bp_bin.bed").intersect(BedTool(f"{tmp_dir}/{chrom}_sorted_{f.rsplit('/', 1)[1]}"), wao=True, sorted=True).saveas(f"{tmp_dir}/{chrom}_intersected_{f.rsplit('/', 1)[1]}")
+
+            if chrom == chroms[0]:
+
+                sp.call(f"cp {tmp_dir}/{chrom}_intersected_{f.rsplit('/', 1)[1]} {tmp_dir}/concatenated.bed", shell = True)
+
+            else:
+                
+                sp.call(f"cat {tmp_dir}/concatenated.bed {tmp_dir}/{chrom}_intersected_{f.rsplit('/', 1)[1]} > {tmp_dir}/tmp_concatenated.bed", shell=True)
+                sp.call(f"mv {tmp_dir}/tmp_concatenated.bed {tmp_dir}/concatenated.bed", shell=True)
+    
+        # Intersect the sorted files and the binnarized file.
+        # BedTool(f"{tmp_dir}/{resolution}bp_bin.bed").intersect(BedTool(f"{tmp_dir}/sorted_{f.rsplit('/', 1)[1]}"), wao=True, sorted=True).saveas(f"{tmp_dir}/intersected_{f.rsplit('/', 1)[1]}")
+
+        n_of_col = sp.getoutput(f"head -n 1 {tmp_dir}/concatenated.bed" + " | awk '{print NF}'")
+
+        awk_com = f"awk -F \'\\t\' -v OFS=\'\\t\' '{{if (${n_of_col} == 0) {{$4 = $1; $5 = $2; $6 = $3}} {{for (i = 7; i <= {n_of_col}; i++) {{$i = $i * (${n_of_col} / ($6 - $5))}}}} print}}' {tmp_dir}/concatenated.bed > {tmp_dir}/intersected_ok_{f.rsplit('/', 1)[1]}"
         sp.call(awk_com, shell=True)
 
     # Create a list of paths to the intersected files.
     intersected_files_paths = [(f"{tmp_dir}/intersected_ok_" + i.rsplit("/", 1)[1]) for i in data]
-
+    
     final_intersect = pd.read_csv(
         intersected_files_paths[0], sep="\t", header=None, low_memory=False
     )  # Read the first intersected file,
-    final_intersect = final_intersect.drop([3, 4, 5, 7, 8], axis=1)  # Drop unnecesary columns,
+
+    final_intersect = final_intersect.drop([3, 4, 5, final_intersect.columns[-1]], axis=1)  # Drop unnecesary columns,
 
     if header == True:
 
@@ -215,7 +243,7 @@ def run(opts):
         for i in range(1, len(intersected_files_paths)):
 
             tmp_intersect = pd.read_csv(intersected_files_paths[i], sep="\t", header=None, low_memory=False)
-            tmp_intersect = tmp_intersect.drop([3, 4, 5, 7, 8], axis=1)
+            tmp_intersect = tmp_intersect.drop([3, 4, 5, tmp_intersect.columns[-1]], axis=1)
 
             if header == True:
 

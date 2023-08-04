@@ -606,15 +606,15 @@ def signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, neighb
 
             if metaloci_only:
 
-                plt.axvline(x=p, color="red", linestyle=":", lw=1, zorder=0, alpha=0.5, ymin=np.nanmin(lmi_geometry.signal) - 0.13)
+                plt.axvline(x=p, color="red", linestyle=":", lw=1, zorder=0, alpha=0.5)
 
             else:
 
                 color, alpha = get_color_alpha(q)
-                plt.axvline(x=p, color=color, linestyle=":", lw=1, zorder=0, alpha=alpha, ymin=np.nanmin(lmi_geometry.signal) - 0.13)
+                plt.axvline(x=p, color=color, linestyle=":", lw=1, zorder=0, alpha=alpha)
 
     plt.tick_params(axis="both", which="minor", labelsize=24)
-    plt.axvline(x=mlobject.poi, color="lime", linestyle="--", lw=1, ymin=np.nanmin(lmi_geometry.signal) - 0.13)
+    plt.axvline(x=mlobject.poi, color="lime", linestyle="--", lw=1, zorder=1, alpha=0.6)
     plt.xlabel(f"chromosome {mlobject.chrom}")
     plt.xticks(bins, coords_b)
     plt.ylabel(f"{lmi_geometry.ID[0]}")

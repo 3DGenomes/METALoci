@@ -23,8 +23,9 @@ class MetalociObject:
         self.kk_nodes = None
         self.kk_coords = None
         self.kk_distances = None
+        self.agg = None
         self.lmi_geometry = None
-        self.lmi_info = None
+        self.lmi_info = {}
 
     def save(self, file_handler):
 

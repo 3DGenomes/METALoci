@@ -1,6 +1,7 @@
 """
 Script to "paint" the Kamada-Kawai layaouts using a signal, grouping individuals by type
 """
+from collections import defaultdict
 import multiprocessing as mp
 import os
 import pathlib
@@ -80,6 +81,16 @@ def populate_args(parser):
     )
 
     optional_arg.add_argument(
+        "-a",
+        "--aggregated",
+        dest="agg",
+        metavar="PATH",
+        type=str,
+        required=False,
+        help="Use the file with aggregated signals",
+    )
+
+    optional_arg.add_argument(
         "-i",
         "--info",
         dest="info",
@@ -104,7 +115,7 @@ def populate_args(parser):
     optional_arg.add_argument("-h", "--help", action="help", help="Show this help message and exit.")
 
 
-def get_lmi(region_iter, opts, signal_data, progress=None, i=None, silent: bool = True):
+def get_lmi(region_iter, opts, progress=None, i=None, silent: bool = True):
 
     INFLUENCE = 1.5
     BFACT = 2
@@ -116,6 +127,7 @@ def get_lmi(region_iter, opts, signal_data, progress=None, i=None, silent: bool 
     signipval = opts.signipval
     moran_info = opts.info
     force = opts.force
+    aggregate = opts.agg
 
     if not work_dir.endswith("/"):
 
@@ -128,13 +140,12 @@ def get_lmi(region_iter, opts, signal_data, progress=None, i=None, silent: bool 
     else:
 
         df_regions = pd.DataFrame({"coords": [regions], "symbol": ["symbol"], "id": ["id"]})
-
+    
     region_timer = time()
 
     region = region_iter.coords
 
     if silent == False:
-
         print(f"\n------> Working on region {region} [{i+1}/{len(df_regions)}]\n")
 
     try:
@@ -161,6 +172,7 @@ def get_lmi(region_iter, opts, signal_data, progress=None, i=None, silent: bool 
         return
 
     # Load only signal for this specific region.
+    signal_data = lmi.load_signals(df_regions, work_dir=work_dir)
     mlobject.signals_dict, signal_types = lmi.load_region_signals(mlobject, signal_data, signals)
 
     # If the signal is not present in the signals folder (has not been processed with prep) but it is in 
@@ -179,22 +191,22 @@ def get_lmi(region_iter, opts, signal_data, progress=None, i=None, silent: bool 
 
         if [signal for signal, _ in mlobject.lmi_info.items()] == signal_types:
 
-            if silent == False:
-                print("\tLMI already computed for this region. \n\tSkipping to next region...")
-
             if progress is not None: progress["done"] = True
 
             if moran_info:
 
                 for signal, df in mlobject.lmi_info.items():
 
-                    moran_log_path = f"{work_dir}{mlobject.chrom}/moran_log/{signal}"
-                    pathlib.Path(moran_log_path).mkdir(parents=True, exist_ok=True)
+                    moran_data_path = f"{work_dir}{mlobject.chrom}/moran_data/{signal}"
+                    pathlib.Path(moran_data_path).mkdir(parents=True, exist_ok=True)
 
-                    df.to_csv(f"{moran_log_path}/{mlobject.region}_{mlobject.poi}_{signal}.txt", sep="\t", index=False)
+                    df.to_csv(f"{moran_data_path}/{mlobject.region}_{mlobject.poi}_{signal}.txt", sep="\t", index=False)
 
                     if silent == False:
-                        print(f"\tLog saved to: {moran_log_path}/{mlobject.region}_{mlobject.poi}_{signal}.txt")
+                        print(f"\tMoran data saved to '{moran_data_path}/{mlobject.region}_{mlobject.poi}_{signal}.txt'")
+
+            if silent == False:
+                print("\tLMI already computed for this region. \n\tSkipping to next region...")
 
             return
 
@@ -208,22 +220,28 @@ def get_lmi(region_iter, opts, signal_data, progress=None, i=None, silent: bool 
         mlobject.lmi_geometry = lmi.construct_voronoi(mlobject, buffer)
 
     if silent == False:
-
         print(f"\tAverage distance between consecutive particles: {mean_distance:6.4f} [{buffer:6.4f}]")
-        print(f"\tGeometry information for region {mlobject.region} saved to: {mlobject.save_path}")
+        print(f"\tGeometry information for region {mlobject.region} saved to '{mlobject.save_path}'")
 
-    all_lmi = {}
+    if aggregate is not None:
 
-    for signal_type in signal_types:
+        mlobject.agg = defaultdict(list); [mlobject.agg[row[0]].append(row[1]) for _, row in pd.read_csv(aggregate, sep="\t", header=None).iterrows()]
 
-        all_lmi[signal_type] = lmi.compute_lmi(mlobject, signal_type, buffer * BFACT, n_permutations, signipval, silent)
+        lmi.aggregate_signals(mlobject)
 
-    mlobject.lmi_info = all_lmi
+        for condition, _ in mlobject.agg.items():
+
+            mlobject.lmi_info[condition] = lmi.compute_lmi(mlobject, condition, buffer * BFACT, n_permutations, signipval, silent)
+
+    else:
+
+        for signal_type in signal_types:
+
+            mlobject.lmi_info[signal_type] = lmi.compute_lmi(mlobject, signal_type, buffer * BFACT, n_permutations, signipval, silent)
 
     if silent == False:
-
         print(f"\n\tRegion done in {timedelta(seconds=round(time() - region_timer))}")
-        print(f"\tLMI information for region {mlobject.region} will be saved to: {mlobject.save_path}")
+        print(f"\tLMI information for region {mlobject.region} will be saved to '{mlobject.save_path}'")
 
     with open(mlobject.save_path, "wb") as hamlo_namendle:
 
@@ -233,14 +251,13 @@ def get_lmi(region_iter, opts, signal_data, progress=None, i=None, silent: bool 
 
         for signal, df in mlobject.lmi_info.items():
 
-            moran_log_path = f"{work_dir}{mlobject.chrom}/moran_log/{signal}"
-            pathlib.Path(moran_log_path).mkdir(parents=True, exist_ok=True) 
+            moran_data_path = f"{work_dir}{mlobject.chrom}/moran_data/{signal}"
+            pathlib.Path(moran_data_path).mkdir(parents=True, exist_ok=True) 
 
-            df.to_csv(f"{moran_log_path}/{mlobject.region}_{mlobject.poi}_{signal}.txt", sep="\t", index=False)
+            df.to_csv(f"{moran_data_path}/{mlobject.region}_{mlobject.poi}_{signal}.txt", sep="\t", index=False)
 
             if silent == False:
-                        
-                        print(f"\tLog saved to: {moran_log_path}/{mlobject.region}_{mlobject.poi}_{signal}.txt")
+                print(f"\tMoran data saved to '{moran_data_path}/{mlobject.region}_{mlobject.poi}_{signal}.txt'")
 
     if progress is not None:
 
@@ -272,8 +289,6 @@ def run(opts):
 
     start_timer = time()
 
-    # Read region list. If its a region as parameter, create a dataframe.
-    # If its a path to a file, read that dataframe.
     if os.path.isfile(regions):
 
         df_regions = pd.read_table(regions)
@@ -282,24 +297,19 @@ def run(opts):
 
         df_regions = pd.DataFrame({"coords": [regions], "symbol": ["symbol"], "id": ["id"]})
 
-    # Read the signal of the chromosomes corresponding to the regions of interest,
-    # not to load useless data.
-    signal_data = lmi.load_signals(df_regions, work_dir=work_dir)
-
     if multiprocess:
 
         print(f"\n------> {len(df_regions)} regions will be computed.\n")
 
         try:
             
-            manager = mp.Manager()
-            progress = manager.dict(value=0, timer = start_timer, done = False, missing_signal = None)
+            progress = mp.Manager().dict(value=0, timer = start_timer, done = False, missing_signal = None)
         
             with mp.Pool(processes=cores) as pool:
 
                 try:
 
-                    pool.starmap(get_lmi, [(row, opts, signal_data, progress) for _, row in df_regions.iterrows()])
+                    pool.starmap(get_lmi, [(row, opts, progress) for _, row in df_regions.iterrows()])
 
                     if progress["done"] == True:
 
@@ -307,14 +317,14 @@ def run(opts):
                     
                         if moran_info:
 
-                            print(f"\n\tLog saved to: '{work_dir}chr/moran_log/'", end="")
+                            print(f"\n\Moran data saved to: '{work_dir}chr/moran_log/'", end="")
 
                 except Exception:
 
                     if progress["missing_signal"] is not None:
 
                         print(f"\tSignal '{progress['missing_signal']}' is in the signal list but has not been processed with prep.\n"
-                              "\tprocess that signal or remove it from the signal list.\nExiting...")
+                              "\tProcess that signal or remove it from the signal list.\n\tExiting...")
                 
                     pool.close()
                     pool.join()
@@ -330,7 +340,7 @@ def run(opts):
 
         for i, row in df_regions.iterrows():
 
-            get_lmi(row, opts, signal_data, i=i, silent=False)
+            get_lmi(row, opts, i=i, silent=False)
 
     print(f"\n\nTotal time spent: {timedelta(seconds=round(time() - start_timer))}.")
     print("\nall done.")

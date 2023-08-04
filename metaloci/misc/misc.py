@@ -111,7 +111,7 @@ def clean_matrix(mlobject: mlo.MetalociObject) -> np.ndarray:
 
     if percentage_zeroes >= 50:
 
-        mlobject.bad_region = "too many zeroes"
+        mlobject.bad_region = "too many zeros"
 
     if max_stretch >= 20:
 
@@ -198,7 +198,7 @@ def check_cooler_names(hic_file: Path, data: Path, coords: bool):
 
     with open(data[0], "r") as handler:
 
-        if [line.strip() for line in handler][1].startswith("chr"):
+        if [line.strip() for line in handler][10].startswith("chr"):
 
             signal_chr_nom = "chrN"
 
@@ -220,7 +220,7 @@ def check_cooler_names(hic_file: Path, data: Path, coords: bool):
 
     with open(coords, "r") as handler:
 
-        if [line.strip() for line in handler][1].startswith("chr"):
+        if [line.strip() for line in handler][0].startswith("chr"):
 
             coords_chr_nom = "chrN"
 
@@ -245,7 +245,7 @@ def check_hic_names(hic_file: Path, data: Path, coords: bool):
 
     with open(data[0], "r") as handler:
 
-        if [line.strip() for line in handler][1].startswith("chr"):
+        if [line.strip() for line in handler][0].startswith("chr"):
 
             signal_chr_nom = "chrN"
 
@@ -265,7 +265,7 @@ def check_hic_names(hic_file: Path, data: Path, coords: bool):
 
     with open(coords, "r") as handler:
 
-        if [line.strip() for line in handler][1].startswith("chr"):
+        if [line.strip() for line in handler][0].startswith("chr"):
 
             coords_chr_nom = "chrN"
 

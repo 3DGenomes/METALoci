@@ -406,10 +406,6 @@ def run(opts):
     multiprocess = opts.multiprocess
     cores = opts.threads
 
-    if not work_dir.endswith("/"):
-
-        work_dir += "/"
-
     if multiprocess is None:
 
         multiprocess = False
@@ -439,9 +435,8 @@ def run(opts):
         print(f"\n------> {len(df_regions)} regions will be computed.\n")
 
         try:
-
-            manager = mp.Manager()
-            progress = manager.dict(value=0, timer=start_timer, done=False, plots=False)
+            
+            progress = mp.Manager().dict(value=0, timer=start_timer, done=False, plots=False)
   
             with mp.Pool(processes=cores) as pool:
             

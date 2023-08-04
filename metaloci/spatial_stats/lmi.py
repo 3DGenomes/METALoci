@@ -280,11 +280,11 @@ def compute_lmi(
 
     signal = []
 
-    res = dict(filter(lambda item: signal_type == item[0], mlobject.signals_dict.items()))
+    filtered_signal_type = dict(filter(lambda item: signal_type == item[0], mlobject.signals_dict.items()))
 
     for _, row in mlobject.lmi_geometry.iterrows():
 
-        signal.append(np.nanmedian([res[key][row.bin_index] for key in res]))
+        signal.append(np.nanmedian([filtered_signal_type[key][row.bin_index] for key in filtered_signal_type]))
 
     signal_geometry = {"v": [], "geometry": []}
 
@@ -321,7 +321,6 @@ def compute_lmi(
         bin_start = int(mlobject.start) + (mlobject.resolution * row.bin_index) + row.bin_index
         bin_end = bin_start + mlobject.resolution
 
-        df_lmi["Class"].append(signal_type)
         df_lmi["ID"].append(signal_type)
 
         df_lmi["bin_index"].append(row.bin_index)
@@ -342,7 +341,6 @@ def compute_lmi(
     df_lmi = pd.DataFrame(df_lmi)
 
     # Changing the data types to the proper ones so the pickle file has a smaller size.
-    df_lmi["Class"] = df_lmi["Class"].astype(str)
     df_lmi["ID"] = df_lmi["ID"].astype(str)
 
     df_lmi["bin_index"] = df_lmi["bin_index"].astype(np.uintc)
@@ -361,3 +359,15 @@ def compute_lmi(
     df_lmi["ZLag"] = df_lmi["ZLag"].astype(np.half)
 
     return df_lmi
+
+
+def aggregate_signals(mlobject: mlo.MetalociObject):
+
+    for condition, signal_type in mlobject.agg.items():
+
+        mlobject.signals_dict[condition] = np.nanmedian(
+            np.array([mlobject.signals_dict[signal] for signal in signal_type]), axis=0
+        )
+ 
+
+

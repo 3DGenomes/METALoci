@@ -3,6 +3,7 @@ This script processes signal .bed files or .bedGraph files, binnarizing them at 
 merging all signals in the same dataframe and subsetting by chromosomes.
 """
 
+import os
 import pathlib
 import subprocess as sp
 import warnings
@@ -11,11 +12,10 @@ from argparse import HelpFormatter
 import h5py
 import hicstraw
 import pandas as pd
+from metaloci.misc import misc
 from numba.core.errors import (NumbaDeprecationWarning,
                                NumbaPendingDeprecationWarning)
 from pybedtools import BedTool
-
-from metaloci.misc import misc
 
 warnings.simplefilter('ignore', category=NumbaDeprecationWarning)
 warnings.simplefilter('ignore', category=NumbaPendingDeprecationWarning)
@@ -145,7 +145,7 @@ def run(opts):
     # names to a dictionary to put it in the next step, then sort the file.
     for f in data:
 
-        signal_file_name = f.rsplit("/", 1)[1]
+        signal_file_name = os.path.basename(f)
         tmp_signal_path = f"{tmp_dir}/tmp_{signal_file_name}"
 
         sp.call(f"cp {f} {tmp_signal_path}", shell=True)
@@ -157,7 +157,7 @@ def run(opts):
             )
 
             sp.call(
-                f"sort {tmp_signal_path} -k1,1V -k2,2n -k3,3n | grep -v random | grep -v Un | grep -v alt > {tmp_dir}/sorted_{f.rsplit('/', 1)[1]}",
+                f"sort {tmp_signal_path} -k1,1V -k2,2n -k3,3n | grep -v random | grep -v Un | grep -v alt > {tmp_dir}/sorted_{signal_file_name}",
                 shell=True,
             )
 
@@ -169,7 +169,7 @@ def run(opts):
             column_dict[signal_file_name] = sp.getoutput(f"head -n 1 {f}").split(sep="\t")
 
             sp.call(
-                f"tail -n +1 {tmp_signal_path} | sort -k1,1V -k2,2n -k3,3n | grep -v random | grep -v Un | grep -v alt > {tmp_dir}/sorted_{f.rsplit('/', 1)[1]}",
+                f"tail -n +1 {tmp_signal_path} | sort -k1,1V -k2,2n -k3,3n | grep -v random | grep -v Un | grep -v alt > {tmp_dir}/sorted_{signal_file_name}",
                 shell=True,
             )
 
@@ -178,37 +178,34 @@ def run(opts):
         # If you do not know what is going on here, ask LZ
         awk_com = f"tail -n +2 {f} | " + ("awk '{print $1}' | uniq")
         chroms = sp.getoutput(awk_com).split(sep="\n")
-        input_file = f"{tmp_dir}/sorted_{f.rsplit('/', 1)[1]}"
+        input_file = f"{tmp_dir}/sorted_{signal_file_name}"
 
         for chrom in chroms:
 
-            awk_com = """awk '{{if($1=="%s") {{print}}}}' """ % f"{chrom}" + f"{input_file}" + f" > {tmp_dir}/{chrom}_sorted_{f.rsplit('/', 1)[1]}"
+            awk_com = """awk '{{if($1=="%s") {{print}}}}' """ % f"{chrom}" + f"{input_file}" + f" > {tmp_dir}/{chrom}_sorted_{signal_file_name}"
             sp.call(awk_com, shell=True)
 
             awk_com = """awk '{{if($1=="%s") {{print}}}}' """ % f"{chrom}" + f"{tmp_dir}/{resolution}bp_bin.bed" + f" > {tmp_dir}/{chrom}_{resolution}bp_bin.bed"
             sp.call(awk_com, shell=True)
 
-            BedTool(f"{tmp_dir}/{chrom}_{resolution}bp_bin.bed").intersect(BedTool(f"{tmp_dir}/{chrom}_sorted_{f.rsplit('/', 1)[1]}"), wao=True, sorted=True).saveas(f"{tmp_dir}/{chrom}_intersected_{f.rsplit('/', 1)[1]}")
+            BedTool(f"{tmp_dir}/{chrom}_{resolution}bp_bin.bed").intersect(BedTool(f"{tmp_dir}/{chrom}_sorted_{signal_file_name}"), wao=True, sorted=True).saveas(f"{tmp_dir}/{chrom}_intersected_{signal_file_name}")
 
             if chrom == chroms[0]:
 
-                sp.call(f"cp {tmp_dir}/{chrom}_intersected_{f.rsplit('/', 1)[1]} {tmp_dir}/concatenated.bed", shell = True)
+                sp.call(f"cp {tmp_dir}/{chrom}_intersected_{signal_file_name} {tmp_dir}/concatenated.bed", shell = True)
 
             else:
                 
-                sp.call(f"cat {tmp_dir}/concatenated.bed {tmp_dir}/{chrom}_intersected_{f.rsplit('/', 1)[1]} > {tmp_dir}/tmp_concatenated.bed", shell=True)
+                sp.call(f"cat {tmp_dir}/concatenated.bed {tmp_dir}/{chrom}_intersected_{signal_file_name} > {tmp_dir}/tmp_concatenated.bed", shell=True)
                 sp.call(f"mv {tmp_dir}/tmp_concatenated.bed {tmp_dir}/concatenated.bed", shell=True)
     
-        # Intersect the sorted files and the binnarized file.
-        # BedTool(f"{tmp_dir}/{resolution}bp_bin.bed").intersect(BedTool(f"{tmp_dir}/sorted_{f.rsplit('/', 1)[1]}"), wao=True, sorted=True).saveas(f"{tmp_dir}/intersected_{f.rsplit('/', 1)[1]}")
-
         n_of_col = sp.getoutput(f"head -n 1 {tmp_dir}/concatenated.bed" + " | awk '{print NF}'")
 
-        awk_com = f"awk -F \'\\t\' -v OFS=\'\\t\' '{{if (${n_of_col} == 0) {{$4 = $1; $5 = $2; $6 = $3}} {{for (i = 7; i <= {n_of_col}; i++) {{$i = $i * (${n_of_col} / ($6 - $5))}}}} print}}' {tmp_dir}/concatenated.bed > {tmp_dir}/intersected_ok_{f.rsplit('/', 1)[1]}"
+        awk_com = f"awk -F \'\\t\' -v OFS=\'\\t\' '{{if (${n_of_col} == 0) {{$4 = $1; $5 = $2; $6 = $3}} {{for (i = 7; i <= {n_of_col}; i++) {{$i = $i * (${n_of_col} / ($6 - $5))}}}} print}}' {tmp_dir}/concatenated.bed > {tmp_dir}/intersected_ok_{signal_file_name}"
         sp.call(awk_com, shell=True)
 
     # Create a list of paths to the intersected files.
-    intersected_files_paths = [(f"{tmp_dir}/intersected_ok_" + i.rsplit("/", 1)[1]) for i in data]
+    intersected_files_paths = [(f"{tmp_dir}/intersected_ok_" + os.path.basename(i)) for i in data]
     
     final_intersect = pd.read_csv(
         intersected_files_paths[0], sep="\t", header=None, low_memory=False

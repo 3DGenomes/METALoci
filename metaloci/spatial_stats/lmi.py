@@ -343,15 +343,15 @@ def compute_lmi(
     # Changing the data types to the proper ones so the pickle file has a smaller size.
     df_lmi["ID"] = df_lmi["ID"].astype(str)
 
-    df_lmi["bin_index"] = df_lmi["bin_index"].astype(np.uintc)
+    df_lmi["bin_index"] = df_lmi["bin_index"].astype(np.ushort)
     df_lmi["bin_chr"] = df_lmi["bin_chr"].astype(str)
     df_lmi["bin_start"] = df_lmi["bin_start"].astype(np.uintc)
     df_lmi["bin_end"] = df_lmi["bin_end"].astype(np.uintc)
 
-    df_lmi["signal"] = df_lmi["signal"].astype(np.float64)
+    df_lmi["signal"] = df_lmi["signal"].astype(np.single) ## WAS FLOAT64, CHECK IF IT BREAKS SOMETHING
 
-    df_lmi["moran_index"] = df_lmi["moran_index"].astype(np.uintc)
-    df_lmi["moran_quadrant"] = df_lmi["moran_quadrant"].astype(np.uintc)
+    df_lmi["moran_index"] = df_lmi["moran_index"].astype(np.ushort)
+    df_lmi["moran_quadrant"] = df_lmi["moran_quadrant"].astype(np.ubyte)
     df_lmi["LMI_score"] = df_lmi["LMI_score"].astype(np.half)
     df_lmi["LMI_pvalue"] = df_lmi["LMI_pvalue"].astype(np.half)
     df_lmi["LMI_inv_pval"] = df_lmi["LMI_inv_pval"].astype(np.half)

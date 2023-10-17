@@ -156,6 +156,7 @@ def get_lmi(region_iter, opts, progress=None, i=None, silent: bool = True):
         ) as mlobject_handler:
 
             mlobject = pickle.load(mlobject_handler)
+            mlobject.save_path = f"{work_dir}{region.split(':', 1)[0]}/{re.sub(':|-', '_', region)}.mlo"
 
     except FileNotFoundError:
 
@@ -173,23 +174,28 @@ def get_lmi(region_iter, opts, progress=None, i=None, silent: bool = True):
 
     # Load only signal for this specific region.
     signal_data = lmi.load_signals(df_regions, work_dir=work_dir)
-    mlobject.signals_dict, signal_types = lmi.load_region_signals(mlobject, signal_data, signals)
+    mlobject.signals_dict = lmi.load_region_signals(mlobject, signal_data, signals)
+
+    if aggregate is not None:
+
+        mlobject.agg = defaultdict(list); [mlobject.agg[row[0]].append(row[1]) for _, row in pd.read_csv(aggregate, sep="\t", header=None).iterrows()]
+
+        lmi.aggregate_signals(mlobject)
 
     # If the signal is not present in the signals folder (has not been processed with prep) but it is in 
     # the list of signal to process, raise an exception and print which signals need to be processed.
     if mlobject.signals_dict == None and progress is not None:
 
-        progress["missing_signal"] = signal_types    
+        progress["missing_signal"] = list(mlobject.signals_dict.keys())   
 
         raise Exception()
 
     # This checks if every signal you want to process is already computed. If the user works with a few signals 
     # but decides to add some more later, she can use the same working directory and KK, and the LMI will be
     # computed again with the new signals. If everything is already computed, does nothing.
-    # TODO compute only the missing signals instead of all the signals again.
     if mlobject.lmi_info is not None and force is False:
 
-        if [signal for signal, _ in mlobject.lmi_info.items()] == signal_types:
+        if [signal for signal, _ in mlobject.lmi_info.items()] == list(mlobject.signals_dict.keys()):
 
             if progress is not None: progress["done"] = True
 
@@ -223,19 +229,9 @@ def get_lmi(region_iter, opts, progress=None, i=None, silent: bool = True):
         print(f"\tAverage distance between consecutive particles: {mean_distance:6.4f} [{buffer:6.4f}]")
         print(f"\tGeometry information for region {mlobject.region} saved to '{mlobject.save_path}'")
 
-    if aggregate is not None:
+    for signal_type in list(mlobject.signals_dict.keys()):
 
-        mlobject.agg = defaultdict(list); [mlobject.agg[row[0]].append(row[1]) for _, row in pd.read_csv(aggregate, sep="\t", header=None).iterrows()]
-
-        lmi.aggregate_signals(mlobject)
-
-        for condition, _ in mlobject.agg.items():
-
-            mlobject.lmi_info[condition] = lmi.compute_lmi(mlobject, condition, buffer * BFACT, n_permutations, signipval, silent)
-
-    else:
-
-        for signal_type in signal_types:
+        if signal_type not in mlobject.lmi_info:
 
             mlobject.lmi_info[signal_type] = lmi.compute_lmi(mlobject, signal_type, buffer * BFACT, n_permutations, signipval, silent)
 

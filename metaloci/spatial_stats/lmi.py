@@ -237,9 +237,9 @@ def load_region_signals(mlobject: mlo.MetalociObject, signal_data: dict, signal_
 
         except KeyError:
             
-            return None, signal_type    
+            return None    
 
-    return signals_dict, signal_types
+    return signals_dict
 
 
 def compute_lmi(
@@ -364,6 +364,10 @@ def compute_lmi(
 def aggregate_signals(mlobject: mlo.MetalociObject):
 
     for condition, signal_type in mlobject.agg.items():
+
+        if not isinstance(signal_type, list):
+                
+                signal_type = [signal_type]
 
         mlobject.signals_dict[condition] = np.nanmedian(
             np.array([mlobject.signals_dict[signal] for signal in signal_type]), axis=0

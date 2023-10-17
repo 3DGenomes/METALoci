@@ -179,6 +179,7 @@ def run(opts):
             ) as mlobject_handler:
 
                 mlobject = pickle.load(mlobject_handler)
+                mlobject.save_path = f"{work_dir}{region.split(':', 1)[0]}/{re.sub(':|-', '_', region)}.mlo"
 
         except FileNotFoundError:
 
@@ -228,8 +229,6 @@ def run(opts):
             print("\t\tHiC plot -> done.")
 
             print("\t\tKamada-Kawai plot", end="\r")
-
-
             
             """If metaloci_bed is True and the LMI p-value of the mlobject.poi is significant and the quadrant is in quadrants,"""
             if metaloci_only and merged_lmi_geometry.loc[merged_lmi_geometry["bin_index"] == mlobject.poi, "LMI_pvalue"].values[0] <= signipval and merged_lmi_geometry.loc[merged_lmi_geometry["bin_index"] == mlobject.poi, "moran_quadrant"].values[0] in quadrants:

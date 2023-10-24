@@ -207,8 +207,9 @@ def check_cooler_names(hic_file: Path, data: Path, coords: bool):
             signal_chr_nom = "N"
 
     hic_file = cooler.Cooler(hic_file)
+    chrom_list = hic_file.chromnames
 
-    if "chr" in [hic_file.chromnames][0][0]:
+    if "chr" in chrom_list[0]:
 
         cooler_chr_nom = "chrN"
 
@@ -239,6 +240,8 @@ def check_cooler_names(hic_file: Path, data: Path, coords: bool):
             "\nYou may want to rename the chromosome names in a cooler file with cooler.rename_chroms() in python. "
             "\n\nExiting..."
         )
+    
+    return chrom_list
 
 
 def check_hic_names(hic_file: Path, data: Path, coords: bool):
@@ -252,8 +255,10 @@ def check_hic_names(hic_file: Path, data: Path, coords: bool):
         else:
 
             signal_chr_nom = "N"
+    
+    chrom_list = [i.name for i in hicstraw.HiCFile(hic_file).getChromosomes()][1:]
 
-    if "chr" in hicstraw.HiCFile(hic_file).getChromosomes()[1].name:
+    if "chr" in chrom_list[0]:
 
         hic_chr_nom = "chrN"
 
@@ -283,3 +288,12 @@ def check_hic_names(hic_file: Path, data: Path, coords: bool):
             "\n\nPlease, rename the chromosome names. "
             "\n\nExiting..."
         )
+
+    return chrom_list
+
+def natural_sort(list: list): 
+
+    convert = lambda text: int(text) if text.isdigit() else text.lower()
+    alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)]
+    
+    return sorted(list, key=alphanum_key)

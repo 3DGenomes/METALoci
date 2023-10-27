@@ -195,7 +195,26 @@ def signal_normalization(region_signal: pd.DataFrame, pseudocounts: float = None
 
 
 def check_cooler_names(hic_file: Path, data: Path, coords: bool):
+    """
+    Checks if the chromosome names in the signal, cooler and chromosome sizes
+    files are the same.
+    
+    Parameters
+    ----------
+    hic_file : Path
+        Path to the cooler file.
+    data : Path
+        Path to the signal file.
+    coords : Path
+        Path to the chromosome sizes file.
+    
+    Returns
+    -------
+    chrom_list : list
+        List of chromosomes in the cooler file.
 
+    """
+    
     with open(data[0], "r") as handler:
 
         if [line.strip() for line in handler][10].startswith("chr"):
@@ -245,6 +264,24 @@ def check_cooler_names(hic_file: Path, data: Path, coords: bool):
 
 
 def check_hic_names(hic_file: Path, data: Path, coords: bool):
+    """
+    Checks if the chromosome names in the signal, cooler and chromosome sizes
+    files are the same.
+    
+    Parameters
+    ----------
+    hic_file : Path
+        Path to the cooler file.
+    data : Path
+        Path to the signal file.
+    coords : Path
+        Path to the chromosome sizes file.
+    
+    Returns
+    -------
+    chrom_list : list
+        List of chromosomes in the cooler file.
+    """
 
     with open(data[0], "r") as handler:
 
@@ -291,9 +328,236 @@ def check_hic_names(hic_file: Path, data: Path, coords: bool):
 
     return chrom_list
 
+
 def natural_sort(list: list): 
+    """
+    Sort the list with natural sorting.
+    
+    Parameters
+    ----------
+    list : list
+        List to be sorted
+        
+    Returns
+    -------
+    list
+        Sorted list
+    """
 
     convert = lambda text: int(text) if text.isdigit() else text.lower()
     alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)]
     
     return sorted(list, key=alphanum_key)
+
+
+def gtfparser(gene_file_f : Path, name : str, extend : int, resolution : int):
+    """
+    Parses a gtf file and returns the information of the genes, excluding
+    artifacts
+    
+    Parameters
+    ----------
+    gene_file : path
+        Path to the file that contains the genes
+    name : str
+        Name of the project
+    extend : int
+        Extend of the region to be analyzed
+    resolution : int
+        Resolution at which to split the genome
+        
+    Returns
+    -------
+    id_tss_f : dict
+        Dictionary linking the gene id to the tss
+    id_chrom_f : dict 
+        Dictionary linking the gene id to the chromosome
+    id_name_f : dict
+        Dictionary linking the gene id to the name
+    fn_f : str
+        Name of the end file
+    """
+    gene_type_count = defaultdict(int)
+
+    with open(gene_file_f, mode="r", encoding="utf-8") as gtf_reader:
+
+        for line in gtf_reader:
+
+            if re.compile("##").search(line) or not re.compile(r"chr\w+").search(line):
+
+                continue
+
+            line_s = line.split("\t")
+
+            if line_s[2] == "gene" and line_s[0] != "chrM":
+
+                if re.compile(r'gene_type "artifact";').search(line):
+
+                    continue
+
+                gene_type_count[re.compile(r'gene_type "(\w+)";').search(line).group(1)] += 1
+
+    print("Index: 0; All genes")
+
+    for i_f, key_f in enumerate(gene_type_count.keys()):
+
+        print(f"Index: {i_f+1}; {key_f}")
+        
+    ch_index = None
+
+    while not isinstance(ch_index, int) or ch_index not in range(len(gene_type_count.keys()) + 1):
+
+        ch_index = input("Choose the gene type to parse in the final file: ")
+
+        try:
+                
+            ch_index = int(ch_index)
+
+        except ValueError:
+                
+            print("Please, enter a number.")
+            continue
+
+        if ch_index not in range(len(gene_type_count.keys()) + 1):
+
+            print(f"Please, enter a number between 0 and {len(gene_type_count.keys())}")
+            continue
+
+    if ch_index == 0:
+
+        ch_type_pat = re.compile(r'gene_type "\w+";')
+        fn_f = f"{name}_all_{extend}_{resolution}_agg.txt"
+        print("Parsing all genes...")
+
+    else:
+        
+        ch_type_pat = re.compile(f'gene_type "{list(gene_type_count.keys())[ch_index - 1]}";')
+        fn_f = f"{name}_{list(gene_type_count.keys())[ch_index - 1]}_{extend}_{resolution}_gene_coords.txt"
+        print(f"Gene type chosen: {list(gene_type_count.keys())[ch_index - 1]}")
+
+    id_tss_f = defaultdict(int)
+    id_name_f = defaultdict(str)
+    id_chrom_f = defaultdict(str)
+
+    print("Gathering information from the annotation file...")
+
+    with open(gene_file_f, mode="r", encoding="utf-8") as gtf_reader:
+
+        for line in gtf_reader:
+
+            if re.compile("##").search(line)or not re.compile(r"chr\w+").search(line):
+
+                continue
+
+            line_s = line.split("\t")
+
+            if line_s[2] == "gene" and line_s[0] != "chrM" and ch_type_pat.search(line):
+
+                gene_id = re.compile(r'gene_id "(ENS\w+)\.\d+"').search(line).group(1)
+                gene_name = re.compile(r'gene_name "([\w\-\_\.]+)";').search(line).group(1)
+                id_chrom_f[gene_id] = line_s[0]
+                id_name_f[gene_id] = gene_name
+
+                if line_s[6] == "+":
+
+                    id_tss_f[gene_id] = int(line_s[3])
+
+                else:
+
+                    id_tss_f[gene_id] = int(line_s[4])
+
+    return id_chrom_f, id_tss_f, id_name_f, fn_f
+
+
+def bedparser(gene_file_f : Path, name : str, extend : int, resolution : int):
+    """
+    Parses a bed file and returns the information of the genes, excluding
+    artifacts.
+    
+    Parameters
+    ----------
+    gene_file : path
+        Path to the file that contains the genes
+    name : str
+        Name of the project
+    extend : int
+        Extend of the region to be analyzed
+    resolution : int
+        Resolution at which to split the genome
+        
+    Returns
+    -------
+    id_tss_f : dict
+        Dictionary linking the gene id to the tss
+    id_chrom_f : dict
+        Dictionary linking the gene id to the chromosome
+    id_name_f : dict
+        Dictionary linking the gene id to the name
+    fn_f : str
+        Name of the end file
+    """
+
+    id_tss_f = defaultdict(int)
+    id_name_f = defaultdict(str)
+    id_chrom_f = defaultdict(str)
+
+    fn_f = f"{name}_all_{extend}_{resolution}_agg.txt"
+
+    print("Gathering information from the annotation file...")
+
+    bed_file = pd.read_table(gene_file_f, names=["coords", "symbol", "id"])
+
+    for _, row_f in bed_file.iterrows():
+
+        id_chrom_f[row_f.id] = row_f.coords.split(":")[0]
+        id_tss_f[row_f.id] = int(row_f.coords.split(":")[1])
+        id_name_f[row_f.id] = row_f.symbol
+
+    return id_chrom_f, id_tss_f, id_name_f, fn_f
+
+
+def binsearcher(id_tss_f, id_chrom_f, id_name_f, bin_genome_f):
+    """
+    Searches the bin index where the gene is located    
+    
+    Parameters
+    ----------
+    id_tss_f : dict
+        Dictionary linking the gene id to the tss
+    id_chrom_f : dict
+        Dictionary linking the gene id to the chromosome
+    id_name_f : dict
+        Dictionary linking the gene id to the name
+    bin_genome_f : pd.DataFrame
+        DataFrame containing the bins of the genome
+        
+    Returns
+    -------
+    data_f : pd.DataFrame
+        DataFrame containing the information of the genes and the bin index
+    """
+
+    data_f = defaultdict(list)
+
+    for k, v in id_tss_f.items():
+
+        chrom_bin_f = bin_genome_f[(bin_genome_f["chrom"] == id_chrom_f[k])].reset_index()
+
+        sub_bin_index = chrom_bin_f[(chrom_bin_f["start"] <= v) & (chrom_bin_f["end"] >= v)].index.tolist()[0]
+
+        data_f["chrom"].append(id_chrom_f[k])
+        data_f["bin_index"].append(sub_bin_index)
+        data_f["gene_name"].append(id_name_f[k])
+        data_f["gene_id"].append(k)
+
+    print("Aggregating genes that are located in the same bin...")
+
+    data_f = pd.DataFrame(data_f)
+    data_f = data_f.groupby(["chrom", "bin_index"])[data_f.columns].agg(",".join).reset_index()
+
+    data_f[["chrom"]] = data_f[["chrom"]].astype(str)
+    data_f[["bin_index"]] = data_f[["bin_index"]].astype(int)
+    data_f[["gene_name"]] = data_f[["gene_name"]].astype(str)
+    data_f[["gene_id"]] = data_f[["gene_id"]].astype(str)
+
+    return data_f

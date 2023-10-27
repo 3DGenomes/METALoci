@@ -10,6 +10,7 @@ from time import time
 import subprocess as sp
 
 import cooler
+import glob
 import hicstraw
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -72,9 +73,9 @@ def populate_args(parser):
         dest="regions",
         metavar="PATH",
         type=str,
-        required=True,
+        required=False,
         help="Region to apply LMI in format chrN:start-end_midpoint or file with the regions of interest. If a file is provided, "
-        "it must contain as a header 'coords', 'symbol' and 'id', and one region per line, tab separated.",
+        "it must contain as a header 'coords', 'symbol' and 'id', and one region per line, tab separated. ",
     )
 
     optional_arg.add_argument(
@@ -138,8 +139,24 @@ def get_region_layout(row, opts, progress=None, silent: bool = True):
     if cutoffs is None:
 
         cutoffs = [0.2] 
+        
+    if regions is None:
 
-    if os.path.isfile(regions):
+        try:
+
+            df_regions = pd.read_table(glob.glob(f"{work_dir}*coords.txt")[0])
+            
+            if len(glob.glob(f"{work_dir}*coords.txt")) > 1:
+                
+                print("More than one region file found. Please provide a region or only one file with regions of interest'.")
+                return
+        
+        except IndexError:
+                
+            print("No regions provided. Please provide a region or a file with regions of interest or run 'metaloci sniffer'.")
+            return
+        
+    elif os.path.isfile(regions):
 
         df_regions = pd.read_table(regions)
 
@@ -153,61 +170,6 @@ def get_region_layout(row, opts, progress=None, silent: bool = True):
     region_coords = f"{region_chrom}_{region_start}_{region_end}_{poi}"
     pathlib.Path(os.path.join(work_dir, region_chrom)).mkdir(parents=True, exist_ok=True)
     save_path = os.path.join(work_dir, region_chrom, f"{region_coords}.mlo")
-
-    # if not os.path.isfile(save_path):
-
-    #     mlobject = mlo.MetalociObject(
-    #         f"{region_chrom}:{region_start}-{region_end}",
-    #         str(region_chrom),
-    #         int(region_start),
-    #         int(region_end),
-    #         resolution,
-    #         int(poi),
-    #         persistence_length,
-    #         save_path,
-    #     )
-        
-    # elif mlobject.bad_region == "empty":
-
-    #     if silent == False:
-
-    #         print(f"\n------> Region {region_coords} already done (Hi-C empty in that region).")
-
-    #     if progress is not None: progress["done"] = True
-
-    #     return
-
-    # else:
-
-    #     if silent == False:
-
-    #         print(f"\n------> Region {region_coords} already done.")
-
-    #     if progress is not None: progress["done"] = True
-
-    #     if force:
-
-    #         if silent == False:
-
-    #             print(
-    #                 "\tForce option (-f) selected, recalculating "
-    #                 "the Kamada-Kawai layout (files will be overwritten)"
-    #             )
-
-    #         mlobject = mlo.MetalociObject(
-    #             f"{region_chrom}:{region_start}-{region_end}",
-    #             str(region_chrom),
-    #             int(region_start),
-    #             int(region_end),
-    #             resolution,
-    #             int(poi),
-    #             persistence_length,
-    #             save_path,
-    #         )
-
-    #     else:
-
-    #         return
         
     if os.path.isfile(save_path):
 
@@ -405,6 +367,10 @@ def run(opts):
     regions = opts.regions
     multiprocess = opts.multiprocess
     cores = opts.threads
+    
+    if not work_dir.endswith("/"):
+
+        work_dir += "/"
 
     if multiprocess is None:
 
@@ -420,7 +386,23 @@ def run(opts):
 
     start_timer = time()
 
-    if os.path.isfile(regions):
+    if regions is None:
+
+        try:
+
+            df_regions = pd.read_table(glob.glob(f"{work_dir}*coords.txt")[0])
+            
+            if len(glob.glob(f"{work_dir}*coords.txt")) > 1:
+                
+                print("More than one region file found. Please provide a region or only one file with regions of interest'.")
+                return
+        
+        except IndexError:
+                
+            print("No regions provided. Please provide a region or a file with regions of interest or run 'metaloci sniffer'.")
+            return
+        
+    elif os.path.isfile(regions):
 
         df_regions = pd.read_table(regions)
 

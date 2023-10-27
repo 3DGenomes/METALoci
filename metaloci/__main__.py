@@ -3,6 +3,7 @@ from argparse import ArgumentParser, HelpFormatter, RawDescriptionHelpFormatter
 from importlib.metadata import version
 
 from metaloci.tools import figure, layout, ml, prep
+from metaloci.utility_scripts import sniffer
 
 
 def main(arguments) -> None: 
@@ -62,6 +63,15 @@ def main(arguments) -> None:
                                           formatter_class=RawDescriptionHelpFormatter)
     args_pp["figure"].set_defaults(func=figure.run)
     figure.populate_args(args_pp["figure"])
+
+    # sniffer
+    args_pp["sniffer"] = subparser.add_parser("sniffer",
+                                          description=sniffer.DESCRIPTION,
+                                          help=sniffer.DESCRIPTION,
+                                          add_help=False,
+                                          formatter_class=RawDescriptionHelpFormatter)
+    args_pp["sniffer"].set_defaults(func=sniffer.run)
+    sniffer.populate_args(args_pp["sniffer"])
 
     if len(arguments) == 1:
 

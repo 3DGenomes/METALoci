@@ -34,7 +34,6 @@ def populate_args(parser):
     input_arg = parser.add_argument_group(title="Input arguments")
     optional_arg = parser.add_argument_group(title="Optional arguments")
 
-
     input_arg.add_argument(
         "-w",
         "--work-dir",
@@ -128,9 +127,9 @@ def run(opts):
 
         if resolution not in aval_resolutions:
              
-            print("The given resolution is not in the provided Hi-C file. Exiting...")
-            print("The available resolutions are: " + ", ".join([str(x) for x in aval_resolutions]))
-            exit()
+            print("The given resolution is not in the provided Hi-C file.")
+            print("The available resolutions are: " + ", ".join(misc.natural_sort([str(x) for x in aval_resolutions])))
+            exit("Exiting...")
 
         hic_chroms = misc.check_hic_names(hic_path, data, coords)
 
@@ -142,12 +141,13 @@ def run(opts):
     BedTool().window_maker(g=coords, w=resolution).saveas(f"{work_dir}tmp/{resolution}bp_bin_unsorted.bed")
 
     sp.call(
-        f"sort {tmp_dir}/{resolution}bp_bin_unsorted.bed -k1,1V -k2,2n -k3,3n | grep -v random | grep -v Un | grep -v alt > {tmp_dir}/{resolution}bp_bin.bed",
+        f"sort {tmp_dir}/{resolution}bp_bin_unsorted.bed -k1,1V -k2,2n -k3,3n > {tmp_dir}/{resolution}bp_bin.bed",
         shell=True,
-    ) # TODO instead of using grep -v I could just use the chromosomes that are in the hic file.
+    ) 
 
     os.remove(f"{work_dir}tmp/{resolution}bp_bin_unsorted.bed")
 
+    last_header = None
     # Check if the given bed file has a header and sort the file. If there is a header, save column
     # names to a dictionary to put it in the next step, then sort the file.
     for f in data:
@@ -160,35 +160,39 @@ def run(opts):
 
         sp.call(f"cp {f} {tmp_signal_path}", shell=True)
 
-        try:
-
-            float(  # If first row fourth column is convertible to float, it is a signal, so the first row is not a header.
-                sp.getoutput(f"head -n 1 {f} | cut -f 4")
-            )
-
+        if sp.getoutput(f"head -n 1 {f} | cut -f 1") != "chrom":
+            
             sp.call(
-                f"sort {tmp_signal_path} -k1,1V -k2,2n -k3,3n | grep -v random | grep -v Un | grep -v alt > {tmp_dir}/sorted_{signal_file_name}",
+                f"sort {tmp_signal_path} -k1,1V -k2,2n -k3,3n > {tmp_dir}/sorted_{signal_file_name}",
                 shell=True,
             )
-
+            
             header = False
-
-        except ValueError:
+            
+        else:
 
             # Saving the corresponding column names in a dict, with only the file name as a key.
             column_dict[signal_file_name] = sp.getoutput(f"head -n 1 {f}").split(sep="\t")
 
             sp.call(
-                f"tail -n +1 {tmp_signal_path} | sort -k1,1V -k2,2n -k3,3n | grep -v random | grep -v Un | grep -v alt > {tmp_dir}/sorted_{signal_file_name}",
+                f"tail -n +1 {tmp_signal_path} | sort -k1,1V -k2,2n -k3,3n > {tmp_dir}/sorted_{signal_file_name}",
                 shell=True,
             )
 
             header = True
-
-        # If you do not know what is going on here, ask LZ
-        awk_com = f"tail -n +2 {f} | " + ("awk '{print $1}' | uniq")
-        chroms = sp.getoutput(awk_com).split(sep="\n")
-        chroms = misc.natural_sort([chrom for chrom in chroms if chrom in hic_chroms])
+        
+        if last_header is not None:
+            
+            if header != last_header:
+                
+                misc.remove_folder(pathlib.Path(tmp_dir)) 
+                exit("ERROR: Some of the files to be processed have a header but others do not. Please, modify the files to keep them consistent.")
+            
+        last_header = header
+        
+        awk_com = f"tail -n +2 {f} | " + ("awk '{print $1}' | uniq")  # Retrieve chromosomes from the data file.
+        chroms = sp.getoutput(awk_com).split(sep="\n")  
+        chroms = misc.natural_sort([chrom for chrom in chroms if chrom in hic_chroms])  # Keep only chromosomes that are in the Hi-C file.
         input_file = f"{tmp_dir}/sorted_{signal_file_name}"
 
         print(f"\tSorting signal... done.")
@@ -231,8 +235,8 @@ def run(opts):
         awk_com = f"awk -F \'\\t\' -v OFS=\'\\t\' '{{if (${n_of_col} == 0) {{$4 = $1; $5 = $2; $6 = $3}} {{for (i = 7; i <= {n_of_col}; i++) {{$i = $i * (${n_of_col} / ($6 - $5))}}}} print}}' {tmp_dir}/concatenated.bed > {tmp_dir}/intersected_ok_{signal_file_name}"
         sp.call(awk_com, shell=True)
 
-        os.remove(f"{tmp_dir}/concatenated.bed")
-        print("Assigning signal to bins... done.")
+        # os.remove(f"{tmp_dir}/concatenated.bed")
+        print("\tAssigning signal to bins... done.")
 
     print("\nConcatenating signals in one file...", end = "\r")
 
@@ -259,7 +263,7 @@ def run(opts):
             "end",
             f"{os.path.basename(intersected_files_paths[0].rsplit('.', 1)[0]).split('intersected_ok_', 1)[1]}", 
         ]
-    
+
     final_intersect = (  # Calculate the median of all signals of the same bin.
         final_intersect.groupby(["chrom", "start", "end"])[final_intersect.columns[3 : len(final_intersect.columns)]]
         .median()
@@ -295,7 +299,7 @@ def run(opts):
                 .reset_index()
             )
 
-            final_intersect = pd.merge(final_intersect, tmp_intersect, on=["chrom", "start", "end"], how="inner")
+            final_intersect = pd.merge(final_intersect, tmp_intersect, on=["chrom", "start", "end"], how="outer").fillna(0)
 
     # For each chromosome, create a directory and save the information for that chromosome in .csv and .pkl.
     for chrom in sorted(final_intersect["chrom"].unique()):
@@ -309,11 +313,10 @@ def run(opts):
         )
 
     print("Concatenating signals in one file... done.")
-    print(f"\nSignal bed files saved to {work_dir}signal/")
 
     chroms_no_signal = [
         chrom
-        for chrom in sp.getoutput(f"cut -f 1 {tmp_dir}/{resolution}bp_bin.bed | uniq").split("\n")
+        for chrom in hic_chroms
         if chrom not in final_intersect["chrom"].unique()
     ]
 
@@ -325,6 +328,7 @@ def run(opts):
 
         print(f"Omited chromosomes {', '.join(chroms_no_signal)} as they did not have any signal.")
 
-    misc.remove_folder(pathlib.Path(tmp_dir))  
+    print(f"\nSignal bed files saved to {work_dir}signal/")
+    misc.remove_folder(pathlib.Path(tmp_dir)) 
 
     print("\ndone.")

@@ -12,6 +12,7 @@ from argparse import HelpFormatter
 from datetime import timedelta
 from time import time
 
+import glob
 import pandas as pd
 
 from metaloci.spatial_stats import lmi
@@ -133,7 +134,23 @@ def get_lmi(region_iter, opts, progress=None, i=None, silent: bool = True):
 
         work_dir += "/"
 
-    if os.path.isfile(regions):
+    if regions is None:
+
+        try:
+
+            df_regions = pd.read_table(glob.glob(f"{work_dir}*coords.txt")[0])
+            
+            if len(glob.glob(f"{work_dir}*coords.txt")) > 1:
+                
+                print("More than one region file found. Please provide a region or only one file with regions of interest'.")
+                return
+        
+        except IndexError:
+                
+            print("No regions provided. Please provide a region or a file with regions of interest or run 'metaloci sniffer'.")
+            return
+        
+    elif os.path.isfile(regions):
 
         df_regions = pd.read_table(regions)
 
@@ -142,7 +159,6 @@ def get_lmi(region_iter, opts, progress=None, i=None, silent: bool = True):
         df_regions = pd.DataFrame({"coords": [regions], "symbol": ["symbol"], "id": ["id"]})
     
     region_timer = time()
-
     region = region_iter.coords
 
     if silent == False:
@@ -162,14 +178,14 @@ def get_lmi(region_iter, opts, progress=None, i=None, silent: bool = True):
 
         if silent == False:
             print("\t.mlo file not found for this region.\n\tSkipping to next region...")
-
+            
         return
 
     if mlobject.kk_nodes is None:
 
         if silent == False:
             print("\tKamada-Kawai layout has not been calculated for this region. \n\tSkipping to next region...")
-
+            
         return
 
     # Load only signal for this specific region.
@@ -187,7 +203,6 @@ def get_lmi(region_iter, opts, progress=None, i=None, silent: bool = True):
     if mlobject.signals_dict == None and progress is not None:
 
         progress["missing_signal"] = list(mlobject.signals_dict.keys())   
-
         raise Exception()
 
     # This checks if every signal you want to process is already computed. If the user works with a few signals 
@@ -206,14 +221,14 @@ def get_lmi(region_iter, opts, progress=None, i=None, silent: bool = True):
                     moran_data_path = f"{work_dir}{mlobject.chrom}/moran_data/{signal}"
                     pathlib.Path(moran_data_path).mkdir(parents=True, exist_ok=True)
 
-                    df.to_csv(f"{moran_data_path}/{mlobject.region}_{mlobject.poi}_{signal}.txt", sep="\t", index=False)
+                    df.to_csv(f"{moran_data_path}/{mlobject.region}_{mlobject.poi}_{signal}.txt", sep="\t", index=False, float_format="%.12f")
 
                     if silent == False:
                         print(f"\tMoran data saved to '{moran_data_path}/{mlobject.region}_{mlobject.poi}_{signal}.txt'")
 
             if silent == False:
                 print("\tLMI already computed for this region. \n\tSkipping to next region...")
-
+                
             return
 
     # Get average distance between consecutive points to define influence,
@@ -282,16 +297,32 @@ def run(opts):
     if not work_dir.endswith("/"):
 
         work_dir += "/"
+    
+    if regions is None:
 
-    start_timer = time()
+        try:
 
-    if os.path.isfile(regions):
+            df_regions = pd.read_table(glob.glob(f"{work_dir}*coords.txt")[0])
+            
+            if len(glob.glob(f"{work_dir}*coords.txt")) > 1:
+                
+                print("More than one region file found. Please provide a region or only one file with regions of interest'.")
+                return
+        
+        except IndexError:
+                
+            print("No regions provided. Please provide a region or a file with regions of interest or run 'metaloci sniffer'.")
+            return
+        
+    elif os.path.isfile(regions):
 
         df_regions = pd.read_table(regions)
 
     else:
 
         df_regions = pd.DataFrame({"coords": [regions], "symbol": ["symbol"], "id": ["id"]})
+        
+    start_timer = time()
 
     if multiprocess:
 

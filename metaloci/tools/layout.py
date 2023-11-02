@@ -87,6 +87,14 @@ def populate_args(parser):
         action="extend",
         help="Fraction of top interactions to keep, space separated (default: 0.2)",
     )
+    
+    optional_arg.add_argument(
+        "-a",
+        "--absolute",
+        dest="absolute",
+        action="store_true",
+        help="Treat the cutoff as an absolute value instead of a fraction of top interactions to keep.",
+    )
 
     optional_arg.add_argument("-f", "--force", dest="force", action="store_true", help="force rewriting existing data.")
 
@@ -127,7 +135,8 @@ def get_region_layout(row, opts, progress=None, silent: bool = True):
     regions = opts.regions
     hic_path = opts.hic_file
     resolution = opts.reso
-    cutoffs = opts.cutoff
+    cutoffs_opt = opts.cutoff
+    absolute = opts.absolute
     force = opts.force
     save_plots = opts.save_plots
     persistence_length = opts.persistence_length
@@ -135,10 +144,31 @@ def get_region_layout(row, opts, progress=None, silent: bool = True):
     if not work_dir.endswith("/"):
 
         work_dir += "/"
+    
+    cutoffs = {}
+        
+    if absolute and cutoffs_opt is None or absolute and len(cutoffs_opt) == 0:
+        
+        exit("Please provide a cutoff (-o) value when using the absolute flag (-a).")
+        
+    elif cutoffs_opt is None or len(cutoffs_opt) == 0:
 
-    if cutoffs is None:
+        cutoffs["cutoff_type"] = "percentage"
+        cutoffs["values"] = [0.2] 
+        
+    elif absolute:
+        
+        cutoffs["cutoff_type"] = "absolute"
+        cutoffs["values"] = cutoffs_opt
 
-        cutoffs = [0.2] 
+    else:
+
+        cutoffs["cutoff_type"] = "percentage"
+        cutoffs["values"] = cutoffs_opt
+    
+    if cutoffs["cutoff_type"] == "percentage" and not 0 < cutoffs["values"][0] <= 1:
+
+        exit("Select a cut-off between 0 and 1.")
         
     if regions is None:
 
@@ -164,7 +194,7 @@ def get_region_layout(row, opts, progress=None, silent: bool = True):
 
         df_regions = pd.DataFrame({"coords": [regions], "symbol": ["symbol"], "id": ["id"]})
 
-    cutoffs.sort(key=float, reverse=True)
+    cutoffs["values"].sort(key=float, reverse=True)
 
     region_chrom, region_start, region_end, poi = re.split(":|-|_", row.coords)
     region_coords = f"{region_chrom}_{region_start}_{region_end}_{poi}"
@@ -206,7 +236,7 @@ def get_region_layout(row, opts, progress=None, silent: bool = True):
                 plot.get_kk_plot(mlobject).savefig(os.path.join(
                     work_dir,
                     region_chrom,
-                    f"plots/KK/{region_coords}_" f"{mlobject.kk_cutoff}_KK.pdf",
+                        f"plots/KK/{region_coords}_{mlobject.kk_cutoff['cutoff_type']}_{mlobject.kk_cutoff['values']:.4f}_mixed-matrices.pdf",
                 ),
                 dpi=300)
 
@@ -216,7 +246,7 @@ def get_region_layout(row, opts, progress=None, silent: bool = True):
                     os.path.join(
                         work_dir,
                         region_chrom,
-                        f"plots/mixed_matrices/{region_coords}_" f"{mlobject.kk_cutoff}_mixed-matrices.pdf",
+                        f"plots/mixed_matrices/{region_coords}_{mlobject.kk_cutoff['cutoff_type']}_{mlobject.kk_cutoff['values']:.4f}_mixed-matrices.pdf",
                     ),
                     dpi=300,
                 )
@@ -247,6 +277,8 @@ def get_region_layout(row, opts, progress=None, silent: bool = True):
                 persistence_length,
                 save_path,
             )
+        
+        mlobject.kk_cutoff["cutoff_type"] = cutoffs["cutoff_type"]
 
         if silent == False:
             print(f"\n------> Working on region: {mlobject.region}\n")
@@ -270,22 +302,22 @@ def get_region_layout(row, opts, progress=None, silent: bool = True):
 
         time_per_region = time()
 
-        for cutoff in cutoffs:
+        for i, cutoff in enumerate(cutoffs["values"]):
 
-            mlobject.kk_cutoff = cutoff
-
-            if silent == False:
-                print(f"\tCutoff: {int(mlobject.kk_cutoff * 100)} %")
+            mlobject.kk_cutoff["values"] = cutoffs["values"][i]
 
             # Get submatrix of restraints
-            restraints_matrix, mlobject = kk.get_restraints_matrix(mlobject)
+            mlobject = kk.get_restraints_matrix(mlobject, silent)
 
+            if mlobject.kk_restraints_matrix is None:
+
+                return
 
             if silent == False:
 
                 print("\tLayouting Kamada-Kawai...")
 
-            mlobject.kk_graph = nx.from_scipy_sparse_array(csr_matrix(restraints_matrix))
+            mlobject.kk_graph = nx.from_scipy_sparse_array(csr_matrix(mlobject.kk_restraints_matrix))
             mlobject.kk_nodes = nx.kamada_kawai_layout(mlobject.kk_graph)
             mlobject.kk_coords = list(mlobject.kk_nodes.values())
             mlobject.kk_distances = distance.cdist(mlobject.kk_coords, mlobject.kk_coords, "euclidean")
@@ -302,7 +334,7 @@ def get_region_layout(row, opts, progress=None, silent: bool = True):
                 plot.get_kk_plot(mlobject).savefig(os.path.join(
                     work_dir,
                     region_chrom,
-                    f"plots/KK/{region_coords}_" f"{mlobject.kk_cutoff}_KK.pdf",
+                        f"plots/KK/{region_coords}_{mlobject.kk_cutoff['cutoff_type']}_{mlobject.kk_cutoff['values']:.4f}_mixed-matrices.pdf",
                 ),
                 dpi=300)
 
@@ -312,7 +344,7 @@ def get_region_layout(row, opts, progress=None, silent: bool = True):
                     os.path.join(
                         work_dir,
                         region_chrom,
-                        f"plots/mixed_matrices/{region_coords}_" f"{mlobject.kk_cutoff}_mixed-matrices.pdf",
+                        f"plots/mixed_matrices/{region_coords}_{mlobject.kk_cutoff['cutoff_type']}_{mlobject.kk_cutoff['values']:.4f}_mixed-matrices.pdf",
                     ),
                     dpi=300,
                 )

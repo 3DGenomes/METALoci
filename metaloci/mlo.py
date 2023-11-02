@@ -18,8 +18,9 @@ class MetalociObject:
         self.mixed_matrices = None
         self.signals_dict = None
         self.flat_matrix = None
+        self.kk_cutoff = {}
+        self.kk_restraints_matrix = None
         self.kk_top_indexes = None
-        self.kk_cutoff = None
         self.kk_nodes = None
         self.kk_coords = None
         self.kk_distances = None

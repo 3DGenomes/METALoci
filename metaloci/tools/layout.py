@@ -236,7 +236,7 @@ def get_region_layout(row, opts, progress=None, silent: bool = True):
                 plot.get_kk_plot(mlobject).savefig(os.path.join(
                     work_dir,
                     region_chrom,
-                        f"plots/KK/{region_coords}_{mlobject.kk_cutoff['cutoff_type']}_{mlobject.kk_cutoff['values']:.4f}_mixed-matrices.pdf",
+                        f"plots/KK/{region_coords}_{mlobject.kk_cutoff['cutoff_type']}_{mlobject.kk_cutoff['values']:.4f}_KK.pdf",
                 ),
                 dpi=300)
 
@@ -334,7 +334,7 @@ def get_region_layout(row, opts, progress=None, silent: bool = True):
                 plot.get_kk_plot(mlobject).savefig(os.path.join(
                     work_dir,
                     region_chrom,
-                        f"plots/KK/{region_coords}_{mlobject.kk_cutoff['cutoff_type']}_{mlobject.kk_cutoff['values']:.4f}_mixed-matrices.pdf",
+                        f"plots/KK/{region_coords}_{mlobject.kk_cutoff['cutoff_type']}_{mlobject.kk_cutoff['values']:.4f}_KK.pdf",
                 ),
                 dpi=300)
 
@@ -356,8 +356,8 @@ def get_region_layout(row, opts, progress=None, silent: bool = True):
             if silent == False:
 
                 print(f"\tdone in {timedelta(seconds=round(time() - time_per_region))}.\n")
-
-            if len(cutoffs) == 1:
+                
+            if len(cutoffs["values"]) == 1:
 
                 if silent == False:
                     print(

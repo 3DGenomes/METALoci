@@ -297,18 +297,18 @@ def run(opts):
 
             maxx = int((img1.size[1] * 0.4 + img2.size[1] * 0.25 + img3.size[1] * 0.25) * 1.3)
 
-            yticks_signal = ax.get_yticks()[1:-1]
-            max_chr_yax = max(len(str(max(yticks_signal))), len(str(min(yticks_signal))))
-            signal_left = {3 : 41, 4 : 30, 5 : 20, 6 : 9}
+            yticks_signal = [f"{round(i, 3):.2f}" for i in ax.get_yticks()[1:-1]]
+            signal_left = {3 : 39, 4 : 29, 5 : 19, 6 : 7, 7: -3, 8: -14}
+            max_chr_yax = max(len(str(i)) for i in yticks_signal)
             
             if max_chr_yax not in signal_left.keys():
 
                 signal_left[max_chr_yax] = 0
 
             composite_image = Image.new(mode="RGBA", size=(maxx, 1550))
-
+            
             composite_image = plot.place_composite(composite_image, f"{plot_filename}_hic.png", 0.5, 100, 50)  # HiC image            
-            composite_image = plot.place_composite(composite_image, f"{plot_filename}_signal.png", 0.4, signal_left[max_chr_yax], 660)  # Signal image
+            composite_image = plot.place_composite(composite_image, f"{plot_filename}_signal.png", 0.4, signal_left[max_chr_yax], 640)  # Signal image
             composite_image = plot.place_composite(composite_image, f"{plot_filename}_kk.png", 0.3, 1300, 50)  # KK image
             composite_image = plot.place_composite(composite_image, f"{plot_filename}_lmi.png", 0.4, 75, 900)  # LMI scatter image
             composite_image = plot.place_composite(composite_image, f"{plot_filename}_gsp.png", 0.25, 900, 900)  # Gaudi signal image

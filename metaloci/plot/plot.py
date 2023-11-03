@@ -10,6 +10,7 @@ import seaborn as sns
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.lines import Line2D
 from matplotlib.ticker import FormatStrFormatter, MaxNLocator
+import matplotlib.gridspec as gridspec
 from PIL import Image
 from scipy.ndimage import rotate
 from scipy.stats import linregress, zscore
@@ -192,7 +193,7 @@ def get_hic_plot(mlobject: mlo.MetalociObject):
         ax=ax,
     ).set_label("$log_{10}$ (Hi-C interactions)", rotation=270, size=12, labelpad=20)
 
-    plt.title(f"[{mlobject.region}]")
+    plt.title(f"{mlobject.region}")
     plt.axis("off")
 
     return hic_fig
@@ -369,7 +370,7 @@ def get_lmi_scatterplot(
     plt.axhline(y=0, color="k", linestyle=":")
 
     ax.set_xlabel(f"Z-score ({lmi_geometry.ID[0]})")
-    ax.set_ylabel("Z-score (Signal Spatial Lag)")
+    ax.set_ylabel(f"Z-score ({lmi_geometry.ID[0]} Spatial Lag)")
 
     r_value_scat = float(r_value_scat)
     p_value_scat = float(r_value_scat)
@@ -620,8 +621,8 @@ def signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, neighb
     plt.ylabel(f"{lmi_geometry.ID[0]}")
     
     ax = sns.lineplot(x=lmi_geometry.bin_index, y=lmi_geometry.signal, color="black", lw=0.7)
-    ax.yaxis.set_major_locator(MaxNLocator(integer=True))
-    ax.yaxis.set_major_formatter(FormatStrFormatter("%.1f"))
+    ax.yaxis.set_major_locator(MaxNLocator(nbins = 5, integer=True))
+    ax.yaxis.set_major_formatter(FormatStrFormatter("%.2f"))
     ax.margins(x=0)
     ax.axhline(y=0, color="k", zorder=0)
 

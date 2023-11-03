@@ -309,7 +309,7 @@ def run(opts):
             f"{work_dir}signal/{chrom}/{chrom}_signal.pkl"
         )
         final_intersect[final_intersect.chrom == f"{chrom}"].to_csv(
-            f"{work_dir}signal/{chrom}/{chrom}_signal.csv", sep="\t", index=False
+            f"{work_dir}signal/{chrom}/{chrom}_signal.tsv", sep="\t", index=False
         )
 
     print("Concatenating signals in one file... done.")

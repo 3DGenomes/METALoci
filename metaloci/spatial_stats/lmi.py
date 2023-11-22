@@ -334,7 +334,6 @@ def compute_lmi(
         df_lmi["moran_quadrant"].append(moran_local_object.q[row.moran_index])
         df_lmi["LMI_score"].append(round(moran_local_object.Is[row.moran_index], 9))
         df_lmi["LMI_pvalue"].append(round(moran_local_object.p_sim[row.moran_index], 9))
-        df_lmi["LMI_inv_pval"].append(round((1 - moran_local_object.p_sim[row.moran_index]), 9))
         df_lmi["ZSig"].append(y[row.moran_index]) 
         df_lmi["ZLag"].append(lags[row.moran_index])
 
@@ -348,13 +347,12 @@ def compute_lmi(
     df_lmi["bin_start"] = df_lmi["bin_start"].astype(np.uintc)
     df_lmi["bin_end"] = df_lmi["bin_end"].astype(np.uintc)
 
-    df_lmi["signal"] = df_lmi["signal"].astype(np.single) ## WAS FLOAT64, CHECK IF IT BREAKS SOMETHING
+    df_lmi["signal"] = df_lmi["signal"].astype(np.single) 
 
     df_lmi["moran_index"] = df_lmi["moran_index"].astype(np.ushort)
     df_lmi["moran_quadrant"] = df_lmi["moran_quadrant"].astype(np.ubyte)
     df_lmi["LMI_score"] = df_lmi["LMI_score"].astype(np.half)
     df_lmi["LMI_pvalue"] = df_lmi["LMI_pvalue"].astype(np.half)
-    df_lmi["LMI_inv_pval"] = df_lmi["LMI_inv_pval"].astype(np.half)
     df_lmi["ZSig"] = df_lmi["ZSig"].astype(np.half)
     df_lmi["ZLag"] = df_lmi["ZLag"].astype(np.half)
 

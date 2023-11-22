@@ -118,7 +118,6 @@ def run(opts):
             exit("The given resolution is not in the provided cooler file. Exiting...")
 
         hic_path = hic_path + "::/resolutions/" + str(resolution)
-
         hic_chroms = misc.check_cooler_names(hic_path, data, coords)
 
     elif hic_path.endswith(".hic"):
@@ -144,7 +143,6 @@ def run(opts):
         f"sort {tmp_dir}/{resolution}bp_bin_unsorted.bed -k1,1V -k2,2n -k3,3n > {tmp_dir}/{resolution}bp_bin.bed",
         shell=True,
     ) 
-
     os.remove(f"{work_dir}tmp/{resolution}bp_bin_unsorted.bed")
 
     last_header = None
@@ -189,9 +187,7 @@ def run(opts):
                 exit("ERROR: Some of the files to be processed have a header but others do not. Please, modify the files to keep them consistent.")
             
         last_header = header
-        
-        awk_com = f"tail -n +2 {f} | " + ("awk '{print $1}' | uniq")  # Retrieve chromosomes from the data file.
-        chroms = sp.getoutput(awk_com).split(sep="\n")  
+        chroms = sp.getoutput(f"tail -n +2 {f} | cut -f 1 | sort -u").split(sep="\n")  # Retrieve chromosomes from the data file.
         chroms = misc.natural_sort([chrom for chrom in chroms if chrom in hic_chroms])  # Keep only chromosomes that are in the Hi-C file.
         input_file = f"{tmp_dir}/sorted_{signal_file_name}"
 
@@ -212,7 +208,6 @@ def run(opts):
 
             # Do an intersection of the signal and the bed file, per each chromsome.
             BedTool(f"{tmp_dir}/{chrom}_{resolution}bp_bin.bed").intersect(BedTool(f"{tmp_dir}/{chrom}_sorted_{signal_file_name}"), wao=True, sorted=True).saveas(f"{tmp_dir}/{chrom}_intersected_{signal_file_name}")
-
             os.remove(f"{tmp_dir}/{chrom}_{resolution}bp_bin.bed")
             os.remove(f"{tmp_dir}/{chrom}_sorted_{signal_file_name}")
 
@@ -242,11 +237,9 @@ def run(opts):
 
     # Create a list of paths to the intersected files.
     intersected_files_paths = [(f"{tmp_dir}/intersected_ok_" + os.path.basename(f)) for f in data]
-    
     final_intersect = pd.read_csv(
         intersected_files_paths[0], sep="\t", header=None, low_memory=False
     )  # Read the first intersected file,
-
     final_intersect = final_intersect.drop([3, 4, 5, final_intersect.columns[-1]], axis=1)  # Drop unnecesary columns,
 
     if header == True:
@@ -290,7 +283,7 @@ def run(opts):
                     "chrom",
                     "start",
                     "end",
-            f"{os.path.basename(intersected_files_paths[i].rsplit('.', 1)[0]).split('intersected_ok_', 1)[1]}", 
+                    f"{os.path.basename(intersected_files_paths[i].rsplit('.', 1)[0]).split('intersected_ok_', 1)[1]}", 
                 ]
 
             tmp_intersect = (
@@ -329,6 +322,7 @@ def run(opts):
         print(f"Omited chromosomes {', '.join(chroms_no_signal)} as they did not have any signal.")
 
     print(f"\nSignal bed files saved to {work_dir}signal/")
+    
     misc.remove_folder(pathlib.Path(tmp_dir)) 
 
     print("\ndone.")

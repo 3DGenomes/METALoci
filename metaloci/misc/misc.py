@@ -9,6 +9,7 @@ from pathlib import Path
 import cooler
 import subprocess as sp
 import hicstraw
+import gzip
 
 
 def remove_folder(path: Path):
@@ -377,9 +378,18 @@ def gtfparser(gene_file_f : Path, name : str, extend : int, resolution : int):
     fn_f : str
         Name of the end file
     """
+    
     gene_type_count = defaultdict(int)
 
-    with open(gene_file_f, mode="r", encoding="utf-8") as gtf_reader:
+    if gene_file_f.endswith("gz"):
+        
+        myopen = gzip.open
+        
+    else:
+        
+        myopen = open    
+
+    with myopen(gene_file_f, mode="rt", encoding="utf-8") as gtf_reader:
 
         for line in gtf_reader:
 
@@ -441,7 +451,7 @@ def gtfparser(gene_file_f : Path, name : str, extend : int, resolution : int):
 
     print("Gathering information from the annotation file...")
 
-    with open(gene_file_f, mode="r", encoding="utf-8") as gtf_reader:
+    with myopen(gene_file_f, mode="rt", encoding="utf-8") as gtf_reader:
 
         for line in gtf_reader:
 

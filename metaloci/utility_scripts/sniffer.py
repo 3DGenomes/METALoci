@@ -111,12 +111,13 @@ def run(opts):
 
         sys.exit()
     
-    file_type = gene_file.split(".")[-1]
     n_of_bins = int(extend / resolution)
-
     tmp_dir = f"{work_dir}tmp"
+    
     pathlib.Path(tmp_dir).mkdir(parents=True, exist_ok=True)
+    
     temp_fn = f"{tmp_dir}/{resolution}bp_bin_unsorted.bed"
+    
     BedTool().window_maker(g=chrom_sizes, w=resolution).saveas(temp_fn)
 
     sort_com = f"sort {tmp_dir}/{resolution}bp_bin_unsorted.bed -k1,1V -k2,2n -k3,3n | " + \
@@ -128,18 +129,21 @@ def run(opts):
     bin_genome[["start"]] = bin_genome[["start"]].astype(int)
     bin_genome[["end"]] = bin_genome[["end"]].astype(int)
 
-    if file_type == "gtf":
+    if "gtf" in gene_file:
 
         ID_CHROM, ID_TSS, ID_NAME, FN = misc.gtfparser(gene_file, name, extend, resolution)
 
-    elif file_type == "bed":
+    elif "bed" in gene_file:
 
         ID_CHROM, ID_TSS, ID_NAME, FN = misc.bedparser(gene_file, name, extend, resolution)
-
-    print("Gathering information about bin index where the gene is located...")
+    
+    else:
+        
+        exit("ERROR: The gene file must be either a .gtf or a .bed file.")
 
     data = misc.binsearcher(ID_TSS, ID_CHROM, ID_NAME, bin_genome)
 
+    print("Gathering information about bin index where the gene is located...")
     print(f"A total of {data.shape[0]} entries will be written to {work_dir + FN}")
 
     with open(f"{work_dir}{FN}", mode="w", encoding="utf-8") as handler:
@@ -149,7 +153,6 @@ def run(opts):
         for _, row in tqdm(data.iterrows()):
 
             chrom_bin = bin_genome[(bin_genome["chrom"] == row.chrom)].reset_index()
-
             bin_start = max(0, (row.bin_index - n_of_bins))
             bin_end = min(chrom_bin.index.max(), (row.bin_index + n_of_bins + 1))
             region_bin = chrom_bin.iloc[bin_start:bin_end].reset_index()

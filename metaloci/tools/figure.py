@@ -338,13 +338,18 @@ def run(opts):
             if len(bed_data) > 0:
 
                 metaloci_bed_path = f"{work_dir}{mlobject.chrom}/metalocis_log/{signal}"
+                
                 pathlib.Path(metaloci_bed_path).mkdir(parents=True, exist_ok=True) 
-
                 bed_data.to_csv(f"{metaloci_bed_path}/{mlobject.chrom}_{mlobject.start}_{mlobject.end}_{mlobject.poi}_{signal}_metalocis.bed", sep="\t", index=False)
+                
                 print(f"\t\tBed file with metalocis location saved to: "
                       f"{metaloci_bed_path}/{mlobject.chrom}_{mlobject.start}_{mlobject.end}_{mlobject.poi}_{signal}.bed")
-
+                
             for signal_key, df in mlobject.lmi_info.items():
+                                
+                if signal_key != signal:
+                    
+                    continue
 
                 sq = [0] * 4
                 q = [0] * 4

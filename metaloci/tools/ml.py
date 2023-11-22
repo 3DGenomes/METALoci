@@ -221,10 +221,10 @@ def get_lmi(region_iter, opts, progress=None, i=None, silent: bool = True):
                     moran_data_path = f"{work_dir}{mlobject.chrom}/moran_data/{signal}"
                     pathlib.Path(moran_data_path).mkdir(parents=True, exist_ok=True)
 
-                    df.to_csv(f"{moran_data_path}/{mlobject.region}_{mlobject.poi}_{signal}.txt", sep="\t", index=False, float_format="%.12f")
+                    df.to_csv(f"{moran_data_path}/{mlobject.region}_{mlobject.poi}_{signal}.tsv", sep="\t", index=False, float_format="%.12f")
 
                     if silent == False:
-                        print(f"\tMoran data saved to '{moran_data_path}/{mlobject.region}_{mlobject.poi}_{signal}.txt'")
+                        print(f"\tMoran data saved to '{moran_data_path}/{mlobject.region}_{mlobject.poi}_{signal}.tsv'")
 
             if silent == False:
                 print("\tLMI already computed for this region. \n\tSkipping to next region...")
@@ -265,10 +265,10 @@ def get_lmi(region_iter, opts, progress=None, i=None, silent: bool = True):
             moran_data_path = f"{work_dir}{mlobject.chrom}/moran_data/{signal}"
             pathlib.Path(moran_data_path).mkdir(parents=True, exist_ok=True) 
 
-            df.to_csv(f"{moran_data_path}/{mlobject.region}_{mlobject.poi}_{signal}.txt", sep="\t", index=False)
+            df.to_csv(f"{moran_data_path}/{mlobject.region}_{mlobject.poi}_{signal}.tsv", sep="\t", index=False)
 
             if silent == False:
-                print(f"\tMoran data saved to '{moran_data_path}/{mlobject.region}_{mlobject.poi}_{signal}.txt'")
+                print(f"\tMoran data saved to '{moran_data_path}/{mlobject.region}_{mlobject.poi}_{signal}.tsv'")
 
     if progress is not None:
 

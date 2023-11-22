@@ -70,7 +70,6 @@ def check_diagonal(diagonal: np.ndarray) -> tuple[int, float, float, list]:
             total += 1
             stretch += 1
             zero_loc.append(i)
-
             max_stretch = max(max_stretch, stretch)
 
         else:
@@ -89,7 +88,7 @@ def clean_matrix(mlobject: mlo.MetalociObject) -> np.ndarray:
     he diagonal, removes values that are zero at the diagonal but are not in
     the rest of the matrix, adds pseudocounts to zeroes depending on the min
     value, scales all values depending on the min value and computes the log10
-    off all values.
+    of all values.
 
     Parameters
     ----------
@@ -108,13 +107,14 @@ def clean_matrix(mlobject: mlo.MetalociObject) -> np.ndarray:
     if total_zeroes == len(diagonal):
 
         mlobject.bad_region = "empty"
+        
         return mlobject
 
-    if percentage_zeroes >= 50:
+    if percentage_zeroes >= 20:
 
         mlobject.bad_region = "too many zeros"
 
-    if max_stretch >= 20:
+    if max_stretch >= 10:
 
         mlobject.bad_region = "stretch"
 
@@ -125,14 +125,12 @@ def clean_matrix(mlobject: mlo.MetalociObject) -> np.ndarray:
     if np.nanmin(mlobject.matrix) == 0:
 
         pc = np.nanmin(mlobject.matrix[mlobject.matrix > 0])
-        # print(f"\t\tPseudocounts: {pc}")
         mlobject.matrix = mlobject.matrix + pc
 
     # Scale if all below 1
     if np.nanmax(mlobject.matrix) <= 1 or np.nanmin(mlobject.matrix) <= 1:
 
         sf = 1 / np.nanmin(mlobject.matrix)
-        # print(f"\t\tScaling factor: {sf}")
         mlobject.matrix = mlobject.matrix * sf
 
     if np.nanmin(mlobject.matrix) < 1:

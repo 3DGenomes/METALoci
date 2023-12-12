@@ -165,11 +165,17 @@ def load_signals(df_regions: pd.DataFrame, work_dir: Path):
     )
 
     signal_data = {}
-
+    
     for chrom in chrom_to_do:
-
-        signal_data[chrom] = pd.read_pickle(glob.glob(f"{os.path.join(work_dir, 'signal', chrom)}/*_signal.pkl")[0])
-
+        
+        try:
+            
+            signal_data[chrom] = pd.read_pickle(glob.glob(f"{os.path.join(work_dir, 'signal', chrom)}/*_signal.pkl")[0])
+        
+        except IndexError:
+            
+            return None
+        
     return signal_data
 
 
@@ -207,14 +213,9 @@ def load_region_signals(mlobject: mlo.MetalociObject, signal_data: dict, signal_
 
         signal_types = [signal_file]
 
-    # region_signal = signal_data[mlobject.chrom][
-    #     (signal_data[mlobject.chrom]["start"] >= int(mlobject.start / mlobject.resolution) * mlobject.resolution)
-    #     & (signal_data[mlobject.chrom]["end"] <= int(mlobject.end / mlobject.resolution) * mlobject.resolution)
-    # ]
-
-    region_signal = signal_data[mlobject.chrom][
-        (signal_data[mlobject.chrom]["start"] >= int(np.floor(mlobject.start / mlobject.resolution)) * mlobject.resolution) 
-        & (signal_data[mlobject.chrom]["end"] <= int(np.ceil(mlobject.end / mlobject.resolution)) * mlobject.resolution)
+    region_signal = signal_data[
+        (signal_data["start"] >= int(np.floor(mlobject.start / mlobject.resolution)) * mlobject.resolution) 
+        & (signal_data["end"] <= int(np.ceil(mlobject.end / mlobject.resolution)) * mlobject.resolution)
     ] # jfm: fix
 
     if len(region_signal) != len(mlobject.kk_coords):

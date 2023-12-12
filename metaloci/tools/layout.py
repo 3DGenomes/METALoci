@@ -281,16 +281,16 @@ def get_region_layout(row, opts, progress=None, silent: bool = True):
         mlobject.kk_cutoff["cutoff_type"] = cutoffs["cutoff_type"]
 
         if silent == False:
+            
             print(f"\n------> Working on region: {mlobject.region}\n")
 
         if hic_path.endswith(".cool") or hic_path.endswith(".mcool"):
 
-            mlobject.matrix = cooler.Cooler(hic_path + "::/resolutions/" + str(mlobject.resolution)).matrix(sparse=True).fetch(mlobject.region).toarray()
+            mlobject.matrix = cooler.Cooler(hic_path + "::/resolutions/" + str(mlobject.resolution)).matrix(sparse=True).fetch(mlobject.region).toarray()     
 
         elif hic_path.endswith(".hic"):
 
-            chrm, start, end = re.split(':|-', mlobject.region)
-            mlobject.matrix = hicstraw.HiCFile(hic_path).getMatrixZoomData(chrm, chrm, 'observed', 'VC_SQRT', 'BP', mlobject.resolution).getRecordsAsMatrix(int(start), int(end), int(start), int(end))      
+            mlobject.matrix = hicstraw.HiCFile(hic_path).getMatrixZoomData(mlobject.chrom, mlobject.chrom, 'observed', 'VC_SQRT', 'BP', mlobject.resolution).getRecordsAsMatrix(mlobject.start, mlobject.end, mlobject.start, mlobject.end)
         
         mlobject = misc.clean_matrix(mlobject)
 

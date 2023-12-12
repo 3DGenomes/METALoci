@@ -189,7 +189,31 @@ def get_lmi(region_iter, opts, progress=None, i=None, silent: bool = True):
         return
 
     # Load only signal for this specific region.
-    signal_data = lmi.load_signals(df_regions, work_dir=work_dir)
+    # signal_data = lmi.load_signals(df_regions, work_dir=work_dir)
+    
+    try:
+        
+        signal_data = pd.read_pickle(glob.glob(f"{os.path.join(work_dir, 'signal', mlobject.chrom)}/*_signal.pkl")[0])
+    
+    except IndexError:
+    
+        if silent == False:
+            
+            print("\tNo signal data found for this region.\n\tSkipping to next region...")
+            
+        if progress is not None:
+
+            progress['value'] += 1
+
+            time_spent = time() - progress['timer']
+            time_remaining = int(time_spent / progress['value'] * (len(df_regions) - progress['value']))
+
+            print(f"\033[A{'  '*int(sp.Popen(['tput','cols'], stdout=sp.PIPE).communicate()[0].strip())}\033[A")
+            print(f"\t[{progress['value']}/{len(df_regions)}] | Time spent: {timedelta(seconds=round(time_spent))} | "
+                    f"ETR: {timedelta(seconds=round(time_remaining))}", end='\r')
+                
+        return
+    
     mlobject.signals_dict = lmi.load_region_signals(mlobject, signal_data, signals)
 
     if aggregate is not None:

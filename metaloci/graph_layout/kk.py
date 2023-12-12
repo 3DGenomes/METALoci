@@ -84,7 +84,7 @@ def get_subset_matrix(mlobject: mlo.MetalociObject, silent = False) -> np.ndarra
         
         if not silent:
         
-            print(f"\tCut-off = {sorted(mlobject.flat_matrix, reverse = True)[top]:.4f} | Using top: {mlobject.kk_cutoff['values'] * 100}% highest interactions")
+            print(f"\tCut-off = {sorted(mlobject.flat_matrix, reverse = True)[top]:.4f} | Using top: {round(mlobject.kk_cutoff['values'] * 100, 2)}% highest interactions")
     
     elif mlobject.kk_cutoff["cutoff_type"] == "absolute":
 

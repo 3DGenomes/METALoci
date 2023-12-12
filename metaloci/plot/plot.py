@@ -10,14 +10,19 @@ import seaborn as sns
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.lines import Line2D
 from matplotlib.ticker import FormatStrFormatter, MaxNLocator
+from matplotlib.patches import Circle
 import matplotlib.gridspec as gridspec
 from PIL import Image
 from scipy.ndimage import rotate
 from scipy.stats import linregress, zscore
 from shapely.geometry import Point
+import bioframe
 
 from metaloci import mlo
 from metaloci.misc import misc
+from metaloci.plot import plot
+# print first 500 rows pandas
+pd.set_option('display.max_rows', 500)
 
 
 def get_kk_plot(mlobject: mlo.MetalociObject, restraints: bool = True, neighbourhood: float = None):
@@ -377,99 +382,12 @@ def get_lmi_scatterplot(
     
     return scatter_fig, r_value_scat, p_value_scat
 
-# def signal_bed(
-#     mlobject: mlo.MetalociObject,
-#     lmi_geometry: pd.DataFrame,
-#     neighbourhood: float,
-#     quadrants: list = [1, 3],
-#     signipval: float = 0.05,
-# ):
-#     """
-#     signal_bed _summary_
 
-#     Parameters
-#     ----------
-#     mlobject : mlo.MetalociObject
-#         _description_
-#     lmi_geometry : pd.DataFrame
-#         _description_
-#     neighbourhood : float
-#         _description_
-#     quadrants : list, optional
-#         _description_, by default [1, 3]
-#     signipval : float, optional
-#         _description_, by default 0.05
-
-#     Returns
-#     -------
-#     _type_
-#         _description_
-#     """
-
-#     poi_distance = mlobject.kk_distances[mlobject.poi]
-
-#     # Select the polygons that are in the quadrant of interest and are significative.
-#     ml_indexes = lmi_geometry[
-#         (lmi_geometry.moran_quadrant.isin(quadrants)) & (lmi_geometry.LMI_pvalue <= signipval)
-#     ].bin_index.values.tolist()
-
-#     # Make a big polygon from the small poligons that are significant.
-#     metalocis = lmi_geometry[lmi_geometry.bin_index.isin(ml_indexes)].unary_union
-
-#     if metalocis and metalocis.geom_type == "Polygon":
-
-#         metalocis = MultiPolygon([metalocis])  # Need a multipolygon in order for the code to work.
-
-#     poi_point = Point(
-#         (lmi_geometry[lmi_geometry.moran_index == mlobject.poi].X, lmi_geometry[lmi_geometry.moran_index == mlobject.poi].Y)
-#     )
-
-#     metalocis_bed = []
-
-#     bed_data = defaultdict(list)
-
-#     try:
-
-#         for metaloci in metalocis.geoms:
-
-#             metaloci = gpd.GeoSeries(metaloci)
-
-#             if poi_point.within(metaloci[0]):
-
-#                 for _, row_ml in lmi_geometry.iterrows():
-
-#                     adjacent_point = Point((row_ml.X, row_ml.Y))
-
-#                     if adjacent_point.within(metaloci[0]):
-
-#                         metalocis_bed.append(row_ml.bin_index)
-
-#                 # Add close particles
-#                 metalocis_bed.sort()
-#                 close_bins = [i for i, distance in enumerate(poi_distance) if distance <= neighbourhood / 2]
-#                 metalocis_bed = np.sort(list(set(close_bins + metalocis_bed)))
-
-#                 for point in metalocis_bed:
-
-#                     bed_data["chr"].append(lmi_geometry.bin_chr[point])
-#                     bed_data["start"].append(lmi_geometry.bin_start[point])
-#                     bed_data["end"].append(lmi_geometry.bin_end[point])
-#                     bed_data["bin"].append(point)
-
-#     except:
-
-#         pass
-
-#     bed_data = pd.DataFrame(bed_data)
-
-#     return bed_data, metalocis_bed
-
-
-
-def signal_bed(
+def get_highlight(
     mlobject: mlo.MetalociObject,
     lmi_geometry: pd.DataFrame,
-    neighbourhood: float,
+    influence: float,
+    bfact: float,
     quadrants: list = [1, 3],
     signipval: float = 0.05,
     metaloci_only: bool = False,
@@ -514,6 +432,7 @@ def signal_bed(
 
     """
 
+    neighbourhood = mlobject.kk_distances.diagonal(1).mean() * influence * bfact
     bins_to_highlight = defaultdict(list)
 
     if metaloci_only == False:
@@ -533,7 +452,6 @@ def signal_bed(
             poi_point = Point(
             (lmi_geometry[lmi_geometry.bin_index == mlobject.poi].X, lmi_geometry[lmi_geometry.bin_index == mlobject.poi].Y)
             )
-
             poi_point = Point(lmi_geometry.loc[lmi_geometry["bin_index"] == mlobject.poi, ["X", "Y"]].iloc[0])
 
             for _, row_ml in lmi_geometry.iterrows():
@@ -549,7 +467,58 @@ def signal_bed(
     return bins_to_highlight
 
 
-def signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, neighbourhood: float, quadrants: list = [1, 3], signipval: float = 0.05, metaloci_only: bool = False):
+def get_bed(mlo, lmi_geometry, influence, bfact, signipval = 0.05, quadrants = [1, 3], poi=None, plotit=False):
+    
+    if poi == None:
+        
+        poi = mlo.poi
+    
+    signal = lmi_geometry.ID[0]  # Extract signal name from lmi_geometry
+    data = mlo.lmi_info[signal]
+    
+    # Check tha the point of interest is significant in the given quadrant
+    significants = len(data[(data.bin_index == poi) & (data.moran_quadrant.isin(quadrants)) & (data.LMI_pvalue <= signipval)])
+
+    if significants == 0:
+        
+        print(f"\t\tPoint of interest {poi} is not significant for quadrant(s) {quadrants} (p-value > {signipval})")
+        return None
+           
+    # Get bins within a distance to point and plot them in a gaudi plot          
+    buffer = mlo.kk_distances.diagonal(1).mean() * influence
+    bbfact = buffer * bfact
+    indices = np.nonzero(mlo.kk_distances[mlo.poi] < bbfact)[0]
+    
+    if plotit:
+        
+        print(f"\tGetting data for point of interest: {poi}...")    
+
+        g = plot.get_gaudi_type_plot(mlo,lmi_geometry)
+        x = lmi_geometry.X[lmi_geometry.bin_index==poi]
+        y = lmi_geometry.Y[lmi_geometry.bin_index==poi]
+        
+        sns.scatterplot(x=lmi_geometry.X, y=lmi_geometry.Y, color='lime', s=10)
+        sns.scatterplot(x=x, y=y, color='yellow', s=100)
+        circle = Circle((x, y), bbfact, color='yellow', fill=False)
+        
+        plt.gcf().gca().add_artist(circle)
+        
+        xs = lmi_geometry.X.iloc[indices]
+        ys = lmi_geometry.Y.iloc[indices]
+        
+        sns.scatterplot(x=xs, y=ys, color='yellow')
+        
+        plt.show()
+    
+    neighbouring_bins = lmi_geometry.iloc[indices]
+    neighbouring_bins = neighbouring_bins[['bin_chr','bin_start','bin_end']]
+    neighbouring_bins.columns = 'chrom start end'.split()
+    bed = pd.DataFrame(bioframe.merge(neighbouring_bins, min_dist=2))  # Merge overlapping intervals and create a continuous BED file
+
+    return bed
+
+
+def signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, influence: float, bfact : float, quadrants: list = [1, 3], signipval: float = 0.05, metaloci_only: bool = False):
 
     """
     Generate a signal plot to visualize the signal intensity and the positions of significant bins.
@@ -589,16 +558,7 @@ def signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, neighb
     Returns matplotlib.axes._subplots.AxesSubplot as it is used to create the composite plot.
     """
     bins, coords_b = get_bins_coords(mlobject)    
-
-    metalocis = signal_bed(
-                mlobject,
-                lmi_geometry,
-                neighbourhood,
-                quadrants,
-                signipval,
-                metaloci_only
-            )
-    
+    metalocis = get_highlight(mlobject, lmi_geometry, influence, bfact, quadrants, signipval, metaloci_only)
     sig_plt = plt.figure(figsize=(10, 1.5))
 
     for q, m in metalocis.items():
@@ -607,7 +567,7 @@ def signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, neighb
 
             if metaloci_only:
 
-                plt.axvline(x=p, color="red", linestyle=":", lw=1, zorder=0, alpha=0.5)
+                plt.axvline(x=p, color="green", linestyle=":", lw=1, zorder=0, alpha=0.5)
 
             else:
 
@@ -628,7 +588,7 @@ def signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, neighb
 
     sns.despine(top=True, right=True, left=False, bottom=True, offset=None, trim=False)
 
-    return sig_plt, ax, metalocis
+    return sig_plt, ax
 
 
 def place_composite(new_PI, ifile, ifactor, ixloc, iyloc):

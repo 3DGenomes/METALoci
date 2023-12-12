@@ -65,7 +65,7 @@ def populate_args(parser):
         action="extend",
         help="Path to file to process. The file must contain titles for the columns,"
         " being the first 3 columns coded as chrom, start, end. The following "
-        "columns should contain the name of the signal coded as: id1_id2.\n"
+        "columns should contain the name of the signal. "
         "Names of the chromosomes must be the same as the coords_file "
         "described below. ",
     )
@@ -77,7 +77,7 @@ def populate_args(parser):
         required=True,
         metavar="INT",
         type=int,
-        help="Resolution of the bins, to calculate the signal (in bp).",
+        help="Resolution of the bins, to binnarize the signal (in bp).",
     )
 
     input_arg.add_argument(
@@ -91,6 +91,15 @@ def populate_args(parser):
         "first column and the ending coordinate of the chromosome in the "
         "second column. This can be found in UCSC for your species of interest.",
     )
+    
+    optional_arg.add_argument("-t",
+        "--summarize_type",
+        dest="sum_type",
+        metavar="STR",
+        type=str,
+        default="median",
+        choices = ["median", "mean", "min", "max", "count"],
+        help="Type of summarization to use. Choose between 'median', 'mean', 'min', 'max' and 'count'. Default: %(default)s.")
 
     optional_arg.add_argument("-h", "--help", action="help", help="Show this help message and exit.")
 
@@ -105,6 +114,7 @@ def run(opts):
     hic_path = opts.hic_file
     coords = opts.coords
     resolution = opts.reso
+    sum_type = opts.sum_type
 
     tmp_dir = f"{work_dir}tmp"
     pathlib.Path(tmp_dir).mkdir(parents=True, exist_ok=True)
@@ -132,7 +142,7 @@ def run(opts):
 
         hic_chroms = misc.check_hic_names(hic_path, data, coords)
 
-    print("Checking input files compatibility... done.")
+    print("Checking input files compatibility... OK.")
 
     column_dict = {}
 
@@ -257,12 +267,27 @@ def run(opts):
             f"{os.path.basename(intersected_files_paths[0].rsplit('.', 1)[0]).split('intersected_ok_', 1)[1]}", 
         ]
 
-    final_intersect = (  # Calculate the median of all signals of the same bin.
-        final_intersect.groupby(["chrom", "start", "end"])[final_intersect.columns[3 : len(final_intersect.columns)]]
-        .median()
-        .reset_index()
-    )
-
+    # Calculate the summary of all signals of the same bin.
+    if sum_type == "median":
+        
+        final_intersect = final_intersect.groupby(["chrom", "start", "end"])[final_intersect.columns[3 : len(final_intersect.columns)]].median().reset_index()
+    
+    elif sum_type == "mean":
+            
+        final_intersect = final_intersect.groupby(["chrom", "start", "end"])[final_intersect.columns[3 : len(final_intersect.columns)]].mean().reset_index()
+    
+    elif sum_type == "min":
+                
+        final_intersect = final_intersect.groupby(["chrom", "start", "end"])[final_intersect.columns[3 : len(final_intersect.columns)]].min().reset_index()
+    
+    elif sum_type == "max":
+                        
+        final_intersect = final_intersect.groupby(["chrom", "start", "end"])[final_intersect.columns[3 : len(final_intersect.columns)]].max().reset_index() 
+        
+    elif sum_type == "count":
+                                    
+        final_intersect = final_intersect.groupby(["chrom", "start", "end"])[final_intersect.columns[3 : len(final_intersect.columns)]].count().reset_index()  
+    
     # Process the rest of the files the same way and merge with next one, until all files are merged.
     if len(intersected_files_paths) > 1:
 
@@ -286,12 +311,26 @@ def run(opts):
                     f"{os.path.basename(intersected_files_paths[i].rsplit('.', 1)[0]).split('intersected_ok_', 1)[1]}", 
                 ]
 
-            tmp_intersect = (
-                tmp_intersect.groupby(["chrom", "start", "end"])[tmp_intersect.columns[3 : len(tmp_intersect.columns)]]
-                .median()
-                .reset_index()
-            )
-
+            if sum_type == "median":
+                
+                tmp_intersect = tmp_intersect.groupby(["chrom", "start", "end"])[tmp_intersect.columns[3 : len(tmp_intersect.columns)]].median().reset_index()
+            
+            elif sum_type == "mean":
+                
+                tmp_intersect = tmp_intersect.groupby(["chrom", "start", "end"])[tmp_intersect.columns[3 : len(tmp_intersect.columns)]].mean().reset_index()
+                
+            elif sum_type == "min":
+                
+                tmp_intersect = tmp_intersect.groupby(["chrom", "start", "end"])[tmp_intersect.columns[3 : len(tmp_intersect.columns)]].min().reset_index()
+            
+            elif sum_type == "max":
+                
+                tmp_intersect = tmp_intersect.groupby(["chrom", "start", "end"])[tmp_intersect.columns[3 : len(tmp_intersect.columns)]].max().reset_index()
+            
+            elif sum_type == "count":
+                
+                tmp_intersect = tmp_intersect.groupby(["chrom", "start", "end"])[tmp_intersect.columns[3 : len(tmp_intersect.columns)]].count().reset_index()
+            
             final_intersect = pd.merge(final_intersect, tmp_intersect, on=["chrom", "start", "end"], how="outer").fillna(0)
 
     # For each chromosome, create a directory and save the information for that chromosome in .csv and .pkl.

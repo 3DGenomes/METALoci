@@ -221,12 +221,12 @@ def run(opts):
 
             # TODO The creation of the merged dataframe should be a function in misc. Put there the coditions of aggregation.
 
-            print("\t\tHiC plot", end="\r")
+            print("\t\tHi-C plot", end="\r")
             hic_plt = plot.get_hic_plot(mlobject)
             hic_plt.savefig(f"{plot_filename}_hic.pdf", **plot_opt)
             hic_plt.savefig(f"{plot_filename}_hic.png", **plot_opt)
             plt.close()
-            print("\t\tHiC plot -> done.")
+            print("\t\tHi-C plot -> done.")
 
             print("\t\tKamada-Kawai plot", end="\r")
             
@@ -259,7 +259,7 @@ def run(opts):
             print("\t\tGaudi Type plot -> done.")
 
             print("\t\tSignal plot", end="\r")
-            sig_plt, ax, metalocis = plot.signal_plot(mlobject, merged_lmi_geometry, buffer * BFACT, quadrants, signipval, metaloci_only)
+            sig_plt, ax = plot.signal_plot(mlobject, merged_lmi_geometry, INFLUENCE, BFACT, quadrants, signipval, metaloci_only)
             sig_plt.savefig(f"{plot_filename}_signal.pdf", **plot_opt)
             sig_plt.savefig(f"{plot_filename}_signal.png", **plot_opt)
             plt.close()
@@ -275,7 +275,6 @@ def run(opts):
                 lmi_plt.savefig(f"{plot_filename}_lmi.pdf", **plot_opt)
                 lmi_plt.savefig(f"{plot_filename}_lmi.png", **plot_opt)
                 plt.close()
-                
                 print("\t\tLMI Scatter plot -> done.")
 
             else: 
@@ -291,12 +290,12 @@ def run(opts):
                     continue
 
             print(f"\t\tFinal composite figure for region '{region}' and signal '{signal}'", end="\r")
+            
             img1 = Image.open(f"{plot_filename}_lmi.png")
             img2 = Image.open(f"{plot_filename}_gsp.png")
             img3 = Image.open(f"{plot_filename}_gtp.png")
 
             maxx = int((img1.size[1] * 0.4 + img2.size[1] * 0.25 + img3.size[1] * 0.25) * 1.3)
-
             yticks_signal = [f"{round(i, 3):.2f}" for i in ax.get_yticks()[1:-1]]
             signal_left = {3 : 39, 4 : 29, 5 : 19, 6 : 7, 7: -3, 8: -14}
             max_chr_yax = max(len(str(i)) for i in yticks_signal)
@@ -306,7 +305,6 @@ def run(opts):
                 signal_left[max_chr_yax] = 0
 
             composite_image = Image.new(mode="RGBA", size=(maxx, 1550))
-            
             composite_image = plot.place_composite(composite_image, f"{plot_filename}_hic.png", 0.5, 100, 50)  # HiC image            
             composite_image = plot.place_composite(composite_image, f"{plot_filename}_signal.png", 0.4, signal_left[max_chr_yax], 640)  # Signal image
             composite_image = plot.place_composite(composite_image, f"{plot_filename}_kk.png", 0.3, 1300, 50)  # KK image
@@ -322,28 +320,18 @@ def run(opts):
             plt.savefig(f"{plot_filename}.pdf", **plot_opt)
             plt.close()
             print(f"\t\tFinal composite figure for region '{region}' and signal '{signal}' -> done.")
+            
+            bed = plot.get_bed(mlobject, merged_lmi_geometry, INFLUENCE, BFACT, signipval, quadrants)
 
-            bed_data = defaultdict(list)
-
-            for point in metalocis:
-
-                bed_data["chr"].append(merged_lmi_geometry.bin_chr[point])
-                bed_data["start"].append(merged_lmi_geometry.bin_start[point])
-                bed_data["end"].append(merged_lmi_geometry.bin_end[point])
-                bed_data["bin"].append(point)
-                bed_data["quadrant"].append(merged_lmi_geometry.moran_quadrant[point])
-
-            bed_data = pd.DataFrame(bed_data)
-
-            if len(bed_data) > 0:
+            if bed is not None and len(bed) > 0:
 
                 metaloci_bed_path = f"{work_dir}{mlobject.chrom}/metalocis_log/{signal}"
                 
                 pathlib.Path(metaloci_bed_path).mkdir(parents=True, exist_ok=True) 
-                bed_data.to_csv(f"{metaloci_bed_path}/{mlobject.chrom}_{mlobject.start}_{mlobject.end}_{mlobject.poi}_{signal}_metalocis.bed", sep="\t", index=False)
+                bed.to_csv(f"{metaloci_bed_path}/{mlobject.chrom}_{mlobject.start}_{mlobject.end}_{mlobject.poi}_{signal}_q-{'_'.join([str(q) for q in quadrants])}_metalocis.bed", sep="\t", index=False)
                 
                 print(f"\t\tBed file with metalocis location saved to: "
-                      f"{metaloci_bed_path}/{mlobject.chrom}_{mlobject.start}_{mlobject.end}_{mlobject.poi}_{signal}.bed")
+                      f"{metaloci_bed_path}/{mlobject.chrom}_{mlobject.start}_{mlobject.end}_{mlobject.poi}_{signal}_q-{'_'.join([str(q) for q in quadrants])}_metalocis.bed")
                 
             for signal_key, df in mlobject.lmi_info.items():
                                 

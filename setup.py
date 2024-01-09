@@ -41,6 +41,7 @@ setup(
                  "Topic :: Scientific/Engineering :: Bio-Informatics",
                  "Operating System :: POSIX :: Linux",],
     packages=find_packages(exclude=["tests", ".github"]),
+    package_data={"metaloci": ["tests/data/*", "tests/data/hic/*.mcool", "tests/data/signal/*.bed"]},
     install_requires=read_requirements("requirements.txt"),
     entry_points={
         "console_scripts": ["metaloci = metaloci.__main__:main"]

@@ -20,7 +20,6 @@ import bioframe
 
 from metaloci import mlo
 from metaloci.misc import misc
-from metaloci.plot import plot
 # print first 500 rows pandas
 pd.set_option('display.max_rows', 500)
 

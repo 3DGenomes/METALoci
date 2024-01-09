@@ -310,6 +310,33 @@ def get_region_layout(row, opts, progress=None, silent: bool = True):
             mlobject = kk.get_restraints_matrix(mlobject, silent)
 
             if mlobject.kk_restraints_matrix is None:
+                
+                # Write to file a list of bad regions, according to the filters defined in clean_matrix().
+                with open(f"{work_dir}bad_regions.txt", "a+") as handler:
+
+                    log = f"{mlobject.region}\t{mlobject.bad_region}\n"
+
+                    handler.seek(0)
+
+                    if not any(log in line for line in handler) and mlobject.bad_region != None:
+
+                        handler.write(log)
+
+                # Save mlobject.
+                with open(mlobject.save_path, "wb") as hamlo_namendle:
+
+                    mlobject.save(hamlo_namendle)
+
+                if progress is not None:
+
+                    progress['value'] += 1
+
+                    time_spent = time() - progress['timer']
+                    time_remaining = int(time_spent / progress['value'] * (len(df_regions) - progress['value']))
+
+                    print(f"\033[A{'  '*int(sp.Popen(['tput','cols'], stdout=sp.PIPE).communicate()[0].strip())}\033[A")
+                    print(f"\t[{progress['value']}/{len(df_regions)}] | Time spent: {timedelta(seconds=round(time_spent))} | "
+                            f"ETR: {timedelta(seconds=round(time_remaining))}", end='\r')
 
                 return
 
@@ -322,7 +349,7 @@ def get_region_layout(row, opts, progress=None, silent: bool = True):
             mlobject.kk_coords = list(mlobject.kk_nodes.values())
             mlobject.kk_distances = distance.cdist(mlobject.kk_coords, mlobject.kk_coords, "euclidean")
 
-            if len(cutoffs) > 1 or save_plots:
+            if len(cutoffs["values"]) > 1 or save_plots:
 
                 if silent == False: print(f"\tPlotting Kamada-Kawai...")
 

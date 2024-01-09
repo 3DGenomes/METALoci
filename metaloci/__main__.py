@@ -2,6 +2,8 @@ import sys
 from argparse import ArgumentParser, HelpFormatter, RawDescriptionHelpFormatter
 from importlib.metadata import version
 
+import metaloci
+from metaloci.tests import test_tools
 from metaloci.tools import figure, layout, ml, prep
 from metaloci.utility_scripts import sniffer
 
@@ -73,13 +75,19 @@ def main(arguments) -> None:
     args_pp["sniffer"].set_defaults(func=sniffer.run)
     sniffer.populate_args(args_pp["sniffer"])
 
+    # test
+    args_pp["test"] = subparser.add_parser("test",
+                                          add_help=False,
+                                          formatter_class=RawDescriptionHelpFormatter)
+    args_pp["test"].set_defaults(func=test_tools.run)
+
     if len(arguments) == 1:
 
         print(DESCRIPTION)
         parser.print_help()
         return
 
-    if len(arguments) == 2:
+    if len(arguments) == 2 and arguments[1] != "test":
 
         try:
 

@@ -296,17 +296,25 @@ def run(opts):
             img3 = Image.open(f"{plot_filename}_gtp.png")
 
             maxx = int((img1.size[1] * 0.4 + img2.size[1] * 0.25 + img3.size[1] * 0.25) * 1.3)
-            yticks_signal = [f"{round(i, 3):.2f}" for i in ax.get_yticks()[1:-1]]
-            signal_left = {3 : 39, 4 : 29, 5 : 19, 6 : 7, 7: -3, 8: -14}
+            yticks_signal = [f"{round(i, 3):.2f}" for i in ax.get_yticks()[1:-1]]                
+            signal_left = {3 : 39, 4 : 32, 5 : 21, 6 : 10, 7: -1, 8: -11}
             max_chr_yax = max(len(str(i)) for i in yticks_signal)
+            
+            if float(min(yticks_signal)) < 0:
+                
+                negative_axis_correction = 5
+            
+            else:
+                
+                negative_axis_correction = 0
             
             if max_chr_yax not in signal_left.keys():
 
-                signal_left[max_chr_yax] = 0
+                signal_left[max_chr_yax] = -21
 
             composite_image = Image.new(mode="RGBA", size=(maxx, 1550))
             composite_image = plot.place_composite(composite_image, f"{plot_filename}_hic.png", 0.5, 100, 50)  # HiC image            
-            composite_image = plot.place_composite(composite_image, f"{plot_filename}_signal.png", 0.4, signal_left[max_chr_yax], 640)  # Signal image
+            composite_image = plot.place_composite(composite_image, f"{plot_filename}_signal.png", 0.4, signal_left[max_chr_yax] + negative_axis_correction, 640)  # Signal image
             composite_image = plot.place_composite(composite_image, f"{plot_filename}_kk.png", 0.3, 1300, 50)  # KK image
             composite_image = plot.place_composite(composite_image, f"{plot_filename}_lmi.png", 0.4, 75, 900)  # LMI scatter image
             composite_image = plot.place_composite(composite_image, f"{plot_filename}_gsp.png", 0.25, 900, 900)  # Gaudi signal image

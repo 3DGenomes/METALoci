@@ -1,0 +1,2 @@
+activator   DM_Arid1a-sub17717303_15052021.IgScaled
+activator   DM_27me3-merged-sub137930236.IgScaled

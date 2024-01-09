@@ -1,6 +1,10 @@
+"""
+Script that contains the functions needed to run the Local Moran's I
+"""
 import glob
 import os
 import warnings
+from itertools import product
 from collections import defaultdict
 from pathlib import Path
 
@@ -21,22 +25,21 @@ from metaloci.misc import misc
 warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
 
 
-def construct_voronoi(mlobject: mlo.MetalociObject, buffer: float):
+def construct_voronoi(mlobject: mlo.MetalociObject, buffer: float) -> pd.DataFrame:
     """
     Takes a Kamada-Kawai layout in a METALoci object and calculates the geometry of each voronoi
     around each point of the Kamada-Kawai, in order the make a gaudi plot.
+
     Parameters
     ----------
     mlobject : mlo.MetalociObject
         METALoci object with Kamada-Kawai layout coordinates in it (MetalociObject.kk_coords).
     buffer : float
         Distance to buffer around the point to be painted in the gaudi plot.
-    LIMITS : int, optional
-        Integer that defines a box around each point of the Kamada-Kawai layout, by default 2.
 
     Returns
     -------
-    df_geometry : DataFrame
+    df_geometry : pd.DataFrame
         Dataframe containing the information about the geometry of each point of the gaudi plot,
         for each bin. Needed for plotting the gaudi plot.
     """
@@ -45,14 +48,7 @@ def construct_voronoi(mlobject: mlo.MetalociObject, buffer: float):
     # the voronoi could extend to infinity in the areas than do not adjoin with another point of the KK layout
     # (and we do not want that for our gaudi plot).
     points = mlobject.kk_coords.copy()
-    points.append(np.array([-2, 2]))
-    points.append(np.array([2, 2]))
-    points.append(np.array([2, -2]))
-    points.append(np.array([-2, -2]))
-    points.append(np.array([0, -2]))
-    points.append(np.array([2, 0]))
-    points.append(np.array([0, 2]))
-    points.append(np.array([-2, 0]))
+    points.extend(list(product([0, 2, -2], repeat=2))[1:]) # Same as all the appends, but more elegant
 
     # Construct the voronoi polygon around the Kamada-Kawai points.
     vor = Voronoi(points)
@@ -93,7 +89,7 @@ def construct_voronoi(mlobject: mlo.MetalociObject, buffer: float):
     return df_geometry
 
 
-def coord_to_id(mlobject: mlo.MetalociObject, poly_from_lines: list):
+def coord_to_id(mlobject: mlo.MetalociObject, poly_from_lines: list) -> dict:
     """
     Correlates the bin index, determined by genomic positions, and the LMI index, which is
     determined by the LMI function. This is called in::
@@ -113,11 +109,11 @@ def coord_to_id(mlobject: mlo.MetalociObject, poly_from_lines: list):
 
     Returns
     -------
-    coord_to_id : dict
+    coord_id_dict : dict
         Dictionary containing the correspondance between bin index and moran index, as they tend to be different.
     """
 
-    coord_to_id = {}
+    coord_id_dict = {}
 
     for i, poly in enumerate(poly_from_lines):
 
@@ -125,14 +121,16 @@ def coord_to_id(mlobject: mlo.MetalociObject, poly_from_lines: list):
 
             if poly.contains(Point(coords)):
 
-                coord_to_id[i] = j
+                coord_id_dict[i] = j
 
                 break
 
-    return coord_to_id
+    return coord_id_dict
 
 
-def load_signals(df_regions: pd.DataFrame, work_dir: Path):
+## TODO This function is not used in ml.py, should we take it out? We changed it so we only load
+## the proper chromosome IIRC
+def load_signals(df_regions: pd.DataFrame, work_dir: Path) -> dict:
     """
     Loads signal data for each chromosome that contains a region to be processed. This is done
     in order not to load useless data.
@@ -157,7 +155,7 @@ def load_signals(df_regions: pd.DataFrame, work_dir: Path):
 
     chrom_to_do = list(
         dict.fromkeys(
-            #            re.compile("chr[0-9]*[A-Z]*").findall("\n".join([x for y in df_regions["coords"] for x in y.split(":")]))
+            # re.compile("chr[0-9]*[A-Z]*").findall("\n".join([x for y in df_regions["coords"] for x in y.split(":")]))
             [
                 chrom for coord in df_regions["coords"] for chrom in coord.split(":")[0:1]
             ]  # for cases where chr is not in the chromosome name
@@ -165,17 +163,17 @@ def load_signals(df_regions: pd.DataFrame, work_dir: Path):
     )
 
     signal_data = {}
-    
+
     for chrom in chrom_to_do:
-        
+
         try:
-            
+
             signal_data[chrom] = pd.read_pickle(glob.glob(f"{os.path.join(work_dir, 'signal', chrom)}/*_signal.pkl")[0])
-        
+
         except IndexError:
-            
+
             return None
-        
+
     return signal_data
 
 
@@ -202,10 +200,9 @@ def load_region_signals(mlobject: mlo.MetalociObject, signal_data: dict, signal_
     """
 
     # Read signal file. Will only process the signals present in this list.
-
     if os.path.isfile(signal_file):
 
-        with open(signal_file) as signals_handler:
+        with open(signal_file, "r", encoding="utf-8") as signals_handler:
 
             signal_types = [line.rstrip() for line in signals_handler]
 
@@ -214,8 +211,8 @@ def load_region_signals(mlobject: mlo.MetalociObject, signal_data: dict, signal_
         signal_types = [signal_file]
 
     region_signal = signal_data[
-        (signal_data["start"] >= int(np.floor(mlobject.start / mlobject.resolution)) * mlobject.resolution) 
-        & (signal_data["end"] <= int(np.ceil(mlobject.end / mlobject.resolution)) * mlobject.resolution)
+        (signal_data["start"] >= int(np.floor(mlobject.start / mlobject.resolution)) * mlobject.resolution) &
+        (signal_data["end"] <= int(np.ceil(mlobject.end / mlobject.resolution)) * mlobject.resolution)
     ] # jfm: fix
 
     if len(region_signal) != len(mlobject.kk_coords):
@@ -223,7 +220,7 @@ def load_region_signals(mlobject: mlo.MetalociObject, signal_data: dict, signal_
         tmp = len(mlobject.kk_coords) - len(region_signal)
         tmp = np.empty((tmp, len(region_signal.columns)))
         # tmp[:] = 0
-        tmp[:] = np.nan # jfm: leave NAs in for now. (in misc.signal_normalization() those NaNS will be substituted for 
+        tmp[:] = np.nan # jfm: leave NAs in for now. (in misc.signal_normalization() those NaNS will be substituted for
         # the median of the signal of the region)
 
         region_signal = pd.concat([region_signal, pd.DataFrame(tmp, columns=list(region_signal))], ignore_index=True)
@@ -237,20 +234,14 @@ def load_region_signals(mlobject: mlo.MetalociObject, signal_data: dict, signal_
             signals_dict[signal_type] = misc.signal_normalization(region_signal[signal_type])
 
         except KeyError:
-            
-            return None    
+
+            return None
 
     return signals_dict
 
 
-def compute_lmi(
-    mlobject: mlo.MetalociObject,
-    signal_type: str,
-    neighbourhood: float,
-    n_permutations=9999,
-    signipval=0.05,
-    silent=False,
-) -> pd.DataFrame:
+def compute_lmi(mlobject: mlo.MetalociObject, signal_type: str, neighbourhood: float,
+                n_permutations: int=9999, signipval: float=0.05, silent: bool=False) -> pd.DataFrame:
     """
     Computes Local Moran's Index for a signal type and outputs information of the LMI value and its p-value
     for each bin for a given signal, as well as some other information.
@@ -259,18 +250,20 @@ def compute_lmi(
     ----------
     mlobject : mlo.MetalociObject
         METALoci with signals for that region (MetalociObject.signals_dict) and MetalociObject.lmi_geometry
-        calculated with::
+        calculated with:
 
         lmi.construct_voronoi()
 
     signal_type : str
         Name of the type of the signal to use for the computation.
     neighbourhood : float
-        buffer * BFACT, to determine the neighbourhood.
+        Radius of the circle that determines the neighbourhood of each of the points in the Kamada-Kawai layout.
     n_permutations : int, optional
         Number of permutations to do in the randomization, by default 9999.
     signipval : float, optional
         Significancy threshold for p-value, by default 0.05.
+    silent : bool, optional
+        Controls the verbosity of the function (useful for multiprocessing), by default False
 
     Returns
     -------
@@ -308,7 +301,7 @@ def compute_lmi(
     )  # geoda_quadsbool (default=False) If False use PySAL Scheme: HH=1, LH=2, LL=3, HL=4
     lags = lag_spatial(moran_local_object.w, moran_local_object.z)
 
-    if silent == False:
+    if not silent:
 
         print(
             f"\tThere is a total of {len(moran_local_object.p_sim[(moran_local_object.p_sim < signipval)])} "
@@ -335,7 +328,7 @@ def compute_lmi(
         df_lmi["moran_quadrant"].append(moran_local_object.q[row.moran_index])
         df_lmi["LMI_score"].append(round(moran_local_object.Is[row.moran_index], 9))
         df_lmi["LMI_pvalue"].append(round(moran_local_object.p_sim[row.moran_index], 9))
-        df_lmi["ZSig"].append(y[row.moran_index]) 
+        df_lmi["ZSig"].append(y[row.moran_index])
         df_lmi["ZLag"].append(lags[row.moran_index])
 
     df_lmi = pd.DataFrame(df_lmi)
@@ -348,7 +341,7 @@ def compute_lmi(
     df_lmi["bin_start"] = df_lmi["bin_start"].astype(np.uintc)
     df_lmi["bin_end"] = df_lmi["bin_end"].astype(np.uintc)
 
-    df_lmi["signal"] = df_lmi["signal"].astype(np.single) 
+    df_lmi["signal"] = df_lmi["signal"].astype(np.single)
 
     df_lmi["moran_index"] = df_lmi["moran_index"].astype(np.ushort)
     df_lmi["moran_quadrant"] = df_lmi["moran_quadrant"].astype(np.ubyte)
@@ -361,16 +354,21 @@ def compute_lmi(
 
 
 def aggregate_signals(mlobject: mlo.MetalociObject):
+    """
+    Function to calculate the aggregated signal.
+
+    Parameters
+    ----------
+    mlobject : mlo.MetalociObject
+        METALoci object that contains the needed information
+    """
 
     for condition, signal_type in mlobject.agg.items():
 
         if not isinstance(signal_type, list):
-                
-                signal_type = [signal_type]
+
+            signal_type = [signal_type]
 
         mlobject.signals_dict[condition] = np.nanmedian(
             np.array([mlobject.signals_dict[signal] for signal in signal_type]), axis=0
         )
- 
-
-

@@ -1,3 +1,7 @@
+"""
+METALoci: spatially auto-correlated signals in 3D genomes.
+"""
+
 import sys
 from argparse import ArgumentParser, HelpFormatter, RawDescriptionHelpFormatter
 from importlib.metadata import version
@@ -6,7 +10,15 @@ from metaloci.tools import figure, layout, ml, prep
 from metaloci.utility_scripts import sniffer
 
 
-def main(arguments) -> None: 
+def main(arguments : list) -> None:
+    """
+    Function to create METALoci tools and populate and pass the arguments to the subprograms.
+
+    Parameters
+    ----------
+    arguments : list
+        List of arguments to run METALoci
+    """
 
     DESCRIPTION = "METALoci: spatially auto-correlated signals in 3D genomes.\n"
 
@@ -14,16 +26,16 @@ def main(arguments) -> None:
 
         subcommand = arguments[1]
 
-        if subcommand == "version" or subcommand == "--version":
+        if subcommand in ["version", "--version"]:
 
             print("METALoci v" + version("metaloci"))
             return
-        
-    parser = ArgumentParser()
+
+    parser = ArgumentParser(prog = "metaloci")
 
     parser.formatter_class=lambda prog: HelpFormatter(prog, width=120,
                                                       max_help_position=60)
-    
+
     subparser = parser.add_subparsers(title="Available programs")
 
     args_pp = {}
@@ -85,7 +97,7 @@ def main(arguments) -> None:
 
             args_pp[arguments[1]].print_help()
             return
-        
+
         except KeyError:
 
             pass

@@ -2,21 +2,20 @@
 Adds signal data to a Kamada-Kawai layout and calculates Local Moran's I for every bin in the layout.
 """
 
-import sys
+import glob
+import multiprocessing as mp
 import os
 import pathlib
 import pickle
 import re
 import subprocess as sp
-import multiprocessing as mp
+import sys
+from argparse import SUPPRESS, HelpFormatter
 from collections import defaultdict
-from argparse import HelpFormatter, SUPPRESS
 from datetime import timedelta
 from time import time
 
-import glob
 import pandas as pd
-
 from metaloci.spatial_stats import lmi
 
 DESCRIPTION = """
@@ -34,9 +33,8 @@ def populate_args(parser):
         ArgumentParser to populate the arguments through the normal METALoci caller
     """
 
-    ## TODO We do not have the silent argument in this parser, don't know if we have to add it...
-    parser.formatter_class=lambda prog: HelpFormatter(prog, width=120,
-                                                      max_help_position=60)
+    # TODO We do not have the silent argument in this parser, don't know if we have to add it...
+    parser.formatter_class = lambda prog: HelpFormatter(prog, width=120, max_help_position=60)
 
     input_arg = parser.add_argument_group(title="Input arguments")
 
@@ -84,8 +82,7 @@ def populate_args(parser):
         default=9999,
         metavar="INT",
         type=int,
-        help="Number of permutations to calculate the Local Moran's I p-value "
-        "(default: %(default)d)."
+        help="Number of permutations to calculate the Local Moran's I p-value (default: %(default)d)."
     )
 
     optional_arg.add_argument(
@@ -105,8 +102,8 @@ def populate_args(parser):
         metavar="PATH",
         type=str,
         required=False,
-        help="Use the file with aggregated signals. This file has 2 columns: first column the name of the original"
-        "signal, second column the new name of the aggregate, separated by tabs. "
+        help="Use the file with aggregated signals. This file has 2 columns: first column the name of the original \
+        signal, second column the new name of the aggregate, separated by tabs. "
     )
 
     optional_arg.add_argument(
@@ -152,8 +149,8 @@ def populate_args(parser):
         help=SUPPRESS)
 
 
-def get_lmi(row : pd.Series, args_2_use : pd.Series,
-            progress = None, counter : int = None, silent: bool = True):
+def get_lmi(row: pd.Series, args_2_use: pd.Series,
+            progress=None, counter: int = None, silent: bool = True):
     """
     This function get the Local Moran's I given the arguments.
 
@@ -192,21 +189,23 @@ def get_lmi(row : pd.Series, args_2_use : pd.Series,
     region_timer = time()
 
     if not silent:
+
         print(f"\n------> Working on region {row.coords} [{counter+1}/{total_num}]\n")
 
     save_path = f"{work_dir}{row.coords.split(':', 1)[0]}/{re.sub(':|-', '_', row.coords)}.mlo"
 
     try:
 
-        with open(save_path,"rb",) as mlobject_handler:
+        with open(save_path, "rb",) as mlobject_handler:
 
             mlobject = pickle.load(mlobject_handler)
-            ## Save path seems to be the same as the one defined in the layout
+            # Save path seems to be the same as the one defined in the layout
             mlobject.save_path = f"{work_dir}{row.coords.split(':', 1)[0]}/{re.sub(':|-', '_', row.coords)}.mlo"
 
     except FileNotFoundError:
 
         if not silent:
+
             print("\t.mlo file not found for this region.\n\tSkipping to next region...")
 
         return
@@ -214,13 +213,10 @@ def get_lmi(row : pd.Series, args_2_use : pd.Series,
     if mlobject.kk_nodes is None:
 
         if not silent:
-            print("\tKamada-Kawai layout has not been calculated for this region. "
-                  "\n\tSkipping to next region...")
+
+            print("\tKamada-Kawai layout has not been calculated for this region. \n\tSkipping to next region...")
 
         return
-
-    # Load only signal for this specific region.
-    # signal_data = lmi.load_signals(df_regions, work_dir=work_dir)
 
     try:
 
@@ -235,13 +231,12 @@ def get_lmi(row : pd.Series, args_2_use : pd.Series,
         if progress is not None:
 
             progress['value'] += 1
-
             time_spent = time() - progress['timer']
             time_remaining = int(time_spent / progress['value'] * (total_num - progress['value']))
 
             print(f"\033[A{'  '*int(sp.Popen(['tput','cols'], stdout=sp.PIPE).communicate()[0].strip())}\033[A")
             print(f"\t[{progress['value']}/{total_num}] | Time spent: {timedelta(seconds=round(time_spent))} | "
-                    f"ETR: {timedelta(seconds=round(time_remaining))}", end='\r')
+                  f"ETR: {timedelta(seconds=round(time_remaining))}", end='\r')
 
         return
 
@@ -259,6 +254,7 @@ def get_lmi(row : pd.Series, args_2_use : pd.Series,
     if mlobject.signals_dict is None and progress is not None:
 
         progress["missing_signal"] = list(mlobject.signals_dict.keys())
+
         raise Exception()
 
     # This checks if every signal you want to process is already computed. If the user works with a
@@ -267,10 +263,11 @@ def get_lmi(row : pd.Series, args_2_use : pd.Series,
     # computed, does nothing.
     if mlobject.lmi_info is not None and force is False:
 
-        ## Better version of the code, I think
+        # Better version of the code, I think
         if [signal for signal in mlobject.lmi_info.keys()] == list(mlobject.signals_dict.keys()):
 
             if progress is not None:
+
                 progress["done"] = True
 
             if moran_info:
@@ -280,47 +277,49 @@ def get_lmi(row : pd.Series, args_2_use : pd.Series,
                     moran_data_path = os.path.join(work_dir, mlobject.chrom, "moran_data", signal)
 
                     pathlib.Path(moran_data_path).mkdir(parents=True, exist_ok=True)
-
-                    df.to_csv(os.path.join(moran_data_path,
-                                           f"{re.sub(':|-', '_', mlobject.region)}_{mlobject.poi}_{signal}.tsv"),
-                              sep="\t", index=False, float_format="%.12f")
+                    df.to_csv(
+                        os.path.join(
+                            moran_data_path,
+                            f"{re.sub(':|-', '_', mlobject.region)}_{mlobject.poi}_{signal}.tsv"),
+                        sep="\t", index=False, float_format="%.12f")
 
                     if not silent:
-                        print("\tMoran data saved to "
-                              f"'{moran_data_path}/{re.sub(':|-', '_', mlobject.region)}_{mlobject.poi}_{signal}.tsv'")
+
+                        print(F"\tMoran data saved to \
+                              '{moran_data_path}/{re.sub(':|-', '_', mlobject.region)}_{mlobject.poi}_{signal}.tsv'")
 
             if not silent:
+
                 print("\tLMI already computed for this region.\n\tSkipping to next region...")
 
             return
 
-    # Get average distance between consecutive points to define influence,
-    # which should be ~2 particles of radius.
-    nhood_region = mlobject.kk_distances.diagonal(1).mean() * INFLUENCE * BFACT
+    # Get average distance between consecutive points to define influence, which should be ~2 particles of radius.
+    neighbourhood = mlobject.kk_distances.diagonal(1).mean() * INFLUENCE * BFACT
 
     if mlobject.lmi_geometry is None:
 
         mlobject.lmi_geometry = lmi.construct_voronoi(mlobject, mlobject.kk_distances.diagonal(1).mean() * INFLUENCE)
 
     if not silent:
+
         print(f"\tAverage distance between consecutive particles: {mlobject.kk_distances.diagonal(1).mean():6.4f}"
               f" [{mlobject.kk_distances.diagonal(1).mean() * INFLUENCE:6.4f}]")
-
         print(f"\tGeometry information for region {mlobject.region} saved to '{mlobject.save_path}'")
 
     for signal_type in list(mlobject.signals_dict.keys()):
 
         if signal_type not in mlobject.lmi_info:
 
-            mlobject.lmi_info[signal_type] = lmi.compute_lmi(mlobject, signal_type, nhood_region,
+            mlobject.lmi_info[signal_type] = lmi.compute_lmi(mlobject, signal_type, neighbourhood,
                                                              n_permutations, signipval, silent)
 
     if not silent:
-        print(f"\n\tRegion done in {timedelta(seconds=round(time() - region_timer))}")
 
+        print(f"\n\tRegion done in {timedelta(seconds=round(time() - region_timer))}")
         print(f"\tLMI information for region {mlobject.region} will be saved to '{mlobject.save_path}'")
 
-    with open(mlobject.save_path, "wb") as hamlo_namendle: # :D
+    with open(mlobject.save_path, "wb") as hamlo_namendle:
 
         mlobject.save(hamlo_namendle)
 
@@ -329,13 +328,16 @@ def get_lmi(row : pd.Series, args_2_use : pd.Series,
         for signal, df in mlobject.lmi_info.items():
 
             moran_data_path = os.path.join(work_dir, mlobject.chrom, "moran_data", signal)
-            pathlib.Path(moran_data_path).mkdir(parents=True, exist_ok=True)
 
-            df.to_csv(os.path.join(moran_data_path,
-                                   f"{re.sub(':|-', '_', mlobject.region)}_{mlobject.poi}_{signal}.tsv"),
-                      sep="\t", index=False)
+            pathlib.Path(moran_data_path).mkdir(parents=True, exist_ok=True)
+            df.to_csv(
+                os.path.join(
+                    moran_data_path,
+                    f"{re.sub(':|-', '_', mlobject.region)}_{mlobject.poi}_{signal}.tsv"),
+                sep="\t", index=False)
 
             if not silent:
+
                 print(f"\tMoran data saved to "
                       f"'{moran_data_path}/{re.sub(':|-', '_', mlobject.region)}_{mlobject.poi}_{signal}.tsv'")
 
@@ -348,7 +350,7 @@ def get_lmi(row : pd.Series, args_2_use : pd.Series,
 
         print(f"\033[A{'  '*int(sp.Popen(['tput','cols'], stdout=sp.PIPE).communicate()[0].strip())}\033[A")
         print(f"\t[{progress['value']}/{total_num}] | Time spent: {timedelta(seconds=round(time_spent))} | "
-                f"ETR: {timedelta(seconds=round(time_remaining))}", end='\r')
+              f"ETR: {timedelta(seconds=round(time_remaining))}", end='\r')
 
 
 def run(opts):
@@ -380,8 +382,7 @@ def run(opts):
 
         if len(glob.glob(f"{work_dir}*coords.txt")) > 1:
 
-            sys.exit("More than one region file found. Please provide a region or only one file with regions "
-                     "of interest'.")
+            sys.exit("More than one region file found. Please provide a region or one file with regions of interest'.")
 
         try:
 
@@ -389,8 +390,8 @@ def run(opts):
 
         except IndexError:
 
-            sys.exit("No regions provided. Please provide a region or a file with regions of interest or run "
-                     "'metaloci sniffer'.")
+            sys.exit("No regions provided. Please provide a region or a file with regions of interest or run \
+                     'metaloci sniffer'.")
 
     elif os.path.isfile(regions):
 
@@ -419,17 +420,19 @@ def run(opts):
 
     if aggregate is not None:
 
-        [agg_dict[row[0]].append(row[1]) for _, row in pd.read_csv(aggregate, sep="\t", header=None).iterrows()]
+        for _, row in pd.read_csv(aggregate, sep="\t", header=None).iterrows():
 
-    args_2_pass = pd.Series({"work_dir" : work_dir,
-                             "signals" : signals,
-                             "n_permutations" : n_permutations,
-                             "signipval" : signipval,
-                             "aggr" : aggregate,
-                             "moran_info" : moran_info,
-                             "agg_dict" : agg_dict,
-                             "force" : force,
-                             "total_num" : len(df_regions)})
+            agg_dict[row[0]].append(row[1])
+
+    parsed_args = pd.Series({"work_dir": work_dir,
+                             "signals": signals,
+                             "n_permutations": n_permutations,
+                             "signipval": signipval,
+                             "aggr": aggregate,
+                             "moran_info": moran_info,
+                             "agg_dict": agg_dict,
+                             "force": force,
+                             "total_num": len(df_regions)})
 
     start_timer = time()
 
@@ -439,19 +442,17 @@ def run(opts):
 
         try:
 
-            progress = mp.Manager().dict(value=0, timer = start_timer, done = False, missing_signal = None)
+            progress = mp.Manager().dict(value=0, timer=start_timer, done=False, missing_signal=None)
 
             with mp.Pool(processes=threads) as pool:
 
                 try:
 
-                    pool.starmap(get_lmi,
-                                 [(row, args_2_pass, progress) for _, row in df_regions.iterrows()])
+                    pool.starmap(get_lmi, [(row, parsed_args, progress) for _, row in df_regions.iterrows()])
 
                     if progress["done"]:
 
-                        print("\tSome regions had already been computed and have been skipped.",
-                              end="")
+                        print("\tSome regions had already been computed and have been skipped.", end="")
 
                         if moran_info:
 
@@ -461,10 +462,10 @@ def run(opts):
 
                     if progress["missing_signal"] is not None:
 
-                        print(f"\tSignal '{progress['missing_signal']}' is in the signal list but "
-                              "has not been processed with prep.\n"
-                              "\tProcess that signal or remove it from the signal list."
-                              "\n\tExiting...")
+                        print(f"\tSignal '{progress['missing_signal']}' is in the signal list but has not been \
+                                processed with prep.\
+                                \n\tProcess that signal or remove it from the signal list.\
+                                \n\tExiting...")
 
                     pool.close()
                     pool.join()
@@ -480,7 +481,7 @@ def run(opts):
 
         for counter, row in df_regions.iterrows():
 
-            get_lmi(row, args_2_pass, counter=counter, silent=False)
+            get_lmi(row, parsed_args, counter=counter, silent=False)
 
     print(f"\n\nTotal time spent: {timedelta(seconds=round(time() - start_timer))}.")
     print("\nAll done.")

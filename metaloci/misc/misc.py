@@ -1,19 +1,20 @@
 """
 Script that contains helper functions of the METALoci package
 """
-import sys
-import numpy as np
-import pandas as pd
+import gzip
 import re
+import sys
 from collections import defaultdict
-from metaloci import mlo
 from pathlib import Path
+
 import cooler
 import hicstraw
-import gzip
+import numpy as np
+import pandas as pd
+from metaloci import mlo
 
 
-def signal_binnarize(data : pd.DataFrame, sum_type : str) -> pd.DataFrame:
+def signal_binnarize(data: pd.DataFrame, sum_type: str) -> pd.DataFrame:
     """
     Parsing the signal data frame with the appropiate binnarizing method
 
@@ -31,23 +32,23 @@ def signal_binnarize(data : pd.DataFrame, sum_type : str) -> pd.DataFrame:
     """
     if sum_type == "median":
 
-        data = data.groupby(["chrom", "start", "end"])[data.columns[3 : len(data.columns)]].median().reset_index()
+        data = data.groupby(["chrom", "start", "end"])[data.columns[3: len(data.columns)]].median().reset_index()
 
     elif sum_type == "mean":
 
-        data = data.groupby(["chrom", "start", "end"])[data.columns[3 : len(data.columns)]].mean().reset_index()
+        data = data.groupby(["chrom", "start", "end"])[data.columns[3: len(data.columns)]].mean().reset_index()
 
     elif sum_type == "min":
 
-        data = data.groupby(["chrom", "start", "end"])[data.columns[3 : len(data.columns)]].min().reset_index()
+        data = data.groupby(["chrom", "start", "end"])[data.columns[3: len(data.columns)]].min().reset_index()
 
     elif sum_type == "max":
 
-        data = data.groupby(["chrom", "start", "end"])[data.columns[3 : len(data.columns)]].max().reset_index()
+        data = data.groupby(["chrom", "start", "end"])[data.columns[3: len(data.columns)]].max().reset_index()
 
     elif sum_type == "count":
 
-        data = data.groupby(["chrom", "start", "end"])[data.columns[3 : len(data.columns)]].count().reset_index()
+        data = data.groupby(["chrom", "start", "end"])[data.columns[3: len(data.columns)]].count().reset_index()
 
     return data
 
@@ -77,9 +78,8 @@ def remove_folder(path: Path):
 
 def check_diagonal(diagonal: np.ndarray) -> tuple[int, float, float, list]:
     """
-    Checks the 0s/NaNs on the diagonal and saves the total number of zeroes,
-    the the max stretch (number of zeros in a row) as a percentage,
-    the percentage of zeroes, and the location of zeroes.
+    Checks the 0s/NaNs on the diagonal and saves the total number of zeroes, the the max stretch (number of zeros in 
+    a row) as a percentage, the percentage of zeroes, and the location of zeroes.
 
     Parameters
     ----------
@@ -193,9 +193,8 @@ def signal_normalization(region_signal: pd.DataFrame, pseudocounts: float = None
     pseudocounts : float, optional
         Pseudocounts to add if the signal is 0, by default corresponds to the median of the signal for the region.
     norm : str, optional
-        Type of normalization to use.
-        Values can be "max" (divide each value by the max value in the signal),
-        "sum" (divide each value by the sum of all values), or "01" ( value - min(signal) / max(signal) - min(signal) ),
+        Type of normalization to use. Values can be "max" (divide each value by the max value in the signal),
+        "sum" (divide each value by the sum of all values), or "01" (value - min(signal) / max(signal) - min(signal)),
         by default "01"
 
     Returns
@@ -238,7 +237,7 @@ def check_names(hic_file: Path, data: Path, coords: Path, resolution: int = None
     """
     Checks if the chromosome names in the signal, cool/mcool/hic and chromosome sizes
     files are the same.
-    
+
     Parameters
     ----------
     hic_file : Path
@@ -249,7 +248,7 @@ def check_names(hic_file: Path, data: Path, coords: Path, resolution: int = None
         Path to the chromosome sizes file.
     resolution : int, optional
         Resolution to choose on the mcool file.
-    
+
     Returns
     -------
     chrom_list : list
@@ -300,12 +299,12 @@ def check_names(hic_file: Path, data: Path, coords: Path, resolution: int = None
     if not signal_chr_nom == cooler_chr_nom == coords_chr_nom:
 
         sys.exit(
-            "\nThe signal, cooler and chromosome sizes files do not have the same nomenclature for chromosomes:\n"
-            f"\n\tSignal chromosomes nomenclature is '{signal_chr_nom}'. "
-            f"\n\tHi-C chromosomes nomenclature is '{cooler_chr_nom}'. "
-            f"\n\tChromosome sizes nomenclature is '{coords_chr_nom}'. "
-            "\n\nPlease, rename the chromosome names. "
-            "\n\nExiting..."
+            "\nThe signal, cooler and chromosome sizes files do not have the same nomenclature for chromosomes:\n\
+            \n\tSignal chromosomes nomenclature is '{signal_chr_nom}'.\
+            \n\tHi-C chromosomes nomenclature is '{cooler_chr_nom}'.\
+            \n\tChromosome sizes nomenclature is '{coords_chr_nom}'.\
+            \n\nPlease, rename the chromosome names.\
+            \n\nExiting..."
         )
 
     return chrom_list
@@ -314,20 +313,20 @@ def check_names(hic_file: Path, data: Path, coords: Path, resolution: int = None
 def natural_sort(element_list: list) -> list:
     """
     Sort the list with natural sorting.
-    
+
     Parameters
     ----------
     element_list : list
         List to be sorted
-        
+
     Returns
     -------
     sorted_element_list : list
         Sorted list
     """
 
-    convert = lambda text: int(text) if text.isdigit() else text.lower()
-    alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)]
+    def convert(text): return int(text) if text.isdigit() else text.lower()
+    def alphanum_key(key): return [convert(c) for c in re.split('([0-9]+)', key)]
 
     sorted_element_list = sorted(element_list, key=alphanum_key)
 
@@ -338,7 +337,7 @@ def gtfparser(gene_file_f: Path, name: str, extend: int, resolution: int) -> tup
     """
     Parses a gtf file and returns the information of the genes, excluding
     artifacts
-    
+
     Parameters
     ----------
     gene_file : path
@@ -349,7 +348,7 @@ def gtfparser(gene_file_f: Path, name: str, extend: int, resolution: int) -> tup
         Extend of the region to be analyzed
     resolution : int
         Resolution at which to split the genome
-        
+
     Returns
     -------
     id_tss_f : dict
@@ -438,7 +437,7 @@ def gtfparser(gene_file_f: Path, name: str, extend: int, resolution: int) -> tup
 
         for line in gtf_reader:
 
-            if re.compile("##").search(line)or not re.compile(r"chr\w+").search(line):
+            if re.compile("##").search(line) or not re.compile(r"chr\w+").search(line):
 
                 continue
 
@@ -466,7 +465,7 @@ def bedparser(gene_file_f: Path, name: str, extend: int, resolution: int) -> tup
     """
     Parses a bed file and returns the information of the genes, excluding
     artifacts.
-    
+
     Parameters
     ----------
     gene_file : path
@@ -477,7 +476,7 @@ def bedparser(gene_file_f: Path, name: str, extend: int, resolution: int) -> tup
         Extend of the region to be analyzed
     resolution : int
         Resolution at which to split the genome
-        
+
     Returns
     -------
     id_tss_f : dict
@@ -512,7 +511,7 @@ def bedparser(gene_file_f: Path, name: str, extend: int, resolution: int) -> tup
 def binsearcher(id_tss_f: dict, id_chrom_f: dict, id_name_f: dict, bin_genome_f: pd.DataFrame) -> pd.DataFrame:
     """
     Searches the bin index where the gene is located    
-    
+
     Parameters
     ----------
     id_tss_f : dict
@@ -523,7 +522,7 @@ def binsearcher(id_tss_f: dict, id_chrom_f: dict, id_name_f: dict, bin_genome_f:
         Dictionary linking the gene id to the name
     bin_genome_f : pd.DataFrame
         DataFrame containing the bins of the genome
-        
+
     Returns
     -------
     data_f : pd.DataFrame

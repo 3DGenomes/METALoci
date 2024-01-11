@@ -1,11 +1,10 @@
 """
 Script that contains the functions needed to run the Local Moran's I
 """
-import glob
 import os
 import warnings
-from itertools import product
 from collections import defaultdict
+from itertools import product
 from pathlib import Path
 
 import geopandas as gpd
@@ -14,13 +13,12 @@ import numpy as np
 import pandas as pd
 from esda.moran import Moran_Local
 from libpysal.weights.spatial_lag import lag_spatial
+from metaloci import mlo
+from metaloci.misc import misc
 from scipy.spatial import Voronoi
 from shapely.errors import ShapelyDeprecationWarning
 from shapely.geometry import LineString, Point
 from shapely.ops import polygonize
-
-from metaloci import mlo
-from metaloci.misc import misc
 
 warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
 
@@ -48,7 +46,7 @@ def construct_voronoi(mlobject: mlo.MetalociObject, buffer: float) -> pd.DataFra
     # the voronoi could extend to infinity in the areas than do not adjoin with another point of the KK layout
     # (and we do not want that for our gaudi plot).
     points = mlobject.kk_coords.copy()
-    points.extend(list(product([0, 2, -2], repeat=2))[1:]) # Same as all the appends, but more elegant
+    points.extend(list(product([0, 2, -2], repeat=2))[1:])
 
     # Construct the voronoi polygon around the Kamada-Kawai points.
     vor = Voronoi(points)
@@ -128,56 +126,7 @@ def coord_to_id(mlobject: mlo.MetalociObject, poly_from_lines: list) -> dict:
     return coord_id_dict
 
 
-## TODO This function is not used in ml.py, should we take it out? We changed it so we only load
-## the proper chromosome IIRC
-def load_signals(df_regions: pd.DataFrame, work_dir: Path) -> dict:
-    """
-    Loads signal data for each chromosome that contains a region to be processed. This is done
-    in order not to load useless data.
-
-    Parameters
-    ----------
-    df_regions : pd.DataFrame
-        Dataframe containing region, symbol and ENSEMBLE ID of each region to be processed.
-    work_dir : Path
-        Path to working directory with pre-calculated signals
-
-    Returns
-    -------
-    signal_data : dict
-        Dictionary with chrN as a key and a signal dataframe as a value.
-
-    Notes
-    -----
-    The values of df_regions.symbol and df_regions.id can be dummy values, it only affects the
-    plot and tables labelling at output.
-    """
-
-    chrom_to_do = list(
-        dict.fromkeys(
-            # re.compile("chr[0-9]*[A-Z]*").findall("\n".join([x for y in df_regions["coords"] for x in y.split(":")]))
-            [
-                chrom for coord in df_regions["coords"] for chrom in coord.split(":")[0:1]
-            ]  # for cases where chr is not in the chromosome name
-        )
-    )
-
-    signal_data = {}
-
-    for chrom in chrom_to_do:
-
-        try:
-
-            signal_data[chrom] = pd.read_pickle(glob.glob(f"{os.path.join(work_dir, 'signal', chrom)}/*_signal.pkl")[0])
-
-        except IndexError:
-
-            return None
-
-    return signal_data
-
-
-def load_region_signals(mlobject: mlo.MetalociObject, signal_data: dict, signal_file: Path):
+def load_region_signals(mlobject: mlo.MetalociObject, signal_data: dict, signal_file: Path) -> dict:
     """
     Does a subset of the signal file to contain only the signal corresponding to the region being processed.
 
@@ -213,14 +162,13 @@ def load_region_signals(mlobject: mlo.MetalociObject, signal_data: dict, signal_
     region_signal = signal_data[
         (signal_data["start"] >= int(np.floor(mlobject.start / mlobject.resolution)) * mlobject.resolution) &
         (signal_data["end"] <= int(np.ceil(mlobject.end / mlobject.resolution)) * mlobject.resolution)
-    ] # jfm: fix
+    ]
 
     if len(region_signal) != len(mlobject.kk_coords):
 
         tmp = len(mlobject.kk_coords) - len(region_signal)
         tmp = np.empty((tmp, len(region_signal.columns)))
-        # tmp[:] = 0
-        tmp[:] = np.nan # jfm: leave NAs in for now. (in misc.signal_normalization() those NaNS will be substituted for
+        tmp[:] = np.nan  # jfm: leave NAs in for now. (in misc.signal_normalization() those NaNS will be substituted for
         # the median of the signal of the region)
 
         region_signal = pd.concat([region_signal, pd.DataFrame(tmp, columns=list(region_signal))], ignore_index=True)
@@ -241,7 +189,7 @@ def load_region_signals(mlobject: mlo.MetalociObject, signal_data: dict, signal_
 
 
 def compute_lmi(mlobject: mlo.MetalociObject, signal_type: str, neighbourhood: float,
-                n_permutations: int=9999, signipval: float=0.05, silent: bool=False) -> pd.DataFrame:
+                n_permutations: int = 9999, signipval: float = 0.05, silent: bool = False) -> pd.DataFrame:
     """
     Computes Local Moran's Index for a signal type and outputs information of the LMI value and its p-value
     for each bin for a given signal, as well as some other information.
@@ -273,7 +221,6 @@ def compute_lmi(mlobject: mlo.MetalociObject, signal_type: str, neighbourhood: f
     """
 
     signal = []
-
     filtered_signal_type = dict(filter(lambda item: signal_type == item[0], mlobject.signals_dict.items()))
 
     for _, row in mlobject.lmi_geometry.iterrows():
@@ -290,7 +237,6 @@ def compute_lmi(mlobject: mlo.MetalociObject, signal_type: str, neighbourhood: f
     gpd_signal = gpd.GeoDataFrame(signal_geometry)  # Stored in Geopandas DataFrame to do LMI
 
     # Get weights for geometric distance
-    # print("\tGetting weights and geometric distance for LM")
     y = gpd_signal["v"].values
     weights = lp.weights.DistanceBand.from_dataframe(gpd_signal, neighbourhood)
     weights.transform = "r"
@@ -316,14 +262,11 @@ def compute_lmi(mlobject: mlo.MetalociObject, signal_type: str, neighbourhood: f
         bin_end = bin_start + mlobject.resolution
 
         df_lmi["ID"].append(signal_type)
-
         df_lmi["bin_index"].append(row.bin_index)
         df_lmi["bin_chr"].append(mlobject.chrom[3:])
         df_lmi["bin_start"].append(bin_start)
         df_lmi["bin_end"].append(bin_end)
-
         df_lmi["signal"].append(signal[row.bin_index])
-
         df_lmi["moran_index"].append(row.moran_index)
         df_lmi["moran_quadrant"].append(moran_local_object.q[row.moran_index])
         df_lmi["LMI_score"].append(round(moran_local_object.Is[row.moran_index], 9))
@@ -332,17 +275,13 @@ def compute_lmi(mlobject: mlo.MetalociObject, signal_type: str, neighbourhood: f
         df_lmi["ZLag"].append(lags[row.moran_index])
 
     df_lmi = pd.DataFrame(df_lmi)
-
     # Changing the data types to the proper ones so the pickle file has a smaller size.
     df_lmi["ID"] = df_lmi["ID"].astype(str)
-
     df_lmi["bin_index"] = df_lmi["bin_index"].astype(np.ushort)
     df_lmi["bin_chr"] = df_lmi["bin_chr"].astype(str)
     df_lmi["bin_start"] = df_lmi["bin_start"].astype(np.uintc)
     df_lmi["bin_end"] = df_lmi["bin_end"].astype(np.uintc)
-
     df_lmi["signal"] = df_lmi["signal"].astype(np.single)
-
     df_lmi["moran_index"] = df_lmi["moran_index"].astype(np.ushort)
     df_lmi["moran_quadrant"] = df_lmi["moran_quadrant"].astype(np.ubyte)
     df_lmi["LMI_score"] = df_lmi["LMI_score"].astype(np.half)

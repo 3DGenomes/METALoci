@@ -6,7 +6,8 @@ import sys
 import pathlib
 import pickle
 import re
-from argparse import HelpFormatter, SUPPRESS
+from argparse import HelpFormatter, SUPPRESS, RawTextHelpFormatter
+
 from datetime import timedelta
 from time import time
 
@@ -38,8 +39,7 @@ def populate_args(parser):
         ArgumentParser to populate the arguments through the normal METALoci caller
     """
 
-    parser.formatter_class=lambda prog: HelpFormatter(prog, width=120,
-                                                      max_help_position=60)
+    parser.formatter_class = lambda prog: HelpFormatter(prog, width=120, max_help_position=60)
 
     input_arg = parser.add_argument_group(title="Input arguments")
 
@@ -72,9 +72,9 @@ def populate_args(parser):
         metavar="PATH",
         type=str,
         required=True,
-        help="Region to apply LMI in format chrN:start-end_midpoint or file with the regions of interest. "
-        "If a file is provided, it must contain as a header 'coords', 'symbol' and 'id', and one region per line, "
-        "tab separated."    
+        help="Region to apply LMI in format chrN:start-end_midpoint or file with the regions of interest. \
+        If a file is provided, it must contain as a header 'coords', 'symbol' and 'id', and one region per line, \
+        tab separated."
     )
 
     optional_arg = parser.add_argument_group(title="Optional arguments")
@@ -87,13 +87,11 @@ def populate_args(parser):
 
     optional_arg.add_argument(
         "-e",
-        "--delete",
+        "--preserve",
         dest="rm_types",
-        metavar="STR",
-        type=str,
-        nargs="*",
-        default=["png"],
-        help="Delete temporal image files, determined by extension (default: %(default)s)"
+        action="store_false",
+        default=True,
+        help="Preserve temporal .png image files that are used for making the composed figure (default: %(default)s)."
     )
 
     optional_arg.add_argument(
@@ -101,10 +99,10 @@ def populate_args(parser):
         "--metalocis",
         dest="metalocis",
         action="store_true",
-        help="Flag to select highlightning of the signal plots. If True, only the neighbouring bins from the point of "
-        "interest will be highlighted (independently of the quadrant and significance of those bins, but only if the "
-        "point of interest is significant). If False, all significant regions that correspond to the quadrant selected "
-        "with -q will be highlighted (default: False)."
+        help="Flag to select highlightning of the signal plots. If True, only the neighbouring bins from the point of \
+        interest will be highlighted (independently of the quadrant and significance of those bins, but only if the \
+        point of interest is significant). If False, all significant regions that correspond to the quadrant selected \
+        with -q will be highlighted (default: False)."
     )
 
     optional_arg.add_argument(
@@ -122,12 +120,11 @@ def populate_args(parser):
         default=[1, 3],
         metavar="INT",
         nargs="*",
-        ## TODO We should pass this help text with new-line characters, as it look really messy.
-        help="Space-separated list with the LMI quadrants to highlight (default: %(default)s) "
-        "1: High-high (signal in bin is high, signal on neighbours is high). "
-        "2: High-Low (signal in bin is high, signal on neighbours is low). "
-        "3: Low-Low (signal in bin is low, signal on neighbours is low). "
-        "4: Low-High (signal in bin is low, signal on neighbours is high).",
+        help="Space-separated list with the LMI quadrants to highlight (default: %(default)s). \
+        1: High-high (signal in bin is high, signal on neighbours is high). \
+        2: High-Low (signal in bin is high, signal on neighbours is low). \
+        3: Low-Low (signal in bin is low, signal on neighbours is low). \
+        4: Low-High (signal in bin is low, signal on neighbours is high).",
     )
 
     optional_arg.add_argument(
@@ -148,9 +145,9 @@ def populate_args(parser):
         help=SUPPRESS)
 
 
-def run(opts : list):
+def run(opts: list):
     """
-    Funtion to run this section of METALoci with the needed arguments
+    Function to run this section of METALoci with the needed arguments
 
     Parameters
     ----------
@@ -167,7 +164,6 @@ def run(opts : list):
     rmtypes = opts.rm_types
     agg = opts.agg
     debug = opts.debug
-
     quadrants = [int(x) for x in quadrants]
 
     if not work_dir.endswith("/"):
@@ -177,10 +173,8 @@ def run(opts : list):
     INFLUENCE = 1.5
     BFACT = 2
 
-    ## Changed the scatterplot and gaudi_type functions so they don't need the color dictionary anymore.
-    ## Functions assume this schema of colors if the user says nothing.
+    # Functions assume this schema of colors if the user says nothing.
     # colors = {1: "firebrick", 2: "lightskyblue", 3: "steelblue", 4: "orange"}
-
     if os.path.isfile(regions):
 
         df_regions = pd.read_table(regions)
@@ -240,7 +234,7 @@ def run(opts : list):
 
             continue
 
-        nhood_region = mlobject.kk_distances.diagonal(1).mean() * INFLUENCE * BFACT
+        neighbourhood = mlobject.kk_distances.diagonal(1).mean() * INFLUENCE * BFACT
 
         for signal in signals:
 
@@ -250,38 +244,38 @@ def run(opts : list):
 
             print(f"\n\tPlotting signal: {signal}")
 
-            plot_filename = os.path.join(work_dir, mlobject.chrom, "plots", signal,
-                                         f"{mlobject.start}_{mlobject.end}_{mlobject.poi}")
+            plot_filename = os.path.join(work_dir, mlobject.chrom, "plots",
+                                         signal, f"{mlobject.start}_{mlobject.end}_{mlobject.poi}")
             pathlib.Path(plot_filename).mkdir(parents=True, exist_ok=True)
 
             plot_filename = os.path.join(
                 plot_filename,
                 f"{mlobject.chrom}_{mlobject.start}_{mlobject.end}_{mlobject.poi}_{mlobject.resolution}_{signal}",
             )
-
             merged_lmi_geometry = pd.merge(
                 mlobject.lmi_info[signal],
                 mlobject.lmi_geometry,
                 on=["bin_index", "moran_index"],
                 how="inner",
             )
-
             merged_lmi_geometry = gpd.GeoDataFrame(merged_lmi_geometry, geometry=merged_lmi_geometry.geometry)
 
             print("\t\tHi-C plot", end="\r")
+
             hic_plt = plot.get_hic_plot(mlobject)
+
             hic_plt.savefig(f"{plot_filename}_hic.pdf", **plot_opt)
             hic_plt.savefig(f"{plot_filename}_hic.png", **plot_opt)
             plt.close()
-            print("\t\tHi-C plot -> done.")
 
+            print("\t\tHi-C plot -> done.")
             print("\t\tKamada-Kawai plot", end="\r")
 
             mlg_poi = merged_lmi_geometry.loc[merged_lmi_geometry["bin_index"] == mlobject.poi].squeeze()
 
             if (metaloci_only and mlg_poi.LMI_pvalue <= signipval and mlg_poi.moran_quadrant in quadrants):
 
-                kk_plt = plot.get_kk_plot(mlobject, neighbourhood=nhood_region)
+                kk_plt = plot.get_kk_plot(mlobject, neighbourhood=neighbourhood)
 
             else:
 
@@ -291,32 +285,35 @@ def run(opts : list):
             kk_plt.savefig(f"{plot_filename}_kk.png", **plot_opt)
             plt.close()
             print("\t\tKamada-Kawai plot -> done.")
-
             print("\t\tGaudi Signal plot", end="\r")
+
             gs_plt = plot.get_gaudi_signal_plot(mlobject, merged_lmi_geometry)
+
             gs_plt.savefig(f"{plot_filename}_gsp.pdf", **plot_opt)
             gs_plt.savefig(f"{plot_filename}_gsp.png", **plot_opt)
             plt.close()
             print("\t\tGaudi Signal plot -> done.")
-
             print("\t\tGaudi Type plot", end="\r")
+
             gt_plt = plot.get_gaudi_type_plot(mlobject, merged_lmi_geometry, signipval)
+
             gt_plt.savefig(f"{plot_filename}_gtp.pdf", **plot_opt)
             gt_plt.savefig(f"{plot_filename}_gtp.png", **plot_opt)
             plt.close()
             print("\t\tGaudi Type plot -> done.")
-
             print("\t\tSignal plot", end="\r")
-            sig_plt, ax = plot.signal_plot(mlobject, merged_lmi_geometry, nhood_region,
+
+            sig_plt, ax = plot.signal_plot(mlobject, merged_lmi_geometry, neighbourhood,
                                            quadrants, signipval, metaloci_only)
+
             sig_plt.savefig(f"{plot_filename}_signal.pdf", **plot_opt)
             sig_plt.savefig(f"{plot_filename}_signal.png", **plot_opt)
             plt.close()
             print("\t\tSignal plot -> done.")
-
             print("\t\tLMI Scatter plot", end="\r")
+
             lmi_plt, r_value, p_value = plot.get_lmi_scatterplot(mlobject, merged_lmi_geometry,
-                                                                 nhood_region, signipval)
+                                                                 neighbourhood, signipval)
 
             if lmi_plt is not None:
 
@@ -339,10 +336,9 @@ def run(opts : list):
             img1 = Image.open(f"{plot_filename}_lmi.png")
             img2 = Image.open(f"{plot_filename}_gsp.png")
             img3 = Image.open(f"{plot_filename}_gtp.png")
-
             maxx = int((img1.size[1] * 0.4 + img2.size[1] * 0.25 + img3.size[1] * 0.25) * 1.3)
             yticks_signal = [f"{round(i, 3):.2f}" for i in ax.get_yticks()[1:-1]]
-            signal_left = {3 : 39, 4 : 32, 5 : 21, 6 : 10, 7: -1, 8: -11}
+            signal_left = {3: 39, 4: 32, 5: 21, 6: 10, 7: -1, 8: -11}
             max_chr_yax = max(len(str(i)) for i in yticks_signal)
 
             if float(min(yticks_signal)) < 0:
@@ -360,31 +356,20 @@ def run(opts : list):
             composite_image = Image.new(mode="RGBA", size=(maxx, 1550))
 
             # HiC image
-            composite_image = plot.place_composite(composite_image, f"{plot_filename}_hic.png", 0.5,
-                                                   100, 50)
-
+            composite_image = plot.place_composite(composite_image, f"{plot_filename}_hic.png", 0.5, 100, 50)
             # Signal image
             composite_image = plot.place_composite(composite_image, f"{plot_filename}_signal.png", 0.4,
                                                    signal_left[max_chr_yax] + negative_axis_correction, 640)
-
             # KK image
-            composite_image = plot.place_composite(composite_image, f"{plot_filename}_kk.png", 0.3,
-                                                   1300, 50)
-
+            composite_image = plot.place_composite(composite_image, f"{plot_filename}_kk.png", 0.3, 1300, 50)
             # LMI scatter image
-            composite_image = plot.place_composite(composite_image, f"{plot_filename}_lmi.png", 0.4,
-                                                   75, 900)
-
+            composite_image = plot.place_composite(composite_image, f"{plot_filename}_lmi.png", 0.4, 75, 900)
             # Gaudi signal image
-            composite_image = plot.place_composite(composite_image, f"{plot_filename}_gsp.png", 0.25,
-                                                   900, 900)
-
+            composite_image = plot.place_composite(composite_image, f"{plot_filename}_gsp.png", 0.25, 900, 900)
             # Gaudi signal image
-            composite_image = plot.place_composite(composite_image, f"{plot_filename}_gtp.png", 0.25,
-                                                   1600, 900)
+            composite_image = plot.place_composite(composite_image, f"{plot_filename}_gtp.png", 0.25, 1600, 900)
 
             composite_image.save(f"{plot_filename}.png")
-
             plt.figure(figsize=(15, 15))
             plt.imshow(composite_image)
             plt.axis("off")
@@ -392,20 +377,21 @@ def run(opts : list):
             plt.close()
             print(f"\t\tFinal composite figure for region '{region_row.coords}' and signal '{signal}' -> done.")
 
-            bed = plot.get_bed(mlobject, merged_lmi_geometry, nhood_region, quadrants, signipval)
+            bed = plot.get_bed(mlobject, merged_lmi_geometry, neighbourhood, BFACT, quadrants, signipval)
 
             if bed is not None and len(bed) > 0:
 
                 metaloci_bed_path = os.path.join(work_dir, mlobject.chrom, "metalocis_log", signal)
 
-                fn = os.path.join(metaloci_bed_path,
-                                  f"{mlobject.chrom}_{mlobject.start}_{mlobject.end}_{mlobject.poi}_{signal}_" + \
-                                  f"q-{'_'.join([str(q) for q in quadrants])}_metalocis.bed")
+                bed_file_name = os.path.join(
+                    metaloci_bed_path,
+                    f"{mlobject.chrom}_{mlobject.start}_{mlobject.end}_{mlobject.poi}_{signal}_\
+                    q-{'_'.join([str(q) for q in quadrants])}_metalocis.bed")
 
                 pathlib.Path(metaloci_bed_path).mkdir(parents=True, exist_ok=True)
-                bed.to_csv(fn, sep="\t", index=False)
+                bed.to_csv(bed_file_name, sep="\t", index=False)
 
-                print(f"\t\tBed file with metalocis location saved to: {fn}")
+                print(f"\t\tBed file with metalocis location saved to: {bed_file_name}")
 
             for signal_key, df in mlobject.lmi_info.items():
 
@@ -428,32 +414,28 @@ def run(opts : list):
 
                 with open(f"{work_dir}moran_info.txt", "a+", encoding="utf-8") as handler:
 
-                    log = f"{region_row.coords}\t{region_row.name}\t{region_row.id}\t{signal_key}" + \
-                          f"\t{r_value}\t{p_value}\t{q_string}\n"
+                    log = f"{region_row.coords}\t{region_row.name}\t{region_row.id}\t{signal_key}\t{r_value}\
+                        \t{p_value}\t{q_string}\n"
 
                     handler.seek(0)
 
                     if os.stat(f"{work_dir}moran_info.txt").st_size == 0:
 
-                        handler.write("region\tsymbol\tgene_id\tsignal\tr_value\tp_value"
-                                      "\tsq1\tq1\tsq2\tq2\tsq3\tq3\tsq4\tq4\n")
+                        handler.write("region\tsymbol\tgene_id\tsignal\tr_value\tp_value\tsq1\tq1\tsq2\tq2\tsq3\tq3\
+                                    \tsq4\tq4\n")
 
                     if not any(log in line for line in handler):
 
                         handler.write(log)
 
-            # Remove image used for composite figure.
-            ## TODO This variable is always png?
             if rmtypes:
 
-                for ext in rmtypes:
-
-                    os.remove(f"{plot_filename}_hic.{ext}")
-                    os.remove(f"{plot_filename}_signal.{ext}")
-                    os.remove(f"{plot_filename}_kk.{ext}")
-                    os.remove(f"{plot_filename}_lmi.{ext}")
-                    os.remove(f"{plot_filename}_gsp.{ext}")
-                    os.remove(f"{plot_filename}_gtp.{ext}")
+                os.remove(f"{plot_filename}_hic.png")
+                os.remove(f"{plot_filename}_signal.png")
+                os.remove(f"{plot_filename}_kk.png")
+                os.remove(f"{plot_filename}_lmi.png")
+                os.remove(f"{plot_filename}_gsp.png")
+                os.remove(f"{plot_filename}_gtp.png")
 
     print(f"\nInformation saved to: '{os.path.join(work_dir, 'moran_info.txt')}'")
     print(f"\nTotal time spent: {timedelta(seconds=round(time() - start_timer))}.")

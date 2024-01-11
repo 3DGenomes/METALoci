@@ -10,8 +10,9 @@ class MetalociObject:
     """
     This object is base class of METALoci. It contains all the information for a given region.
     """
-    def __init__(self, region : str, resolution : int, persistence_length : float, save_path : str,
-                 chrom : str = None, start : int = None, end : int = None, poi : int = None):
+
+    def __init__(self, region: str, resolution: int, persistence_length: float, save_path: str,
+                 chrom: str = None, start: int = None, end: int = None, poi: int = None):
         """
         Creation of the METALoci object
 
@@ -32,32 +33,44 @@ class MetalociObject:
         end : int, optional
             End of the region
         poi : int, optional
-            Bin position of the point of interest (normally the tss of the gene)
+            Bin position of the point of interest (usually the TSS of the gene)
         """
 
         self.region = region
 
         if chrom is None:
+
             self.chrom, _, _, _ = re.split(r":|-|_", region)
+
         else:
+
             self.chrom = chrom
 
         if start is None:
+
             _, temp, _, _ = re.split(r":|-|_", region)
             self.start = int(temp)
+
         else:
+
             self.start = start
 
         if end is None:
+
             _, _, temp, _ = re.split(r":|-|_", region)
             self.end = int(temp)
+
         else:
+
             self.end = end
 
         if poi is None:
+
             _, _, _, temp = re.split(r":|-|_", region)
             self.poi = int(temp)
+
         else:
+
             self.poi = poi
 
         self.resolution = resolution
@@ -80,7 +93,7 @@ class MetalociObject:
         self.lmi_geometry = None
         self.lmi_info = {}
 
-    def save(self, file_handler : str):
+    def save(self, file_handler: str):
         """
         Function to save the mlobject.
 

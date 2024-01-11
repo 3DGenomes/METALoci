@@ -3,27 +3,23 @@ Script that contains the functions needed to run the plotting
 """
 from collections import defaultdict
 
+import bioframe
 import libpysal as lp
+import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.lines import Line2D
-from matplotlib.ticker import FormatStrFormatter, MaxNLocator
 from matplotlib.patches import Circle
+from matplotlib.ticker import FormatStrFormatter, MaxNLocator
+from metaloci import mlo
+from metaloci.graph_layout import kk
 from PIL import Image
 from scipy.ndimage import rotate
 from scipy.stats import linregress, zscore
 from shapely.geometry import Point
-import bioframe
-
-from metaloci import mlo
-from metaloci.graph_layout import kk
-
-# print first 500 rows pandas
-pd.set_option('display.max_rows', 500)
 
 
 def mixed_matrices_plot(mlobject: mlo.MetalociObject):
@@ -52,7 +48,7 @@ def mixed_matrices_plot(mlobject: mlo.MetalociObject):
 
     if mlobject.subset_matrix is None:
 
-        ## Changed from misc to kk, as it is where the get_subset_matrix function is located
+        # Changed from misc to kk, as it is where the get_subset_matrix function is located
         mlobject.subset_matrix = kk.get_subset_matrix(mlobject)
 
     upper_triangle = np.triu(mlobject.matrix.copy(), k=1)  # Original matrix
@@ -116,8 +112,9 @@ def get_kk_plot(mlobject: mlo.MetalociObject,
     ys = [mlobject.kk_nodes[n][1] for n in mlobject.kk_nodes]
 
     kk_plt = plt.figure(figsize=(10, 10))
-    plt.axis("off")
     options = {"node_size": 50, "edge_color": "black", "linewidths": 0.1, "width": 0.05}
+
+    plt.axis("off")
 
     if restraints:
 
@@ -176,27 +173,19 @@ def get_hic_plot(mlobject: mlo.MetalociObject,
     """
 
     poi_factor = mlobject.poi / mlobject.lmi_geometry["bin_index"].shape[0]
-
     array = mlobject.matrix
     matrix_min_value = np.nanmin(array)
     matrix_max_value = np.nanmax(array)
-
-    # Massage the matrix
-    array = np.nan_to_num(array, nan=0)  # Rotate get crazy when rotating with nans.
-    array = np.triu(array, -1)
-    array = rotate(array, angle=45)
+    array = rotate(np.triu(np.nan_to_num(array, nan=0), -1), angle=45)  # Rotate get crazy when rotating with nans.
     mid = int(array.shape[0] / 2)
-    poi_X = int(poi_factor * int(array.shape[0]))
-
+    poi_x = int(poi_factor * int(array.shape[0]))
     array = array[:mid, :]
     array[array == 0] = np.nan
-
     hic_fig = plt.figure(figsize=(10, 10))
     ax = hic_fig.add_subplot(111)
+
     ax.matshow(array, cmap="YlOrRd", vmin=matrix_min_value, vmax=matrix_max_value, label="")
-
-    sns.scatterplot(x=[poi_X], y=[mid + 4], color="lime", marker="^", label="", ax=ax)
-
+    sns.scatterplot(x=[poi_x], y=[mid + 4], color="lime", marker="^", label="", ax=ax)
     plt.colorbar(
         plt.cm.ScalarMappable(cmap=cmap_user),
         ticks=np.linspace(matrix_min_value, matrix_max_value, 6),
@@ -205,7 +194,6 @@ def get_hic_plot(mlobject: mlo.MetalociObject,
         format=FormatStrFormatter("%.2f"),
         ax=ax,
     ).set_label("$log_{10}$ (Hi-C interactions)", rotation=270, size=12, labelpad=20)
-
     plt.title(f"{mlobject.region}")
     plt.axis("off")
 
@@ -239,10 +227,9 @@ def get_gaudi_signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFra
 
     min_value = lmi_geometry.signal.min()
     max_value = lmi_geometry.signal.max()
-
     gaudi_signal_fig, ax = plt.subplots(figsize=(12, 10), subplot_kw={"aspect": "equal"})
-    lmi_geometry.plot(column="signal", cmap=cmap_user, linewidth=2, edgecolor="white", ax=ax)
 
+    lmi_geometry.plot(column="signal", cmap=cmap_user, linewidth=2, edgecolor="white", ax=ax)
     sns.scatterplot(x=[lmi_geometry.X[mlobject.poi]], y=[lmi_geometry.Y[mlobject.poi]], s=50, ec="none", fc="lime")
     sm = plt.cm.ScalarMappable(cmap=cmap_user, norm=plt.Normalize(vmin=min_value, vmax=max_value))
     sm.set_array([1, 2, 3, 4])
@@ -256,6 +243,7 @@ def get_gaudi_signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFra
         format=FormatStrFormatter("%.2f"),
         ax=ax,
     )
+
     cbar.set_label(f"{lmi_geometry.ID[0]}", rotation=270, size=20, labelpad=35)
     plt.axis("off")
 
@@ -264,7 +252,7 @@ def get_gaudi_signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFra
 
 def get_gaudi_type_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame,
                         signipval: float = 0.05, colors_lmi: dict = None
-):
+                        ):
     """
     Get a Gaudí type plot.
 
@@ -284,7 +272,7 @@ def get_gaudi_type_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame
     -------
     gtp : matplotlib.pyplot.figure.Figure
         matplotlib figure containing the Gaudi type plot.
-    
+
     Notes
     -----
     The Gaudi type plot is a plot of the LMI values for each bin in the region, where the color of the bin represents
@@ -294,6 +282,7 @@ def get_gaudi_type_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame
     """
 
     if colors_lmi is None:
+
         colors_lmi = {1: "firebrick", 2: "lightskyblue", 3: "steelblue", 4: "orange"}
 
     legend_elements = [
@@ -305,8 +294,8 @@ def get_gaudi_type_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame
 
     cmap = LinearSegmentedColormap.from_list("Custom cmap", [colors_lmi[nu] for nu in colors_lmi], len(colors_lmi))
     alpha = [1.0 if pval <= signipval else 0.3 for pval in lmi_geometry.LMI_pvalue]
-
     gaudi_type_fig, ax = plt.subplots(figsize=(12, 10), subplot_kw={"aspect": "equal"})
+
     lmi_geometry.plot(column="moran_quadrant", cmap=cmap, alpha=alpha, linewidth=2, edgecolor="white", ax=ax)
     plt.axis("off")
 
@@ -326,7 +315,6 @@ def get_gaudi_type_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame
 
 def signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, neighbourhood: float,
                 quadrants: list = None, signipval: float = 0.05, metaloci_only: bool = False):
-
     """
     Generate a signal plot to visualize the signal intensity and the positions of significant bins.
 
@@ -363,9 +351,10 @@ def signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, neighb
     """
 
     if quadrants is None:
-        quadrants = [1,3]
 
-    bins, coords_b = get_bins_coords(mlobject)
+        quadrants = [1, 3]
+
+    bins, coords_b = get_x_axis_label_signal_plot(mlobject)
     metalocis = get_highlight(mlobject, lmi_geometry, neighbourhood, quadrants, signipval, metaloci_only)
     sig_plt = plt.figure(figsize=(10, 1.5))
 
@@ -380,6 +369,7 @@ def signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, neighb
             else:
 
                 color, alpha = get_color_alpha(q)
+
                 plt.axvline(x=p, color=color, linestyle=":", lw=1, zorder=0, alpha=alpha)
 
     plt.tick_params(axis="both", which="minor", labelsize=24)
@@ -389,20 +379,18 @@ def signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, neighb
     plt.ylabel(f"{lmi_geometry.ID[0]}")
 
     ax = sns.lineplot(x=lmi_geometry.bin_index, y=lmi_geometry.signal, color="black", lw=0.7)
-    ax.yaxis.set_major_locator(MaxNLocator(nbins = 5, integer=True))
+
+    ax.yaxis.set_major_locator(MaxNLocator(nbins=5, integer=True))
     ax.yaxis.set_major_formatter(FormatStrFormatter("%.2f"))
     ax.margins(x=0)
     ax.axhline(y=0, color="k", zorder=0)
-
     sns.despine(top=True, right=True, left=False, bottom=True, offset=None, trim=False)
 
     return sig_plt, ax
 
 
-def get_highlight(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, neighbourhood : float,
-                  quadrants: list = None, signipval: float = 0.05, metaloci_only: bool = False,
-):
-
+def get_highlight(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, neighbourhood: float,
+                  quadrants: list = None, signipval: float = 0.05, metaloci_only: bool = False) -> dict:
     """
     Generate a dictionary containing metaloci information and their bin indices based on given parameters.
 
@@ -443,7 +431,8 @@ def get_highlight(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, neig
     """
 
     if quadrants is None:
-        quadrants = [1,3]
+
+        quadrants = [1, 3]
 
     bins_to_highlight = defaultdict(list)
 
@@ -461,10 +450,6 @@ def get_highlight(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, neig
 
         if poi_row.LMI_pvalue <= signipval and poi_row.moran_quadrant in quadrants:
 
-            poi_point = Point(
-            (lmi_geometry[lmi_geometry.bin_index == mlobject.poi].X,
-             lmi_geometry[lmi_geometry.bin_index == mlobject.poi].Y)
-            )
             poi_point = Point(lmi_geometry.loc[lmi_geometry["bin_index"] == mlobject.poi, ["X", "Y"]].iloc[0])
 
             for _, row_ml in lmi_geometry.iterrows():
@@ -481,8 +466,7 @@ def get_highlight(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, neig
 
 
 def get_lmi_scatterplot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, neighbourhood: float,
-                        signipval: float = 0.05, colors_lmi: dict = None
-):
+                        signipval: float = 0.05, colors_lmi: dict = None) -> tuple:
     """
     Get a scatterplot of Z-scores of signal vs Z-score of signal spacial lag, given LMI values.
 
@@ -548,7 +532,7 @@ def get_lmi_scatterplot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame
     return scatter_fig, r_value_scat, p_value_scat
 
 
-def place_composite(new_PI: Image.Image, ifile: str, ifactor: float, ixloc: int, iyloc: int):
+def place_composite(image: Image.Image, image_to_add: str, ifactor: float, ixloc: int, iyloc: int):
     """
     Place an image on a composite image (PIL Image) at a specified location.
 
@@ -570,16 +554,17 @@ def place_composite(new_PI: Image.Image, ifile: str, ifactor: float, ixloc: int,
     PIL.Image.Image
         The updated composite image (PIL Image) after adding the new image.
     """
-    img = Image.open(ifile)
-    # niz = tuple([int(nu * ifactor) for nu in img.size])
+    img = Image.open(image_to_add)
     niz = tuple(int(nu * ifactor) for nu in img.size)
     img = img.resize(niz, Image.Resampling.LANCZOS)
-    new_PI.paste(img, (ixloc, iyloc))
 
-    return new_PI
+    image.paste(img, (ixloc, iyloc))
 
-def get_bed(mlobject: mlo.MetalociObject, lmi_geometry : pd.DataFrame, neighbourhood : float, bfact : float,
-            quadrants : list = None, signipval : float = 0.05, poi : int = None, plotit : bool = False) -> pd.DataFrame:
+    return image
+
+
+def get_bed(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, neighbourhood: float, bfact: float,
+            quadrants: list = None, signipval: float = 0.05, poi: int = None, plotit: bool = False) -> pd.DataFrame:
     """
     _summary_
 
@@ -613,11 +598,11 @@ def get_bed(mlobject: mlo.MetalociObject, lmi_geometry : pd.DataFrame, neighbour
         poi = mlobject.poi
 
     if quadrants is None:
-        quadrants = [1,3]
+
+        quadrants = [1, 3]
 
     signal = lmi_geometry.ID[0]  # Extract signal name from lmi_geometry
     data = mlobject.lmi_info[signal]
-
     # Check tha the point of interest is significant in the given quadrant
     significants = len(data[(data.bin_index == poi) &
                             (data.moran_quadrant.isin(quadrants)) &
@@ -636,37 +621,30 @@ def get_bed(mlobject: mlo.MetalociObject, lmi_geometry : pd.DataFrame, neighbour
         print(f"\tGetting data for point of interest: {poi}...")
 
         # g = get_gaudi_type_plot(mlobject,lmi_geometry)
-        x_poi = lmi_geometry.X[lmi_geometry.bin_index==poi]
-        y_poi = lmi_geometry.Y[lmi_geometry.bin_index==poi]
-
-        sns.scatterplot(x=lmi_geometry.X, y=lmi_geometry.Y, color='lime', s=10)
-        sns.scatterplot(x=x_poi, y=y_poi, color='yellow', s=100)
+        x_poi = lmi_geometry.X[lmi_geometry.bin_index == poi]
+        y_poi = lmi_geometry.Y[lmi_geometry.bin_index == poi]
         circle = Circle((x_poi, y_poi), bfact, color='yellow', fill=False)
-
-        plt.gcf().gca().add_artist(circle)
-
         xs = lmi_geometry.X.iloc[indices]
         ys = lmi_geometry.Y.iloc[indices]
 
+        sns.scatterplot(x=lmi_geometry.X, y=lmi_geometry.Y, color='lime', s=10)
+        sns.scatterplot(x=x_poi, y=y_poi, color='yellow', s=100)
+        plt.gcf().gca().add_artist(circle)
         sns.scatterplot(x=xs, y=ys, color='yellow')
-
         plt.show()
         plt.close()
 
     neighbouring_bins = lmi_geometry.iloc[indices]
-    neighbouring_bins = neighbouring_bins[['bin_chr','bin_start','bin_end']]
+    neighbouring_bins = neighbouring_bins[['bin_chr', 'bin_start', 'bin_end']]
     neighbouring_bins.columns = ['chrom', 'start', 'end']
 
     # Merge overlapping intervals and create a continuous BED file
-    bed = pd.DataFrame(bioframe.merge(neighbouring_bins, min_dist=2))
-
-    return bed
+    return pd.DataFrame(bioframe.merge(neighbouring_bins, min_dist=2))
 
 
-def get_bins_coords(mlobject):
-
+def get_x_axis_label_signal_plot(mlobject):
     """
-    Get bin indices and corresponding coordinates for a given METALoci object.
+    Get bin indexes and corresponding coordinates for a given METALoci object.
 
     Parameters
     ----------
@@ -698,10 +676,6 @@ def get_bins_coords(mlobject):
         if i == 1:
 
             bins.append(int(0))
-
-        elif i == 4: ## TODO This case should never happen, as range(1,4) corresponds to 1, 2, 3
-
-            bins.append(len(mlobject.lmi_geometry) - 1)
 
         else:
 

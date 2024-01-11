@@ -4,23 +4,23 @@ merging all signals in the same dataframe and subsetting by chromosomes.
 """
 
 import os
-import sys
 import pathlib
 import subprocess as sp
+import sys
 import warnings
-from argparse import HelpFormatter, SUPPRESS
-from time import time
+from argparse import SUPPRESS, HelpFormatter
 from datetime import timedelta
+from time import time
 
+import cooler
 import h5py
 import hicstraw
-import cooler
 import pandas as pd
-from numba.core.errors import NumbaDeprecationWarning, NumbaPendingDeprecationWarning
-from tqdm import tqdm
-from pybedtools import BedTool
-
 from metaloci.misc import misc
+from numba.core.errors import (NumbaDeprecationWarning,
+                               NumbaPendingDeprecationWarning)
+from pybedtools import BedTool
+from tqdm import tqdm
 
 warnings.simplefilter('ignore', category=NumbaDeprecationWarning)
 warnings.simplefilter('ignore', category=NumbaPendingDeprecationWarning)
@@ -30,6 +30,7 @@ DESCRIPTION = """
 Processes signal .bed files or .bedGraph files, binnarizing them at a given resolution,
 merging all signals in the same dataframe and subsetting by chromosomes.
 """
+
 
 def populate_args(parser):
     """
@@ -41,8 +42,7 @@ def populate_args(parser):
         ArgumentParser to populate the arguments through the normal METALoci caller
     """
 
-    parser.formatter_class=lambda prog: HelpFormatter(prog, width=120,
-                                                      max_help_position=60)
+    parser.formatter_class = lambda prog: HelpFormatter(prog, width=120, max_help_position=60)
 
     input_arg = parser.add_argument_group(title="Input arguments")
 
@@ -110,13 +110,14 @@ def populate_args(parser):
         action="help",
         help="Show this help message and exit.")
 
-    optional_arg.add_argument("-t",
+    optional_arg.add_argument(
+        "-t",
         "--summarize_type",
         dest="sum_type",
         metavar="STR",
         type=str,
         default="median",
-        choices = ["median", "mean", "min", "max", "count"],
+        choices=["median", "mean", "min", "max", "count"],
         help="Type of summarization to use. Options: %(choices)s. Default: %(default)s.")
 
     optional_arg.add_argument(
@@ -126,7 +127,8 @@ def populate_args(parser):
         action="store_true",
         help=SUPPRESS)
 
-def run(opts : list):
+
+def run(opts: list):
     """
     Funtion to run this section of METALoci with the needed arguments
 
@@ -147,7 +149,7 @@ def run(opts : list):
 
         work_dir += "/"
 
-    ## Debug 'menu' for testing purposes
+    # Debug 'menu' for testing purposes
     if opts.debug:
 
         print(f"work_dir ->\n\t{work_dir}")
@@ -160,57 +162,58 @@ def run(opts : list):
         sys.exit()
 
     start_timer = time()
-
     tmp_dir = os.path.join(work_dir, "tmp")
+
     pathlib.Path(tmp_dir).mkdir(parents=True, exist_ok=True)
+    print("Checking input files compatibility...", end="\r")
 
-    print("Checking input files compatibility...", end = "\r")
-
-    ## Checking if the resolution supplied by the user is within the resolutions of the cool/mcool/hic files
+    # Checking if the resolution supplied by the user is within the resolutions of the cool/mcool/hic files
     if hic_path.endswith(".cool"):
 
-        aval_resolutions = cooler.Cooler(hic_path).binsize
+        available_resolutions = cooler.Cooler(hic_path).binsize
 
-        if resolution != aval_resolutions:
+        if resolution != available_resolutions:
+
             sys.exit("The given resolution is not the same as the provided cooler file. Exiting...")
 
         hic_chroms = misc.check_names(hic_path, data, coords)
 
     if hic_path.endswith(".mcool"):
 
-        aval_resolutions = [int(x) for x in list(h5py.File(hic_path)["resolutions"].keys())]
+        available_resolutions = [int(x) for x in list(h5py.File(hic_path)["resolutions"].keys())]
 
-        if resolution not in aval_resolutions:
+        if resolution not in available_resolutions:
 
-            print("The given resolution is not in the provided mcooler file. Exiting...")
-            print("The available resolutions are: " +
-                  ", ".join(misc.natural_sort([str(x) for x in aval_resolutions])))
+            print(
+                f"The given resolution is not in the provided mcooler file.\nThe available resolutions are: \
+                {', '.join(misc.natural_sort([str(x) for x in available_resolutions]))}"
+            )
             sys.exit("Exiting...")
 
         hic_chroms = misc.check_names(hic_path, data, coords, resolution)
 
     elif hic_path.endswith(".hic"):
 
-        aval_resolutions = hicstraw.HiCFile(hic_path).getResolutions()
+        available_resolutions = hicstraw.HiCFile(hic_path).getResolutions()
 
-        if resolution not in aval_resolutions:
+        if resolution not in available_resolutions:
 
-            print("The given resolution is not in the provided Hi-C file.")
-            print("The available resolutions are: " +
-                  ", ".join(misc.natural_sort([str(x) for x in aval_resolutions])))
+            print(
+                f"The given resolution is not in the provided mcooler file.\nThe available resolutions are: \
+                {', '.join(misc.natural_sort([str(x) for x in available_resolutions]))}"
+            )
             sys.exit("Exiting...")
 
         hic_chroms = misc.check_names(hic_path, data, coords)
 
-    ## Added an else statement just in case the user is stupid enough to not use a cool/mcool/hic file.
     else:
-        print("HiC file format not supported. Supported formats are: cool, mcool, hic.")
+
+        print("Hi-C file format not supported. Supported formats are: cool, mcool, hic.")
         sys.exit("Exiting...")
 
     print("Checking input files compatibility... OK.")
 
     # Create a bed file that contains regions of a given resolution and sort it.
-
     bin_genome_fn = os.path.join(tmp_dir, f"{resolution}bp_bin" + "{}.bed")
 
     BedTool().window_maker(g=coords, w=resolution).saveas(bin_genome_fn.format('_unsorted'))
@@ -229,18 +232,18 @@ def run(opts : list):
     for data_counter, data_fn in enumerate(data):
 
         print(f"\nProcessing signal file: {data_fn} [{data_counter + 1}/{len(data)}]\n")
-        print("\tSorting signal...", end = "\r")
+        print("\tSorting signal...", end="\r")
 
         signal_file_name = os.path.basename(data_fn)
-        t_sig_pth = os.path.join(tmp_dir, "{}_" + f"{signal_file_name}")
+        tmp_signal_path = os.path.join(tmp_dir, "{}_" + f"{signal_file_name}")
 
-        sp.call(f"cp {data_fn} {t_sig_pth.format('tmp')}", shell=True)
+        sp.call(f"cp {data_fn} {tmp_signal_path.format('tmp')}", shell=True)
 
         if sp.getoutput(f"head -n 1 {data_fn} | cut -f 1") != "chrom":
 
             sp.call(
-               f"sort {t_sig_pth.format('tmp')} -k1,1V -k2,2n -k3,3n > {t_sig_pth.format('sorted')}",
-               shell=True
+                f"sort {tmp_signal_path.format('tmp')} -k1,1V -k2,2n -k3,3n > {tmp_signal_path.format('sorted')}",
+                shell=True
             )
 
             header = False
@@ -251,7 +254,8 @@ def run(opts : list):
             column_dict[signal_file_name] = sp.getoutput(f"head -n 1 {data_fn}").split(sep="\t")
 
             sp.call(
-                f"tail -n +1 {t_sig_pth.format('tmp')} | sort -k1,1V -k2,2n -k3,3n > {t_sig_pth.format('sorted')}",
+                f"tail -n +1 {tmp_signal_path.format('tmp')} | sort -k1,1V -k2,2n -k3,3n > \
+                {tmp_signal_path.format('sorted')}",
                 shell=True
             )
 
@@ -274,66 +278,73 @@ def run(opts : list):
         print("\tSorting signal... done.")
         print(f"\tIntersecting signal with {resolution}bp bins...")
 
-        ## Perhaps use a \t?
+        # Perhaps use a \t?
         pbar = tqdm(chroms, desc=f"        {chroms[0]}")
-
         chrom_bed_path = os.path.join(tmp_dir, "{}" + f'_{resolution}bp_bin.bed')
 
         for i, chrom in enumerate(pbar):
 
             # Do a subset of the signal
-            awk_com = f"""awk '{{if($1=="{chrom}") {{print}}}}' {t_sig_pth.format('sorted')} > """ + \
-                f"{t_sig_pth.format(f'{chrom}_sorted')}"
+            awk_com = f"""awk '{{if($1=="{chrom}") {{print}}}}' {tmp_signal_path.format('sorted')} > """ + \
+                f"{tmp_signal_path.format(f'{chrom}_sorted')}"
+
             sp.call(awk_com, shell=True)
 
             # Do a subset of the BedTools makewindows file
             awk_com = f"""awk '{{if($1=="{chrom}") {{print}}}}' {bin_genome_fn.format('')} > """ + \
                 f"{chrom_bed_path.format(chrom)}"
+
             sp.call(awk_com, shell=True)
 
             # Do an intersection of the signal and the bed file, per each chromsome.
-            BedTool(chrom_bed_path.format(chrom)).intersect(BedTool(t_sig_pth.format(f'{chrom}_sorted')), wao=True, sorted=True).saveas(t_sig_pth.format(f'{chrom}_intersected'))
+            BedTool(
+                chrom_bed_path.format(chrom)).intersect(
+                BedTool(tmp_signal_path.format(f'{chrom}_sorted')),
+                wao=True, sorted=True).saveas(tmp_signal_path.format(f'{chrom}_intersected'))
 
             os.remove(chrom_bed_path.format(chrom))
-            os.remove(t_sig_pth.format(f'{chrom}_sorted'))
+            os.remove(tmp_signal_path.format(f'{chrom}_sorted'))
 
-            conc_bed = os.path.join(tmp_dir, '{}concatenated.bed')
+            concatenated_bed = os.path.join(tmp_dir, '{}concatenated.bed')
 
             # Concatenate all the intersected files.
             if chrom == chroms[0]:
 
-                sp.call(f"cp {t_sig_pth.format(f'{chrom}_intersected')} {conc_bed.format('')}", shell = True)
+                sp.call(
+                    f"cp {tmp_signal_path.format(f'{chrom}_intersected')} {concatenated_bed.format('')}",
+                    shell=True
+                )
 
             else:
 
-                sp.call(f"cat {conc_bed.format('')} {t_sig_pth.format(f'{chrom}_intersected')} > "
-                        f"{conc_bed.format('tmp_')}",
-                        shell=True)
+                sp.call(
+                    f"cat {concatenated_bed.format('')} {tmp_signal_path.format(f'{chrom}_intersected')} > \
+                    {concatenated_bed.format('tmp_')}",
+                    shell=True
+                )
+                sp.call(f"mv {concatenated_bed.format('tmp_')} {concatenated_bed.format('')}", shell=True)
 
-                sp.call(f"mv {conc_bed.format('tmp_')} {conc_bed.format('')}", shell=True)
-
-            os.remove(t_sig_pth.format(f'{chrom}_intersected'))
-
+            os.remove(tmp_signal_path.format(f'{chrom}_intersected'))
             pbar.set_description(f"        {chroms[i+1] if i+1 < len(chroms) else 'all done! ('}")
 
-        print("\tAssigning signal to bins...", end = "\r")
+        print("\tAssigning signal to bins...", end="\r")
 
-        n_of_col = sp.getoutput(f"head -n 1 {conc_bed.format('')}" + " | awk '{print NF}'")
-
-        awk_com = f"awk -F \'\\t\' -v OFS=\'\\t\' '{{if (${n_of_col} == 0) {{$4 = $1; $5 = $2; $6 = $3}} {{for (i = 7; i <= {n_of_col}; i++) {{$i = $i * (${n_of_col} / ($6 - $5))}}}} print}}' {conc_bed.format('')} > {tmp_dir}/intersected_ok_{signal_file_name}"
+        n_of_col = sp.getoutput(f"head -n 1 {concatenated_bed.format('')}" + " | awk '{print NF}'")
+        awk_com = (
+            f"awk -F \'\\t\' -v OFS=\'\\t\' '{{if (${n_of_col} == 0) {{$4 = $1; $5 = $2; $6 = $3}} \
+            {{for (i = 7; i <= {n_of_col}; i++) {{$i = $i * (${n_of_col} / ($6 - $5))}}}} print}}' \
+             {concatenated_bed.format('')} > {tmp_dir}/intersected_ok_{signal_file_name}"
+        )
 
         sp.call(awk_com, shell=True)
-
         print("\tAssigning signal to bins... done.")
 
-    print("\nConcatenating signals in one file...", end = "\r")
+    print("\nConcatenating signals in one file...", end="\r")
 
     # Create a list of paths to the intersected files.
     intersected_files_paths = [os.path.join(tmp_dir, f"intersected_ok_{os.path.basename(f)}") for f in data]
-
     # Read the first intersected file,
     final_intersect = pd.read_csv(intersected_files_paths[0], sep="\t", header=None, low_memory=False)
-
     # Drop unnecesary columns,
     final_intersect = final_intersect.drop([3, 4, 5, final_intersect.columns[-1]], axis=1)
 
@@ -353,14 +364,10 @@ def run(opts : list):
             f"{os.path.basename(intersected_files_paths[0].rsplit('.', 1)[0]).split('intersected_ok_', 1)[1]}"
         ]
 
-    ## In this case we should consider adding a function that performs this to avoid the
-    ## chain of if-elif. Should go in misc?
-
     # Calculate the summary of all signals of the same bin.
     final_intersect = misc.signal_binnarize(final_intersect, sum_type)
 
-    # Process the rest of the files the same way and merge with next one,
-    # until all files are merged.
+    # Process the rest of the files the same way and merge with the previous one, until all files are merged.
     if len(intersected_files_paths) > 1:
 
         for i in range(1, len(intersected_files_paths)):
@@ -381,12 +388,11 @@ def run(opts : list):
                     "chrom",
                     "start",
                     "end",
-                    f"{os.path.basename(intersected_files_paths[i].rsplit('.', 1)[0]).split('intersected_ok_', 1)[1]}" 
+                    f"{os.path.basename(intersected_files_paths[i].rsplit('.', 1)[0]).split('intersected_ok_', 1)[1]}"
                 ]
 
             # Calculate the summary of all signals of the same bin.
             tmp_intersect = misc.signal_binnarize(tmp_intersect, sum_type)
-
             final_intersect = pd.merge(final_intersect, tmp_intersect,
                                        on=["chrom", "start", "end"], how="outer").fillna(0)
 
@@ -395,11 +401,9 @@ def run(opts : list):
     for chrom in sorted(final_intersect["chrom"].unique()):
 
         pathlib.Path(os.path.join(work_dir, "signal", chrom)).mkdir(parents=True, exist_ok=True)
-
         final_intersect[final_intersect.chrom == f"{chrom}"].to_pickle(
             f"{work_dir}signal/{chrom}/{chrom}_signal.pkl"
         )
-
         final_intersect[final_intersect.chrom == f"{chrom}"].to_csv(
             f"{work_dir}signal/{chrom}/{chrom}_signal.tsv",
             sep="\t", index=False
@@ -418,8 +422,6 @@ def run(opts : list):
         print(f"Omited chromosomes {', '.join(chroms_no_signal)} as they did not have any signal.")
 
     print(f"\nSignal bed files saved to {work_dir}signal/")
-
     misc.remove_folder(pathlib.Path(tmp_dir))
-
     print(f"\nTotal time spent: {timedelta(seconds=round(time() - start_timer))}.")
     print("\nAll done.")

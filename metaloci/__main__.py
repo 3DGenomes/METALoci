@@ -1,12 +1,24 @@
+"""
+METALoci: spatially auto-correlated signals in 3D genomes.
+"""
+
 import sys
-from argparse import ArgumentParser, HelpFormatter, RawDescriptionHelpFormatter
+from argparse import ArgumentParser, HelpFormatter, RawDescriptionHelpFormatter, RawTextHelpFormatter
 from importlib.metadata import version
 
 from metaloci.tools import figure, layout, ml, prep
 from metaloci.utility_scripts import sniffer
 
 
-def main(arguments) -> None: 
+def main(arguments: list) -> None:
+    """
+    Function to create METALoci tools and populate and pass the arguments to the subprograms.
+
+    Parameters
+    ----------
+    arguments : list
+        List of arguments to run METALoci
+    """
 
     DESCRIPTION = "METALoci: spatially auto-correlated signals in 3D genomes.\n"
 
@@ -14,62 +26,62 @@ def main(arguments) -> None:
 
         subcommand = arguments[1]
 
-        if subcommand == "version" or subcommand == "--version":
+        if subcommand in ["version", "--version"]:
 
             print("METALoci v" + version("metaloci"))
             return
-        
-    parser = ArgumentParser()
 
-    parser.formatter_class=lambda prog: HelpFormatter(prog, width=120,
-                                                      max_help_position=60)
-    
+    parser = ArgumentParser(prog="metaloci")
+
+    parser.formatter_class = lambda prog: HelpFormatter(prog, width=120,
+                                                        max_help_position=60)
+
     subparser = parser.add_subparsers(title="Available programs")
 
     args_pp = {}
 
     # prep
     args_pp["prep"] = subparser.add_parser("prep",
-                                          description=prep.DESCRIPTION,
-                                          help=prep.DESCRIPTION,
-                                          add_help=False,
-                                          formatter_class=RawDescriptionHelpFormatter)
+                                           description=prep.DESCRIPTION,
+                                           help=prep.DESCRIPTION,
+                                           add_help=False,
+                                           formatter_class=RawDescriptionHelpFormatter)
     args_pp["prep"].set_defaults(func=prep.run)
     prep.populate_args(args_pp["prep"])
 
     # layout
     args_pp["layout"] = subparser.add_parser("layout",
-                                          description=layout.DESCRIPTION,
-                                          help=layout.DESCRIPTION,
-                                          add_help=False,
-                                          formatter_class=RawDescriptionHelpFormatter)
+                                             description=layout.DESCRIPTION,
+                                             help=layout.DESCRIPTION,
+                                             add_help=False,
+                                             formatter_class=RawDescriptionHelpFormatter)
     args_pp["layout"].set_defaults(func=layout.run)
     layout.populate_args(args_pp["layout"])
 
     # ml
     args_pp["lm"] = subparser.add_parser("lm",
-                                          description=ml.DESCRIPTION,
-                                          help=ml.DESCRIPTION,
-                                          add_help=False,
-                                          formatter_class=RawDescriptionHelpFormatter)
+                                         description=ml.DESCRIPTION,
+                                         help=ml.DESCRIPTION,
+                                         add_help=False,
+                                         formatter_class=RawDescriptionHelpFormatter)
     args_pp["lm"].set_defaults(func=ml.run)
     ml.populate_args(args_pp["lm"])
 
     # figure
     args_pp["figure"] = subparser.add_parser("figure",
-                                          description=figure.DESCRIPTION,
-                                          help=figure.DESCRIPTION,
-                                          add_help=False,
-                                          formatter_class=RawDescriptionHelpFormatter)
+                                             description=figure.DESCRIPTION,
+                                             help=figure.DESCRIPTION,
+                                             add_help=False,
+                                             formatter_class=RawTextHelpFormatter)
     args_pp["figure"].set_defaults(func=figure.run)
     figure.populate_args(args_pp["figure"])
 
     # sniffer
     args_pp["sniffer"] = subparser.add_parser("sniffer",
-                                          description=sniffer.DESCRIPTION,
-                                          help=sniffer.DESCRIPTION,
-                                          add_help=False,
-                                          formatter_class=RawDescriptionHelpFormatter)
+                                              description=sniffer.DESCRIPTION,
+                                              help=sniffer.DESCRIPTION,
+                                              add_help=False,
+                                              formatter_class=RawDescriptionHelpFormatter)
     args_pp["sniffer"].set_defaults(func=sniffer.run)
     sniffer.populate_args(args_pp["sniffer"])
 
@@ -85,7 +97,7 @@ def main(arguments) -> None:
 
             args_pp[arguments[1]].print_help()
             return
-        
+
         except KeyError:
 
             pass
@@ -93,5 +105,6 @@ def main(arguments) -> None:
     args = parser.parse_args(arguments[1:])
 
     args.func(args)
+
 
 sys.exit(main(sys.argv))

@@ -1,8 +1,11 @@
+"""
+Script that contains the functions needed to create the Kamada-Kawai layout
+"""
 import numpy as np
 from metaloci import mlo
 
 
-def get_restraints_matrix(mlobject: mlo.MetalociObject, silent : bool = False) -> mlo.MetalociObject:
+def get_restraints_matrix(mlobject: mlo.MetalociObject, silent: bool = False) -> mlo.MetalociObject:
     """
     Calculate top interaction matrix subset, plot matrix and get restraints.
 
@@ -11,9 +14,8 @@ def get_restraints_matrix(mlobject: mlo.MetalociObject, silent : bool = False) -
     mlobject : mlo.MetalociObject
         METALoci object with a matrix and a cutoff (MetalociObject.matrix and MetalociObject.kk_cutoff) in it.
         MetalociObject.persistence_length is optional.
-    plot_bool : bool, optional
-        Boolean. If true, it will save a Kamada-Kawai of the region in the working directory.
-        This is useful when exploring your data. By default True
+    silent : bool, optional
+        Variable passed to get_subset_matrix function to control the verbosity of it (useful for multiprocessing).
 
     Returns
     -------
@@ -34,7 +36,7 @@ def get_restraints_matrix(mlobject: mlo.MetalociObject, silent : bool = False) -
 
     # Modify the matrix and transform to restraints
     restraints_matrix = np.where(mlobject.subset_matrix == 0, np.nan, mlobject.subset_matrix)  # Remove zeroes
-    restraints_matrix = 1 / restraints_matrix  # Convert to distance Matrix instead of similarity matrix
+    restraints_matrix = 1 / restraints_matrix  # Convert to distance matrix instead of similarity matrix
     restraints_matrix = np.triu(restraints_matrix, k=0)  # Remove lower triangle
     restraints_matrix = np.nan_to_num(restraints_matrix, nan=0, posinf=0, neginf=0)  # Clean nans and infs
 
@@ -43,7 +45,7 @@ def get_restraints_matrix(mlobject: mlo.MetalociObject, silent : bool = False) -
     return mlobject
 
 
-def get_subset_matrix(mlobject: mlo.MetalociObject, silent = False) -> np.ndarray:
+def get_subset_matrix(mlobject: mlo.MetalociObject, silent=False) -> np.ndarray:
     """
     Get a subset of the Hi-C matrix with the top contact interactions in the matrix, defined by a cutoff.
     The diagonal is also removed.
@@ -53,6 +55,8 @@ def get_subset_matrix(mlobject: mlo.MetalociObject, silent = False) -> np.ndarra
     mlobject : mlo.MetalociObject
         METALoci object with a matrix and a cutoff in it (MetalociObject.matrix and
         MetalociObject.kk_cutoff respectively).
+    silent : boolean
+        Variable that controls the verbosity of the function (useful for multiprocessing).
 
     Returns
     -------
@@ -69,11 +73,12 @@ def get_subset_matrix(mlobject: mlo.MetalociObject, silent = False) -> np.ndarra
     """
 
     if mlobject.kk_cutoff is None:
-        
+
         if not silent:
 
             print(
-                f"\tMETALoci object {mlobject.region} does not have a cutoff. Set the cutoff in 'mlobject.kk_cutoff' first."
+                f"\tMETALoci object {mlobject.region} does not have a cutoff. \
+                    Set the cutoff in 'mlobject.kk_cutoff' first."
             )
 
         return None
@@ -81,24 +86,32 @@ def get_subset_matrix(mlobject: mlo.MetalociObject, silent = False) -> np.ndarra
     mlobject.flat_matrix = mlobject.matrix.copy().flatten()
 
     if mlobject.kk_cutoff["cutoff_type"] == "percentage":
+
         # Calculating the top interactions of and subsetting the matrix to get those.
-        top = int(len(mlobject.flat_matrix[mlobject.flat_matrix > np.nanmin(mlobject.flat_matrix)]) * mlobject.kk_cutoff["values"])
-        
+        top = int(len(mlobject.flat_matrix[mlobject.flat_matrix > np.nanmin(
+            mlobject.flat_matrix)]) * mlobject.kk_cutoff["values"])
+
         if not silent:
-        
-            print(f"\tCut-off = {sorted(mlobject.flat_matrix, reverse = True)[top]:.4f} | Using top: {round(mlobject.kk_cutoff['values'] * 100, 2)}% highest interactions")
-    
+
+            print(f"\tCut-off = {sorted(mlobject.flat_matrix, reverse = True)[top]:.4f} | \
+                  Using top: {round(mlobject.kk_cutoff['values'] * 100, ndigits=2)}% highest interactions")
+
     elif mlobject.kk_cutoff["cutoff_type"] == "absolute":
 
-        # get the interaction values that are higher than the cutoff
+        # Get the interaction values that are higher than the cutoff
         top = int(len(mlobject.flat_matrix[mlobject.flat_matrix > mlobject.kk_cutoff["values"]]))
 
         if not silent:
 
-            print(f"\tCut-off = {mlobject.kk_cutoff['values']:.4f} | Using top {round(top/len(mlobject.flat_matrix[mlobject.flat_matrix > np.nanmin(mlobject.flat_matrix)])*100, ndigits=2)}% highest interactions")
-    
+            perc_temp = top/len(mlobject.flat_matrix[mlobject.flat_matrix > np.nanmin(mlobject.flat_matrix)])
+
+            print(f"\tCut-off = {mlobject.kk_cutoff['values']:.4f} | \
+                  Using top: {round(perc_temp * 100, ndigits=2)}% highest interactions")
+
     if top < len(np.diag(mlobject.matrix)):
-        
+
+        # TODO Needs the code to add this to bad_regions file?
+        # mlobject.bad_region = "cutoff too high"
         if not silent:
 
             print(f"\tCut-off is too high for {mlobject.region}. Try lowering it.")   
@@ -122,7 +135,7 @@ def get_subset_matrix(mlobject: mlo.MetalociObject, silent = False) -> np.ndarra
 
         mlobject.persistence_length = np.nanquantile(subset_matrix[subset_matrix > 0], 0.99) ** 2
 
-    subset_matrix[rng, rng + 1] = mlobject.persistence_length
+    subset_matrix[rng, rng + 1] = mlobject.persistence_length  # Add persistence length to bins next to diagonal
     subset_matrix[0, 0] = 0
     subset_matrix[rng + 1, rng + 1] = 0  # Remove diagonal
     

@@ -1,15 +1,56 @@
+"""
+Script that contains helper functions of the METALoci package
+"""
+import gzip
+import re
+import sys
+from collections import defaultdict
+from pathlib import Path
+
+import cooler
+import hicstraw
 import numpy as np
 import pandas as pd
-from tqdm.auto import tqdm
-import re
-from collections import defaultdict
-import sys
 from metaloci import mlo
-from pathlib import Path
-import cooler
-import subprocess as sp
-import hicstraw
-import gzip
+
+
+def signal_binnarize(data: pd.DataFrame, sum_type: str) -> pd.DataFrame:
+    """
+    Parsing the signal data frame with the appropiate binnarizing method
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        Signal DataFrmae
+    sum_type : str
+        Method to binnarize the signal
+
+    Returns
+    -------
+    data : pd.DataFrame
+        Binnarized signal data frame
+    """
+    if sum_type == "median":
+
+        data = data.groupby(["chrom", "start", "end"])[data.columns[3: len(data.columns)]].median().reset_index()
+
+    elif sum_type == "mean":
+
+        data = data.groupby(["chrom", "start", "end"])[data.columns[3: len(data.columns)]].mean().reset_index()
+
+    elif sum_type == "min":
+
+        data = data.groupby(["chrom", "start", "end"])[data.columns[3: len(data.columns)]].min().reset_index()
+
+    elif sum_type == "max":
+
+        data = data.groupby(["chrom", "start", "end"])[data.columns[3: len(data.columns)]].max().reset_index()
+
+    elif sum_type == "count":
+
+        data = data.groupby(["chrom", "start", "end"])[data.columns[3: len(data.columns)]].count().reset_index()
+
+    return data
 
 
 def remove_folder(path: Path):
@@ -37,9 +78,8 @@ def remove_folder(path: Path):
 
 def check_diagonal(diagonal: np.ndarray) -> tuple[int, float, float, list]:
     """
-    Checks the 0s on the diagonal and saves the total number os zeroes,
-    the the max stretch (number of zeros in a row) as a percentage,
-    the percentage of zeroes, and the location of zeroes.
+    Checks the 0s/NaNs on the diagonal and saves the total number of zeroes, the the max stretch (number of zeros in 
+    a row) as a percentage, the percentage of zeroes, and the location of zeroes.
 
     Parameters
     ----------
@@ -48,13 +88,13 @@ def check_diagonal(diagonal: np.ndarray) -> tuple[int, float, float, list]:
 
     Returns
     -------
-    int
+    total : int
         Total number of zeroes.
-    float
+    percentage_stretch : float
         Percentage of max stretch.
-    float
+    percentatge_zeroes : float
         Percentage of zeroes.
-    list
+    zero_loc : list
         Location of zeroes in the diagonal.
     """
 
@@ -82,7 +122,7 @@ def check_diagonal(diagonal: np.ndarray) -> tuple[int, float, float, list]:
     return total, percentage_stretch, percentage_zeroes, zero_loc
 
 
-def clean_matrix(mlobject: mlo.MetalociObject) -> np.ndarray:
+def clean_matrix(mlobject: mlo.MetalociObject) -> mlo.MetalociObject:
     """
     Clean a given HiC matrix. It checks if the matrix has too many zeroes at
     he diagonal, removes values that are zero at the diagonal but are not in
@@ -92,13 +132,13 @@ def clean_matrix(mlobject: mlo.MetalociObject) -> np.ndarray:
 
     Parameters
     ----------
-    mlo : np.ndarray
+    mlo : mlo.MetalociObject
         METALoci object with a matrix in it.
 
     Returns
     -------
-    np.ndarray
-        Clean matrix.
+    mlobject : mlo.MetalociObject
+        mlo object with the assigned clean matrix.
     """
 
     diagonal = np.array(mlobject.matrix.diagonal())
@@ -107,7 +147,7 @@ def clean_matrix(mlobject: mlo.MetalociObject) -> np.ndarray:
     if total_zeroes == len(diagonal):
 
         mlobject.bad_region = "empty"
-        
+
         return mlobject
 
     if percentage_zeroes >= 20:
@@ -142,7 +182,7 @@ def clean_matrix(mlobject: mlo.MetalociObject) -> np.ndarray:
     return mlobject
 
 
-def signal_normalization(region_signal: pd.DataFrame, pseudocounts: float = None, norm=None) -> np.ndarray:
+def signal_normalization(region_signal: pd.DataFrame, pseudocounts: float = None, norm: str = None) -> np.ndarray:
     """
     Normalize signal values
 
@@ -151,24 +191,22 @@ def signal_normalization(region_signal: pd.DataFrame, pseudocounts: float = None
     ind_signal : pd.DataFrame
         Subset of the signal for a given region and for a signal type.
     pseudocounts : float, optional
-        Pseudocounts to and if the signal is 0, by default 0.01
+        Pseudocounts to add if the signal is 0, by default corresponds to the median of the signal for the region.
     norm : str, optional
-        Type of normalization to use.
-        Values can be "max" (divide each value by the max value in the signal),
-        "sum" (divide each value by the sum of all values),
-        or "01" ( value - min(signal) / max(signal) - min(signal) ), by default "01"
+        Type of normalization to use. Values can be "max" (divide each value by the max value in the signal),
+        "sum" (divide each value by the sum of all values), or "01" (value - min(signal) / max(signal) - min(signal)),
+        by default "01"
 
     Returns
     -------
-    np.ndarray
+    signal : np.ndarray
         Array of normalized signal values for a region and a signal type.
     """
 
     if pseudocounts is None:
 
-        # signal = [0.0 if np.isnan(index) else index for index in region_signal]
-        median_default = np.nanmedian(region_signal) # jfk fix
-        signal = [median_default if np.isnan(index) else index for index in region_signal] # jfk fix
+        median_default = np.nanmedian(region_signal)
+        signal = [median_default if np.isnan(index) else index for index in region_signal]
 
     else:
 
@@ -190,14 +228,16 @@ def signal_normalization(region_signal: pd.DataFrame, pseudocounts: float = None
 
         signal = [(float(value) - min(signal)) / (max(signal) - min(signal) + 0.01) for value in signal]
 
-    return np.array(signal)
+    signal = np.array(signal)
+
+    return signal
 
 
-def check_cooler_names(hic_file: Path, data: Path, coords: bool):
+def check_names(hic_file: Path, data: Path, coords: Path, resolution: int = None) -> list:
     """
-    Checks if the chromosome names in the signal, cooler and chromosome sizes
+    Checks if the chromosome names in the signal, cool/mcool/hic and chromosome sizes
     files are the same.
-    
+
     Parameters
     ----------
     hic_file : Path
@@ -206,15 +246,17 @@ def check_cooler_names(hic_file: Path, data: Path, coords: bool):
         Path to the signal file.
     coords : Path
         Path to the chromosome sizes file.
-    
+    resolution : int, optional
+        Resolution to choose on the mcool file.
+
     Returns
     -------
     chrom_list : list
         List of chromosomes in the cooler file.
 
     """
-    
-    with open(data[0], "r") as handler:
+
+    with open(data[0], "r", encoding="utf-8") as handler:
 
         if [line.strip() for line in handler][10].startswith("chr"):
 
@@ -224,8 +266,17 @@ def check_cooler_names(hic_file: Path, data: Path, coords: bool):
 
             signal_chr_nom = "N"
 
-    hic_file = cooler.Cooler(hic_file)
-    chrom_list = hic_file.chromnames
+    if hic_file.endswith(".cool"):
+
+        chrom_list = cooler.Cooler(hic_file).chromnames
+
+    elif hic_file.endswith(".mcool"):
+
+        chrom_list = cooler.Cooler(f"{hic_file}::/resolutions/{resolution}").chromnames
+
+    elif hic_file.endswith(".hic"):
+
+        chrom_list = [chrom.name for chrom in hicstraw.HiCFile(hic_file).getChromosomes()][1:]
 
     if "chr" in chrom_list[0]:
 
@@ -234,10 +285,8 @@ def check_cooler_names(hic_file: Path, data: Path, coords: bool):
     else:
 
         cooler_chr_nom = "N"
-    
-    del hic_file
 
-    with open(coords, "r") as handler:
+    with open(coords, "r", encoding="utf-8") as handler:
 
         if [line.strip() for line in handler][0].startswith("chr"):
 
@@ -249,111 +298,46 @@ def check_cooler_names(hic_file: Path, data: Path, coords: bool):
 
     if not signal_chr_nom == cooler_chr_nom == coords_chr_nom:
 
-        exit(
-            "\nThe signal, cooler and chromosome sizes files do not have the same nomenclature for chromosomes:\n"
-            f"\n\tSignal chromosomes nomenclature is '{signal_chr_nom}'. "
-            f"\n\tHi-C chromosomes nomenclature is '{cooler_chr_nom}'. "
-            f"\n\tChromosome sizes nomenclature is '{coords_chr_nom}'. "
-            "\n\nPlease, rename the chromosome names. "
-            "\nYou may want to rename the chromosome names in a cooler file with cooler.rename_chroms() in python. "
-            "\n\nExiting..."
-        )
-    
-    return chrom_list
-
-
-def check_hic_names(hic_file: Path, data: Path, coords: bool):
-    """
-    Checks if the chromosome names in the signal, cooler and chromosome sizes
-    files are the same.
-    
-    Parameters
-    ----------
-    hic_file : Path
-        Path to the cooler file.
-    data : Path
-        Path to the signal file.
-    coords : Path
-        Path to the chromosome sizes file.
-    
-    Returns
-    -------
-    chrom_list : list
-        List of chromosomes in the cooler file.
-    """
-
-    with open(data[0], "r") as handler:
-
-        if [line.strip() for line in handler][0].startswith("chr"):
-
-            signal_chr_nom = "chrN"
-
-        else:
-
-            signal_chr_nom = "N"
-    
-    chrom_list = [i.name for i in hicstraw.HiCFile(hic_file).getChromosomes()][1:]
-
-    if "chr" in chrom_list[0]:
-
-        hic_chr_nom = "chrN"
-
-    else:
-
-        hic_chr_nom = "N"
-
-    del hic_file
-
-    with open(coords, "r") as handler:
-
-        if [line.strip() for line in handler][0].startswith("chr"):
-
-            coords_chr_nom = "chrN"
-
-        else:
-
-            coords_chr_nom = "N"
-
-    if not signal_chr_nom == hic_chr_nom == coords_chr_nom:
-
-        exit(
-            "\nThe signal, cooler and chromosome sizes files do not have the same nomenclature for chromosomes:\n"
-            f"\n\tSignal chromosomes nomenclature is '{signal_chr_nom}'. "
-            f"\n\tHi-C chromosomes nomenclature is '{hic_chr_nom}'. "
-            f"\n\tChromosome sizes nomenclature is '{coords_chr_nom}'. "
-            "\n\nPlease, rename the chromosome names. "
-            "\n\nExiting..."
+        sys.exit(
+            "\nThe signal, cooler and chromosome sizes files do not have the same nomenclature for chromosomes:\n\
+            \n\tSignal chromosomes nomenclature is '{signal_chr_nom}'.\
+            \n\tHi-C chromosomes nomenclature is '{cooler_chr_nom}'.\
+            \n\tChromosome sizes nomenclature is '{coords_chr_nom}'.\
+            \n\nPlease, rename the chromosome names.\
+            \n\nExiting..."
         )
 
     return chrom_list
 
 
-def natural_sort(list: list): 
+def natural_sort(element_list: list) -> list:
     """
     Sort the list with natural sorting.
-    
+
     Parameters
     ----------
-    list : list
+    element_list : list
         List to be sorted
-        
+
     Returns
     -------
-    list
+    sorted_element_list : list
         Sorted list
     """
 
-    convert = lambda text: int(text) if text.isdigit() else text.lower()
-    alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)]
-    
-    return sorted(list, key=alphanum_key)
+    def convert(text): return int(text) if text.isdigit() else text.lower()
+    def alphanum_key(key): return [convert(c) for c in re.split('([0-9]+)', key)]
+
+    sorted_element_list = sorted(element_list, key=alphanum_key)
+
+    return sorted_element_list
 
 
-def gtfparser(gene_file_f : Path, name : str, extend : int, resolution : int):
+def gtfparser(gene_file_f: Path, name: str, extend: int, resolution: int) -> tuple[dict, dict, dict, str]:
     """
     Parses a gtf file and returns the information of the genes, excluding
     artifacts
-    
+
     Parameters
     ----------
     gene_file : path
@@ -364,7 +348,7 @@ def gtfparser(gene_file_f : Path, name : str, extend : int, resolution : int):
         Extend of the region to be analyzed
     resolution : int
         Resolution at which to split the genome
-        
+
     Returns
     -------
     id_tss_f : dict
@@ -376,16 +360,16 @@ def gtfparser(gene_file_f : Path, name : str, extend : int, resolution : int):
     fn_f : str
         Name of the end file
     """
-    
+
     gene_type_count = defaultdict(int)
 
     if gene_file_f.endswith("gz"):
-        
+
         myopen = gzip.open
-        
+
     else:
-        
-        myopen = open    
+
+        myopen = open
 
     with myopen(gene_file_f, mode="rt", encoding="utf-8") as gtf_reader:
 
@@ -407,10 +391,10 @@ def gtfparser(gene_file_f : Path, name : str, extend : int, resolution : int):
 
     print("Index: 0; All genes")
 
-    for i_f, key_f in enumerate(gene_type_count.keys()):
+    for type_index, type_name in enumerate(gene_type_count.keys()):
 
-        print(f"Index: {i_f+1}; {key_f}")
-        
+        print(f"Index: {type_index+1}; {type_name}")
+
     ch_index = None
 
     while not isinstance(ch_index, int) or ch_index not in range(len(gene_type_count.keys()) + 1):
@@ -418,11 +402,11 @@ def gtfparser(gene_file_f : Path, name : str, extend : int, resolution : int):
         ch_index = input("Choose the gene type to parse in the final file: ")
 
         try:
-                
+
             ch_index = int(ch_index)
 
         except ValueError:
-                
+
             print("Please, enter a number.")
             continue
 
@@ -438,7 +422,7 @@ def gtfparser(gene_file_f : Path, name : str, extend : int, resolution : int):
         print("Parsing all genes...")
 
     else:
-        
+
         ch_type_pat = re.compile(f'gene_type "{list(gene_type_count.keys())[ch_index - 1]}";')
         fn_f = f"{name}_{list(gene_type_count.keys())[ch_index - 1]}_{extend}_{resolution}_gene_coords.txt"
         print(f"Gene type chosen: {list(gene_type_count.keys())[ch_index - 1]}")
@@ -453,7 +437,7 @@ def gtfparser(gene_file_f : Path, name : str, extend : int, resolution : int):
 
         for line in gtf_reader:
 
-            if re.compile("##").search(line)or not re.compile(r"chr\w+").search(line):
+            if re.compile("##").search(line) or not re.compile(r"chr\w+").search(line):
 
                 continue
 
@@ -477,11 +461,11 @@ def gtfparser(gene_file_f : Path, name : str, extend : int, resolution : int):
     return id_chrom_f, id_tss_f, id_name_f, fn_f
 
 
-def bedparser(gene_file_f : Path, name : str, extend : int, resolution : int):
+def bedparser(gene_file_f: Path, name: str, extend: int, resolution: int) -> tuple[dict, dict, dict, str]:
     """
     Parses a bed file and returns the information of the genes, excluding
     artifacts.
-    
+
     Parameters
     ----------
     gene_file : path
@@ -492,7 +476,7 @@ def bedparser(gene_file_f : Path, name : str, extend : int, resolution : int):
         Extend of the region to be analyzed
     resolution : int
         Resolution at which to split the genome
-        
+
     Returns
     -------
     id_tss_f : dict
@@ -524,10 +508,10 @@ def bedparser(gene_file_f : Path, name : str, extend : int, resolution : int):
     return id_chrom_f, id_tss_f, id_name_f, fn_f
 
 
-def binsearcher(id_tss_f, id_chrom_f, id_name_f, bin_genome_f):
+def binsearcher(id_tss_f: dict, id_chrom_f: dict, id_name_f: dict, bin_genome_f: pd.DataFrame) -> pd.DataFrame:
     """
     Searches the bin index where the gene is located    
-    
+
     Parameters
     ----------
     id_tss_f : dict
@@ -538,7 +522,7 @@ def binsearcher(id_tss_f, id_chrom_f, id_name_f, bin_genome_f):
         Dictionary linking the gene id to the name
     bin_genome_f : pd.DataFrame
         DataFrame containing the bins of the genome
-        
+
     Returns
     -------
     data_f : pd.DataFrame
@@ -547,16 +531,17 @@ def binsearcher(id_tss_f, id_chrom_f, id_name_f, bin_genome_f):
 
     data_f = defaultdict(list)
 
-    for k, v in id_tss_f.items():
+    for g_id, tss_pos in id_tss_f.items():
 
-        chrom_bin_f = bin_genome_f[(bin_genome_f["chrom"] == id_chrom_f[k])].reset_index()
+        chrom_bin_f = bin_genome_f[(bin_genome_f["chrom"] == id_chrom_f[g_id])].reset_index()
 
-        sub_bin_index = chrom_bin_f[(chrom_bin_f["start"] <= v) & (chrom_bin_f["end"] >= v)].index.tolist()[0]
+        sub_bin_index = chrom_bin_f[(chrom_bin_f["start"] <= tss_pos) &
+                                    (chrom_bin_f["end"] >= tss_pos)].index.tolist()[0]
 
-        data_f["chrom"].append(id_chrom_f[k])
+        data_f["chrom"].append(id_chrom_f[g_id])
         data_f["bin_index"].append(sub_bin_index)
-        data_f["gene_name"].append(id_name_f[k])
-        data_f["gene_id"].append(k)
+        data_f["gene_name"].append(id_name_f[g_id])
+        data_f["gene_id"].append(g_id)
 
     print("Aggregating genes that are located in the same bin...")
 

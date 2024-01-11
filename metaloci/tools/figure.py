@@ -354,7 +354,6 @@ def run(opts: list):
                 signal_left[max_chr_yax] = -21
 
             composite_image = Image.new(mode="RGBA", size=(maxx, 1550))
-
             # HiC image
             composite_image = plot.place_composite(composite_image, f"{plot_filename}_hic.png", 0.5, 100, 50)
             # Signal image

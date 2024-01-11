@@ -26,9 +26,11 @@ def get_restraints_matrix(mlobject: mlo.MetalociObject, silent: bool = False) ->
     """
 
     # Get subset matrix
-    mlobject.subset_matrix = get_subset_matrix(mlobject, silent)
+    mlobject = get_subset_matrix(mlobject, silent)
 
     if mlobject.subset_matrix is None:
+        
+        mlobject.kk_restraints_matrix = None
 
         return mlobject
 
@@ -112,9 +114,12 @@ def get_subset_matrix(mlobject: mlo.MetalociObject, silent=False) -> np.ndarray:
         # mlobject.bad_region = "cutoff too high"
         if not silent:
 
-            print(f"\tCut-off is too high for {mlobject.region}. Try lowering it.")
-
-        return None
+            print(f"\tCut-off is too high for {mlobject.region}. Try lowering it.")   
+            
+            mlobject.bad_region = "cut-off"
+            mlobject.subset_matrix = None
+            
+            return mlobject
 
     mlobject.kk_top_indexes = np.argpartition(mlobject.flat_matrix, -top)[-top:]
 
@@ -133,5 +138,7 @@ def get_subset_matrix(mlobject: mlo.MetalociObject, silent=False) -> np.ndarray:
     subset_matrix[rng, rng + 1] = mlobject.persistence_length  # Add persistence length to bins next to diagonal
     subset_matrix[0, 0] = 0
     subset_matrix[rng + 1, rng + 1] = 0  # Remove diagonal
+    
+    mlobject.subset_matrix = subset_matrix
 
-    return subset_matrix
+    return mlobject

@@ -20,6 +20,72 @@ from PIL import Image
 from scipy.ndimage import rotate
 from scipy.stats import linregress, zscore
 from shapely.geometry import Point
+import bioframe
+
+from metaloci import mlo
+from metaloci.misc import misc
+
+
+def get_kk_plot(mlobject: mlo.MetalociObject, restraints: bool = True, neighbourhood: float = None):
+    """
+    Generate Kamada-Kawai plot from pre-calculated restraints.
+
+    Parameters
+    ----------
+    mlobject : mlo.MetalociObject
+        METALoci object with Kamada-Kawai graphs and nodes (MetalociObject.kk_nodes and MetalociObject.kk_graph)
+    restraints : bool, optional
+        Boolean to set whether or not to plot restraints, by default True
+
+    Returns
+    -------
+    matplotlib.pyplot.figure.Figure
+        Kamada-Kawai layout plot object
+    """
+    PLOTSIZE = 10
+    POINTSIZE = PLOTSIZE * 5
+
+    xs = [mlobject.kk_nodes[n][0] for n in mlobject.kk_nodes]
+    ys = [mlobject.kk_nodes[n][1] for n in mlobject.kk_nodes]
+
+    kk_plt = plt.figure(figsize=(PLOTSIZE, PLOTSIZE))
+    plt.axis("off")
+    options = {"node_size": 50, "edge_color": "black", "linewidths": 0.1, "width": 0.05}
+
+    if restraints == True:
+        
+        nx.draw(
+            mlobject.kk_graph,
+            mlobject.kk_nodes,
+            node_color=range(len(mlobject.kk_nodes)),
+            cmap=plt.cm.coolwarm,
+            **options,
+        )
+
+    else:
+
+        sns.scatterplot(x=xs, y=ys, hue=range(len(xs)), palette="coolwarm", legend=False, s=POINTSIZE, zorder=2)
+
+    g = sns.lineplot(x=xs, y=ys, sort=False, lw=2, color="black", legend=False, zorder=1)
+    g.set_aspect("equal", adjustable="box")
+    g.set(ylim=(-1.1, 1.1))
+    g.set(xlim=(-1.1, 1.1))
+    g.tick_params(bottom=False, left=False)
+    g.annotate(f"       {mlobject.chrom}:{mlobject.start}", (xs[0], ys[0]), size=9)
+    g.annotate(f"       {mlobject.chrom}:{mlobject.end}", (xs[len(xs) - 1], ys[len(ys) - 1]), size=9)
+
+    poi_x, poi_y = xs[mlobject.poi], ys[mlobject.poi]
+
+    if neighbourhood:
+
+        circle = plt.Circle((poi_x, poi_y), neighbourhood, color="red", fill=False, linestyle=":", alpha=0.5, lw=1, zorder=3)
+        plt.gca().add_patch(circle)
+
+    sns.scatterplot(
+        x=[poi_x], y=[poi_y], s=POINTSIZE * 1.5, ec="lime", fc="none", zorder=4
+    )
+
+    return kk_plt
 
 
 def mixed_matrices_plot(mlobject: mlo.MetalociObject):

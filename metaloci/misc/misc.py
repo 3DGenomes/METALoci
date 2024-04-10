@@ -1,19 +1,25 @@
 """
 Script that contains helper functions of the METALoci package
 """
+import re
 import sys
+import gzip
+import os
+import subprocess as sp
+from pickle import UnpicklingError
+from io import TextIOWrapper
+from pathlib import Path
+from collections import defaultdict
+
+import hicstraw
+import cooler
 import numpy as np
 import pandas as pd
-import re
-from collections import defaultdict
+
 from metaloci import mlo
-from pathlib import Path
-import cooler
-import hicstraw
-import gzip
 
 
-def signal_binnarize(data : pd.DataFrame, sum_type : str) -> pd.DataFrame:
+def signal_binnarize(data: pd.DataFrame, sum_type: str) -> pd.DataFrame:
     """
     Parsing the signal data frame with the appropiate binnarizing method
 
@@ -31,23 +37,23 @@ def signal_binnarize(data : pd.DataFrame, sum_type : str) -> pd.DataFrame:
     """
     if sum_type == "median":
 
-        data = data.groupby(["chrom", "start", "end"])[data.columns[3 : len(data.columns)]].median().reset_index()
+        data = data.groupby(["chrom", "start", "end"])[data.columns[3: len(data.columns)]].median().reset_index()
 
     elif sum_type == "mean":
 
-        data = data.groupby(["chrom", "start", "end"])[data.columns[3 : len(data.columns)]].mean().reset_index()
+        data = data.groupby(["chrom", "start", "end"])[data.columns[3: len(data.columns)]].mean().reset_index()
 
     elif sum_type == "min":
 
-        data = data.groupby(["chrom", "start", "end"])[data.columns[3 : len(data.columns)]].min().reset_index()
+        data = data.groupby(["chrom", "start", "end"])[data.columns[3: len(data.columns)]].min().reset_index()
 
     elif sum_type == "max":
 
-        data = data.groupby(["chrom", "start", "end"])[data.columns[3 : len(data.columns)]].max().reset_index()
+        data = data.groupby(["chrom", "start", "end"])[data.columns[3: len(data.columns)]].max().reset_index()
 
     elif sum_type == "count":
 
-        data = data.groupby(["chrom", "start", "end"])[data.columns[3 : len(data.columns)]].count().reset_index()
+        data = data.groupby(["chrom", "start", "end"])[data.columns[3: len(data.columns)]].count().reset_index()
 
     return data
 
@@ -238,7 +244,7 @@ def check_names(hic_file: Path, data: Path, coords: Path, resolution: int = None
     """
     Checks if the chromosome names in the signal, cool/mcool/hic and chromosome sizes
     files are the same.
-    
+
     Parameters
     ----------
     hic_file : Path
@@ -249,7 +255,7 @@ def check_names(hic_file: Path, data: Path, coords: Path, resolution: int = None
         Path to the chromosome sizes file.
     resolution : int, optional
         Resolution to choose on the mcool file.
-    
+
     Returns
     -------
     chrom_list : list
@@ -314,20 +320,20 @@ def check_names(hic_file: Path, data: Path, coords: Path, resolution: int = None
 def natural_sort(element_list: list) -> list:
     """
     Sort the list with natural sorting.
-    
+
     Parameters
     ----------
     element_list : list
         List to be sorted
-        
+
     Returns
     -------
     sorted_element_list : list
         Sorted list
     """
 
-    convert = lambda text: int(text) if text.isdigit() else text.lower()
-    alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)]
+    def convert(text): return int(text) if text.isdigit() else text.lower()
+    def alphanum_key(key): return [convert(c) for c in re.split('([0-9]+)', key)]
 
     sorted_element_list = sorted(element_list, key=alphanum_key)
 
@@ -338,7 +344,7 @@ def gtfparser(gene_file_f: Path, name: str, extend: int, resolution: int) -> tup
     """
     Parses a gtf file and returns the information of the genes, excluding
     artifacts
-    
+
     Parameters
     ----------
     gene_file : path
@@ -349,7 +355,7 @@ def gtfparser(gene_file_f: Path, name: str, extend: int, resolution: int) -> tup
         Extend of the region to be analyzed
     resolution : int
         Resolution at which to split the genome
-        
+
     Returns
     -------
     id_tss_f : dict
@@ -438,7 +444,7 @@ def gtfparser(gene_file_f: Path, name: str, extend: int, resolution: int) -> tup
 
         for line in gtf_reader:
 
-            if re.compile("##").search(line)or not re.compile(r"chr\w+").search(line):
+            if re.compile("##").search(line) or not re.compile(r"chr\w+").search(line):
 
                 continue
 
@@ -466,7 +472,7 @@ def bedparser(gene_file_f: Path, name: str, extend: int, resolution: int) -> tup
     """
     Parses a bed file and returns the information of the genes, excluding
     artifacts.
-    
+
     Parameters
     ----------
     gene_file : path
@@ -477,7 +483,7 @@ def bedparser(gene_file_f: Path, name: str, extend: int, resolution: int) -> tup
         Extend of the region to be analyzed
     resolution : int
         Resolution at which to split the genome
-        
+
     Returns
     -------
     id_tss_f : dict
@@ -512,7 +518,7 @@ def bedparser(gene_file_f: Path, name: str, extend: int, resolution: int) -> tup
 def binsearcher(id_tss_f: dict, id_chrom_f: dict, id_name_f: dict, bin_genome_f: pd.DataFrame) -> pd.DataFrame:
     """
     Searches the bin index where the gene is located    
-    
+
     Parameters
     ----------
     id_tss_f : dict
@@ -523,7 +529,7 @@ def binsearcher(id_tss_f: dict, id_chrom_f: dict, id_name_f: dict, bin_genome_f:
         Dictionary linking the gene id to the name
     bin_genome_f : pd.DataFrame
         DataFrame containing the bins of the genome
-        
+
     Returns
     -------
     data_f : pd.DataFrame
@@ -555,3 +561,133 @@ def binsearcher(id_tss_f: dict, id_chrom_f: dict, id_name_f: dict, bin_genome_f:
     data_f[["gene_id"]] = data_f[["gene_id"]].astype(str)
 
     return data_f
+
+
+def meta_param_search(work_dir_f: str, hic_f: str, reso_f: int, reso_file: str, pl_f: list, cutoff_f: float,
+                      sample_num_f: int, seed_f: int):
+    """
+    Test MetaLoci parameters to optimise Kamada-Kawai layout.
+
+    Parameters
+    ----------
+    work_dir_f : str
+        Path to working directory.
+    hic_f : str
+        Complete path to the cool/mcool/hic file.
+    reso_f : int
+        Hi-C resolution to be tested (in bp).
+    reso_file : str
+        Path to region file to be tested.
+    pl_f : _type_
+        Persistent length; amount of possible rotation of points in layout.
+    cutoff_f : float
+        Percent of top interactions to use from HiC.
+    sample_num_f : int
+        Number of regions to sample from the region file.
+    seed_f : int
+        Random seed for region sampling.
+    """
+
+    save_dir_f = os.path.join(work_dir_f, f"reso_{reso_f}_cutoff_{cutoff_f*100:.0f}_pl_{pl_f}")
+    Path(save_dir_f).mkdir(parents=True, exist_ok=True)
+
+    ml_comm = f"metaloci layout -w {save_dir_f} -c {hic_f}" + " -r {} -g {} --cutoff {} --pl {} --plot > /dev/null 2>&1"
+
+    regions = pd.read_table(reso_file)
+    sample = regions.sample(sample_num_f, random_state=seed_f)
+
+    for region_coords in sample['coords']:
+        com2run = ml_comm.format(reso_f, region_coords, cutoff_f, pl_f)
+        sp.check_call(com2run, shell=True)
+
+
+def get_poi_data(
+        line_f: pd.Series, signals_f: list, work_dir_f: str,
+        bf_f: str, of: str,
+        pval: float, quadrant_list: str,
+        region_file_f: bool = False, rf_h=None):
+    """
+    Function to extract data from the METALoci objects and parse it into a table.
+
+    Parameters
+    ----------
+    line_f : pd.Series
+        Row of the gene file to parse.
+    signals_f : list
+        List of signals to parse.
+    work_dir_f : str
+        Path to working directory.
+    bf_f : str
+        Bad file name.
+    of : str
+        Output file name.
+    pval : float
+        P-value threshold.
+    quadrant_list : list
+        List of quadrants to consider.
+    region_file_f : bool, optional
+        Select whether or not to store a metaloci region file with the significant regions.
+    rf_h : TextIOWrapper, optional
+        Region file name.
+
+    Returns
+    -------
+    None
+    """
+
+    mlo_fn = f"{line_f.coords.replace(':', '_').replace('-', '_')}.mlo"
+
+    bfh_f = open(bf_f, mode="a", encoding="utf-8")
+
+    if not os.path.exists(os.path.join(work_dir_f, mlo_fn.split("_")[0], mlo_fn)):
+
+        bfh_f.write(f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}\tno_file\n")
+        bfh_f.flush()
+        return None
+
+    table_line_f = f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}"
+
+    try:
+
+        mlo_data_f = pd.read_pickle(os.path.join(work_dir_f, mlo_fn.split("_")[0], mlo_fn))
+
+    except UnpicklingError:
+
+        bfh_f.write(f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}\tcorrupt_file\n")
+        bfh_f.flush()
+        return None
+
+    of_h = open(of, mode="a", encoding="utf-8")
+
+    for sig_f in signals_f:
+
+        try:
+
+            poi_data_f = mlo_data_f.lmi_info[sig_f][mlo_data_f.lmi_info[sig_f]["bin_index"] == mlo_data_f.poi]
+            poi_lmi_f = poi_data_f.LMI_score.squeeze()
+            poi_quadrant_f = poi_data_f.moran_quadrant.squeeze()
+            poi_pval_f = poi_data_f.LMI_pvalue.squeeze()
+
+            if poi_quadrant_f in quadrant_list and poi_pval_f <= pval:
+
+                table_line_f = table_line_f + f"\t{poi_quadrant_f}\t{poi_lmi_f}\t{poi_pval_f}"
+
+                if region_file_f:
+
+                    regionfile_h = open(rf_h, mode="a", encoding="utf-8")
+                    regionfile_h.write(f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}\n")
+                    regionfile_h.flush()
+
+            else:
+
+                table_line_f = table_line_f + "\tNA\tNA\tNA"
+
+            of_h.write(f"{table_line_f}\n")
+            of_h.flush()
+
+        except KeyError:
+
+            bfh_f.write(f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}\tno_signal_{sig_f}\n")
+            bfh_f.flush()
+
+    return None

@@ -7,10 +7,10 @@ from argparse import ArgumentParser, HelpFormatter, RawDescriptionHelpFormatter
 from importlib.metadata import version
 
 from metaloci.tools import figure, layout, ml, prep
-from metaloci.utility_scripts import sniffer
+from metaloci.utility_scripts import sniffer, param_search, gene_selector
 
 
-def main(arguments : list) -> None:
+def main(arguments: list) -> None:
     """
     Function to create METALoci tools and populate and pass the arguments to the subprograms.
 
@@ -31,10 +31,10 @@ def main(arguments : list) -> None:
             print("METALoci v" + version("metaloci"))
             return
 
-    parser = ArgumentParser(prog = "metaloci")
+    parser = ArgumentParser(prog="metaloci")
 
-    parser.formatter_class=lambda prog: HelpFormatter(prog, width=120,
-                                                      max_help_position=60)
+    parser.formatter_class = lambda prog: HelpFormatter(prog, width=120,
+                                                        max_help_position=60)
 
     subparser = parser.add_subparsers(title="Available programs")
 
@@ -42,48 +42,68 @@ def main(arguments : list) -> None:
 
     # prep
     args_pp["prep"] = subparser.add_parser("prep",
-                                          description=prep.DESCRIPTION,
-                                          help=prep.DESCRIPTION,
-                                          add_help=False,
-                                          formatter_class=RawDescriptionHelpFormatter)
+                                           description=prep.DESCRIPTION,
+                                           help=prep.DESCRIPTION,
+                                           add_help=False,
+                                           formatter_class=RawDescriptionHelpFormatter)
     args_pp["prep"].set_defaults(func=prep.run)
     prep.populate_args(args_pp["prep"])
 
     # layout
     args_pp["layout"] = subparser.add_parser("layout",
-                                          description=layout.DESCRIPTION,
-                                          help=layout.DESCRIPTION,
-                                          add_help=False,
-                                          formatter_class=RawDescriptionHelpFormatter)
+                                             description=layout.DESCRIPTION,
+                                             help=layout.DESCRIPTION,
+                                             add_help=False,
+                                             formatter_class=RawDescriptionHelpFormatter)
     args_pp["layout"].set_defaults(func=layout.run)
     layout.populate_args(args_pp["layout"])
 
     # ml
     args_pp["lm"] = subparser.add_parser("lm",
-                                          description=ml.DESCRIPTION,
-                                          help=ml.DESCRIPTION,
-                                          add_help=False,
-                                          formatter_class=RawDescriptionHelpFormatter)
+                                         description=ml.DESCRIPTION,
+                                         help=ml.DESCRIPTION,
+                                         add_help=False,
+                                         formatter_class=RawDescriptionHelpFormatter)
     args_pp["lm"].set_defaults(func=ml.run)
     ml.populate_args(args_pp["lm"])
 
     # figure
     args_pp["figure"] = subparser.add_parser("figure",
-                                          description=figure.DESCRIPTION,
-                                          help=figure.DESCRIPTION,
-                                          add_help=False,
-                                          formatter_class=RawDescriptionHelpFormatter)
+                                             description=figure.DESCRIPTION,
+                                             help=figure.DESCRIPTION,
+                                             add_help=False,
+                                             formatter_class=RawDescriptionHelpFormatter)
     args_pp["figure"].set_defaults(func=figure.run)
     figure.populate_args(args_pp["figure"])
 
     # sniffer
     args_pp["sniffer"] = subparser.add_parser("sniffer",
-                                          description=sniffer.DESCRIPTION,
-                                          help=sniffer.DESCRIPTION,
-                                          add_help=False,
-                                          formatter_class=RawDescriptionHelpFormatter)
+                                              description=sniffer.DESCRIPTION,
+                                              help=sniffer.DESCRIPTION,
+                                              add_help=False,
+                                              formatter_class=RawDescriptionHelpFormatter)
     args_pp["sniffer"].set_defaults(func=sniffer.run)
     sniffer.populate_args(args_pp["sniffer"])
+
+    # param_search
+    args_pp["param_search"] = subparser.add_parser("param_search",
+                                                   formatter_class=RawDescriptionHelpFormatter,
+                                                   description=param_search.DESCRIPTION,
+                                                   help=param_search.HELP,
+                                                   add_help=False,
+                                                   )
+    args_pp["param_search"].set_defaults(func=param_search.run)
+    param_search.populate_args(args_pp["param_search"])
+
+    # param_search
+    args_pp["gene_selector"] = subparser.add_parser("gene_selector",
+                                                    formatter_class=RawDescriptionHelpFormatter,
+                                                    description=gene_selector.DESCRIPTION,
+                                                    help=gene_selector.HELP,
+                                                    add_help=False,
+                                                    )
+    args_pp["gene_selector"].set_defaults(func=gene_selector.run)
+    gene_selector.populate_args(args_pp["gene_selector"])
 
     if len(arguments) == 1:
 
@@ -105,5 +125,6 @@ def main(arguments : list) -> None:
     args = parser.parse_args(arguments[1:])
 
     args.func(args)
+
 
 sys.exit(main(sys.argv))

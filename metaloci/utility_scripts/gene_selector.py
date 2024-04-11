@@ -137,7 +137,7 @@ def populate_args(parser):
         "--ncpus",
         dest="ncpus",
         metavar="INT",
-        default="8",
+        default=int(mp.cpu_count() - 2),
         type=int,
         help="Number of cpus for the multiprocessing (default: %(default)s).",
     )
@@ -218,23 +218,23 @@ def run(opts: list):
 
     for sig in signals:
 
-        HEADER += f"\t{sig}_LMIq\t{sig}_LMIscore\t{sig}_LMIpval"
+        HEADER += f"\t{sig}_LMIq\t{sig}_LMIscore\t{sig}_LMIpval\t{sig}_signal\t{sig}_lag"
 
     out_file_handler = open(out_file_name, mode="w", encoding="utf-8")
     out_file_handler.write(f"{HEADER}\n")
     out_file_handler.flush()
 
     bad_file_handler = open(bad_file_name, mode="w", encoding="utf-8")
-    bad_file_handler.write("coords\tsymbol\tid\n")
+    bad_file_handler.write("coords\tsymbol\tid\treason\n")
     bad_file_handler.flush()
 
     if region_file:
 
         region_file_handler = open(region_file_name, mode="w", encoding="utf-8")
-        region_file_handler.write("coords\tsymbol\tid\n")
+        region_file_handler.write(f"{HEADER}\n")
         region_file_handler.flush()
 
-        args2do = [(line, signals, work_dir, bad_file_handler, out_file_handler, pval,
+        args2do = [(line, signals, work_dir, bad_file_name, out_file_name, pval,
                     quadrant_list, region_file, region_file_name) for _, line in genes.iterrows()]
 
     else:

@@ -7,7 +7,6 @@ import gzip
 import os
 import subprocess as sp
 from pickle import UnpicklingError
-from io import TextIOWrapper
 from pathlib import Path
 from collections import defaultdict
 
@@ -657,6 +656,12 @@ def get_poi_data(
         bfh_f.flush()
         return None
 
+    if mlo_data_f.bad_region:
+
+        bfh_f.write(f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}\t{mlo_data_f.bad_region}\n")
+        bfh_f.flush()
+        return None
+
     of_h = open(of, mode="a", encoding="utf-8")
 
     for sig_f in signals_f:
@@ -667,27 +672,23 @@ def get_poi_data(
             poi_lmi_f = poi_data_f.LMI_score.squeeze()
             poi_quadrant_f = poi_data_f.moran_quadrant.squeeze()
             poi_pval_f = poi_data_f.LMI_pvalue.squeeze()
+            poi_signal_f = poi_data_f.ZSig.squeeze()
+            poi_lag_f = poi_data_f.ZLag.squeeze()
 
-            if poi_quadrant_f in quadrant_list and poi_pval_f <= pval:
+            table_line_f += f"\t{poi_quadrant_f}\t{poi_lmi_f}\t{poi_pval_f}\t{poi_signal_f}\t{poi_lag_f}"
 
-                table_line_f = table_line_f + f"\t{poi_quadrant_f}\t{poi_lmi_f}\t{poi_pval_f}"
+            if poi_quadrant_f in quadrant_list and poi_pval_f <= pval and region_file_f:
 
-                if region_file_f:
-
-                    regionfile_h = open(rf_h, mode="a", encoding="utf-8")
-                    regionfile_h.write(f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}\n")
-                    regionfile_h.flush()
-
-            else:
-
-                table_line_f = table_line_f + "\tNA\tNA\tNA"
-
-            of_h.write(f"{table_line_f}\n")
-            of_h.flush()
+                regionfile_h = open(rf_h, mode="a", encoding="utf-8")
+                regionfile_h.write(f"{table_line_f}\n")
+                regionfile_h.flush()
 
         except KeyError:
 
             bfh_f.write(f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}\tno_signal_{sig_f}\n")
             bfh_f.flush()
+
+    of_h.write(f"{table_line_f}\n")
+    of_h.flush()
 
     return None

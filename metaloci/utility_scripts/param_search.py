@@ -129,7 +129,7 @@ def populate_args(parser):
     optional_arg.add_argument("--ncpus",
                               dest="ncpus",
                               metavar="INT",
-                              default=8,
+                              default=int(mp.cpu_count() - 2),
                               type=int,
                               help="Number of CPUs to use in the multiprocessing step (default: %(default)s).",
                               )

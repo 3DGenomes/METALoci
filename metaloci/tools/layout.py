@@ -72,7 +72,7 @@ def populate_args(parser):
     input_arg.add_argument(
         "-r",
         "--resolution",
-        dest="reso",
+        dest="resolution",
         metavar="INT",
         type=int,
         required=True,
@@ -167,7 +167,7 @@ def populate_args(parser):
         help=SUPPRESS)
 
 
-def get_region_layout(row: pd.Series, args_2_use: pd.Series,
+def get_region_layout(row: pd.Series, args: pd.Series,
                       progress=None, counter: int = None, silent: bool = True):
     """
     Function to get the Kamada-Kawai layout for a given region
@@ -186,25 +186,12 @@ def get_region_layout(row: pd.Series, args_2_use: pd.Series,
         Verbosity of the function, by default True
     """
 
-    work_dir = args_2_use.work_dir
-    hic_path = args_2_use.hic_path
-    resolution = args_2_use.resolution
-    cutoffs = args_2_use.cutoffs
-    persistence_length = args_2_use.persistence_length
-    force = args_2_use.force
-    save_plots = args_2_use.save_plots
-    total_num = args_2_use.total_num
-
     region_chrom, _, _, _ = re.split(r":|-|_", row.coords)
-    save_path = os.path.join(work_dir, region_chrom, f"{re.sub(':|-', '_', row.coords)}.mlo")
+    save_path = os.path.join(args.work_dir, region_chrom, f"{re.sub(':|-', '_', row.coords)}.mlo")
 
-    pathlib.Path(os.path.join(work_dir, region_chrom)).mkdir(parents=True, exist_ok=True)
+    pathlib.Path(os.path.join(args.work_dir, region_chrom)).mkdir(parents=True, exist_ok=True)
 
     if os.path.isfile(save_path):
-
-        with open(save_path, "rb") as mlobject_handler:
-
-            mlobject = pickle.load(mlobject_handler)
 
         # TODO Redo this if chain so we mention the force once (in the run function maybe?) and if force is active
         # to NOT say Region bla is already done.
@@ -212,7 +199,7 @@ def get_region_layout(row: pd.Series, args_2_use: pd.Series,
 
             print(f"\n------> Region {row.coords} already done.")
 
-        if force:
+        if args.force:
 
             if not silent:
 
@@ -224,7 +211,11 @@ def get_region_layout(row: pd.Series, args_2_use: pd.Series,
 
         else:
 
-            if save_plots:
+            with open(save_path, "rb") as mlobject_handler:
+
+                mlobject = pickle.load(mlobject_handler)
+
+            if args.save_plots:
 
                 if not silent:
 
@@ -232,11 +223,11 @@ def get_region_layout(row: pd.Series, args_2_use: pd.Series,
 
                 # Should the paths be created with the os.path.join?
                 # For example: os.path.join(work_dir, region_chrom, "plots", "KK")
-                pathlib.Path(os.path.join(work_dir, region_chrom, "plots", "KK")).mkdir(
+                pathlib.Path(os.path.join(args.work_dir, region_chrom, "plots", "KK")).mkdir(
                     parents=True, exist_ok=True
                 )
 
-                pathlib.Path(os.path.join(work_dir, region_chrom, "plots", "mixed_matrices")).mkdir(
+                pathlib.Path(os.path.join(args.work_dir, region_chrom, "plots", "mixed_matrices")).mkdir(
                     parents=True, exist_ok=True
                 )
 
@@ -247,7 +238,7 @@ def get_region_layout(row: pd.Series, args_2_use: pd.Series,
 
                 plot.get_kk_plot(mlobject).savefig(
                     os.path.join(
-                        work_dir,
+                        args.work_dir,
                         region_chrom,
                         "plots",
                         "KK",
@@ -259,7 +250,7 @@ def get_region_layout(row: pd.Series, args_2_use: pd.Series,
 
                 plot.mixed_matrices_plot(mlobject).savefig(
                     os.path.join(
-                        work_dir,
+                        args.work_dir,
                         region_chrom,
                         "plots",
                         "mixed_matrices",
@@ -277,12 +268,6 @@ def get_region_layout(row: pd.Series, args_2_use: pd.Series,
 
                 progress["done"] = True
 
-        if mlobject.bad_region == "empty":
-
-            if not silent:
-
-                print(f"\n------> Region {row.coords} already done (Hi-C is empty in that region).")
-
             if progress is not None:
 
                 progress["done"] = True
@@ -291,29 +276,29 @@ def get_region_layout(row: pd.Series, args_2_use: pd.Series,
 
         if not silent:
 
-            print(f"\n------> Working on region: {row.coords} [{counter+1}/{total_num}]\n")
+            print(f"\n------> Working on region: {row.coords} [{counter+1}/{args.total_num}]\n")
 
         mlobject = mlo.MetalociObject(
             region=row.coords,
-            resolution=resolution,
-            persistence_length=persistence_length,
+            resolution=args.resolution,
+            persistence_length=args.persistence_length,
             save_path=save_path,
         )
 
-        mlobject.kk_cutoff["cutoff_type"] = cutoffs["cutoff_type"]
+        mlobject.kk_cutoff["cutoff_type"] = args.cutoffs["cutoff_type"]
 
-        if hic_path.endswith(".cool"):
+        if args.hic_path.endswith(".cool"):
 
-            mlobject.matrix = cooler.Cooler(hic_path).matrix(sparse=True).fetch(mlobject.region).toarray()
+            mlobject.matrix = cooler.Cooler(args.hic_path).matrix(sparse=True).fetch(mlobject.region).toarray()
 
-        if hic_path.endswith(".mcool"):
+        if args.hic_path.endswith(".mcool"):
 
             mlobject.matrix = cooler.Cooler(
-                f"{hic_path}::/resolutions/{mlobject.resolution}").matrix(sparse=True).fetch(mlobject.region).toarray()
+                f"{args.hic_path}::/resolutions/{mlobject.resolution}").matrix(sparse=True).fetch(mlobject.region).toarray()
 
-        elif hic_path.endswith(".hic"):
+        elif args.hic_path.endswith(".hic"):
 
-            mlobject.matrix = hicstraw.HiCFile(hic_path).getMatrixZoomData(
+            mlobject.matrix = hicstraw.HiCFile(args.hic_path).getMatrixZoomData(
                 mlobject.chrom, mlobject.chrom, 'observed', 'VC_SQRT', 'BP', mlobject.resolution).getRecordsAsMatrix(
                 mlobject.start, mlobject.end, mlobject.start, mlobject.end)
 
@@ -327,15 +312,15 @@ def get_region_layout(row: pd.Series, args_2_use: pd.Series,
 
         time_per_region = time()
 
-        for i, cutoff in enumerate(cutoffs["values"]):
+        for i, cutoff in enumerate(args.cutoffs["values"]):
 
-            mlobject.kk_cutoff["values"] = cutoffs["values"][i]  # Select cut-off for this iteration
+            mlobject.kk_cutoff["values"] = args.cutoffs["values"][i]  # Select cut-off for this iteration
             mlobject = kk.get_restraints_matrix(mlobject, silent)  # Get submatrix of restraints
 
             if mlobject.kk_restraints_matrix is None:
-                
+
                 # Write to file a list of bad regions, according to the filters defined in clean_matrix().
-                with open(f"{work_dir}bad_regions.txt", "a+") as handler:
+                with open(f"{args.work_dir}bad_regions.txt", "a+") as handler:
 
                     log = f"{mlobject.region}\t{mlobject.bad_region}\n"
 
@@ -355,11 +340,11 @@ def get_region_layout(row: pd.Series, args_2_use: pd.Series,
                     progress['value'] += 1
 
                     time_spent = time() - progress['timer']
-                    time_remaining = int(time_spent / progress['value'] * (len(df_regions) - progress['value']))
+                    time_remaining = int(time_spent / progress['value'] * (args.total_num - progress['value']))
 
                     print(f"\033[A{'  '*int(sp.Popen(['tput','cols'], stdout=sp.PIPE).communicate()[0].strip())}\033[A")
-                    print(f"\t[{progress['value']}/{len(df_regions)}] | Time spent: {timedelta(seconds=round(time_spent))} | "
-                            f"ETR: {timedelta(seconds=round(time_remaining))}", end='\r')
+                    print(f"\t[{progress['value']}/{args.total_num}] | Time spent: {timedelta(seconds=round(time_spent))} | "
+                          f"ETR: {timedelta(seconds=round(time_remaining))}", end='\r')
 
                 return
 
@@ -367,20 +352,19 @@ def get_region_layout(row: pd.Series, args_2_use: pd.Series,
 
                 print("\tLayouting Kamada-Kawai...")
 
-            mlobject.kk_graph = nx.from_scipy_sparse_array(
-                csr_matrix(mlobject.kk_restraints_matrix))
+            mlobject.kk_graph = nx.from_scipy_sparse_array(csr_matrix(mlobject.kk_restraints_matrix))
             mlobject.kk_nodes = nx.kamada_kawai_layout(mlobject.kk_graph)
             mlobject.kk_coords = list(mlobject.kk_nodes.values())
-            mlobject.kk_distances = distance.cdist(
-                mlobject.kk_coords, mlobject.kk_coords, "euclidean")
+            mlobject.kk_distances = distance.cdist(mlobject.kk_coords, mlobject.kk_coords, "euclidean")
 
-            if len(cutoffs["values"]) > 1 or save_plots:
+            if len(args.cutoffs["values"]) > 1 or args.save_plots:
 
                 if not silent:
                     print("\tPlotting Kamada-Kawai...")
 
-                pathlib.Path(os.path.join(work_dir, region_chrom, "plots", "KK")).mkdir(parents=True, exist_ok=True)
-                pathlib.Path(os.path.join(work_dir, region_chrom, "plots", "mixed_matrices")).mkdir(
+                pathlib.Path(os.path.join(args.work_dir, region_chrom, "plots", "KK")
+                             ).mkdir(parents=True, exist_ok=True)
+                pathlib.Path(os.path.join(args.work_dir, region_chrom, "plots", "mixed_matrices")).mkdir(
                     parents=True, exist_ok=True
                 )
 
@@ -391,7 +375,7 @@ def get_region_layout(row: pd.Series, args_2_use: pd.Series,
 
                 plot.get_kk_plot(mlobject).savefig(
                     os.path.join(
-                        work_dir,
+                        args.work_dir,
                         region_chrom,
                         "plots",
                         "KK",
@@ -401,7 +385,7 @@ def get_region_layout(row: pd.Series, args_2_use: pd.Series,
 
                 plot.mixed_matrices_plot(mlobject).savefig(
                     os.path.join(
-                        work_dir,
+                        args.work_dir,
                         region_chrom,
                         "plots",
                         "mixed_matrices",
@@ -414,18 +398,16 @@ def get_region_layout(row: pd.Series, args_2_use: pd.Series,
 
                     progress["plots"] = True
 
-            elif len(cutoffs["values"]) == 1:
+            elif len(args.cutoffs["values"]) == 1:
 
                 if not silent:
 
                     print(
-                        f"\tKamada-Kawai layout of region '{mlobject.region}' \
-                        at {int(cutoff * 100)} % cutoff saved to file: '{mlobject.save_path}'"
+                        f"\tKamada-Kawai layout of region '{mlobject.region}' at {int(cutoff * 100)} % cutoff saved to file: '{mlobject.save_path}'"
                     )
 
-                # Write to file a list of bad regions, according to the filters defined
-                # in clean_matrix().
-                with open(f"{work_dir}bad_regions.txt", "a+", encoding="utf-8") as handler:
+                # Write to file a list of bad regions, according to the filters defined in clean_matrix().
+                with open(f"{args.work_dir}bad_regions.txt", "a+", encoding="utf-8") as handler:
 
                     log = f"{mlobject.region}\t{mlobject.bad_region}\n"
 
@@ -448,10 +430,10 @@ def get_region_layout(row: pd.Series, args_2_use: pd.Series,
 
         progress['value'] += 1
         time_spent = time() - progress['timer']
-        time_remaining = int(time_spent / progress['value'] * (total_num - progress['value']))
+        time_remaining = int(time_spent / progress['value'] * (args.total_num - progress['value']))
 
         print(f"\033[A{'  '*int(sp.Popen(['tput','cols'], stdout=sp.PIPE).communicate()[0].strip())}\033[A")
-        print(f"\t[{progress['value']}/{total_num}] | Time spent: {timedelta(seconds=round(time_spent))} | "
+        print(f"\t[{progress['value']}/{args.total_num}] | Time spent: {timedelta(seconds=round(time_spent))} | "
               f"ETR: {timedelta(seconds=round(time_remaining))}", end='\r')
 
 
@@ -465,47 +447,34 @@ def run(opts: list):
         List of arguments
     """
 
-    work_dir = opts.work_dir
-    hic_path = opts.hic_file
-    resolution = opts.reso
-    regions = opts.regions
-    cutoffs_opt = opts.cutoff
-    absolute = opts.absolute
-    persistence_length = opts.persistence_length
-    force = opts.force
-    save_plots = opts.save_plots
-    multiprocess = opts.multiprocess
-    threads = opts.threads
+    if not opts.work_dir.endswith("/"):
 
-    # Parsing of some of the arguments
-    if not work_dir.endswith("/"):
+        opts.work_dir += "/"
 
-        work_dir += "/"
+    if opts.threads > mp.cpu_count():
 
-    if threads > mp.cpu_count():
-
-        threads = mp.cpu_count()
+        opts.threads = mp.cpu_count()
 
     cutoffs = {}
 
-    if absolute and cutoffs_opt is None or absolute and len(cutoffs_opt) == 0:
+    if opts.absolute and opts.cutoff is None or opts.absolute and len(opts.cutoff) == 0:
 
         sys.exit("Please provide a cutoff (-o) value when using the absolute flag (-a).")
 
-    elif cutoffs_opt is None or len(cutoffs_opt) == 0:
+    elif opts.cutoff is None or len(opts.cutoff) == 0:
 
         cutoffs["cutoff_type"] = "percentage"
         cutoffs["values"] = [0.2]
 
-    elif absolute:
+    elif opts.absolute:
 
         cutoffs["cutoff_type"] = "absolute"
-        cutoffs["values"] = cutoffs_opt
+        cutoffs["values"] = opts.cutoff
 
     else:
 
         cutoffs["cutoff_type"] = "percentage"
-        cutoffs["values"] = cutoffs_opt
+        cutoffs["values"] = opts.cutoff
 
     if cutoffs["cutoff_type"] == "percentage" and not 0 < cutoffs["values"][0] <= 1:
 
@@ -513,76 +482,73 @@ def run(opts: list):
 
     cutoffs["values"].sort(key=float, reverse=True)
 
-    if regions is None:
+    if opts.regions is None:
 
-        if len(glob.glob(f"{work_dir}*coords.txt")) > 1:
+        if len(glob.glob(f"{opts.work_dir}*coords.txt")) > 1:
 
             sys.exit("More than one region file found. Please, provide a region or one file with regions of interest.")
 
         try:
 
-            df_regions = pd.read_table(glob.glob(f"{work_dir}*coords.txt")[0])
+            df_regions = pd.read_table(glob.glob(f"{opts.work_dir}*coords.txt")[0])
 
         except IndexError:
 
-            sys.exit("No regions provided. Please provide a region or a file with regions of interest or run \
-                     'metaloci sniffer'.")
+            sys.exit("No regions provided. Please provide a region or a file with regions of interest or run 'metaloci sniffer'.")
 
-    elif os.path.isfile(regions):
+    elif os.path.isfile(opts.regions):
 
-        df_regions = pd.read_table(regions)
+        df_regions = pd.read_table(opts.regions)
 
     else:
 
-        df_regions = pd.DataFrame({"coords": [regions], "symbol": ["symbol"], "id": ["id"]})
+        df_regions = pd.DataFrame({"coords": [opts.regions], "symbol": ["symbol"], "id": ["id"]})
 
     # Debug 'menu' for testing purposes
     if opts.debug:
 
-        print(f"work_dir ->\n\t{work_dir}")
-        print(f"hic_path ->\n\t{hic_path}")
-        print(f"resolution ->\n\t{resolution}")
-        print(f"regions ->\n\t{regions}")
+        print(f"work_dir ->\n\t{opts.work_dir}")
+        print(f"hic_path ->\n\t{opts.hic_file}")
+        print(f"resolution ->\n\t{opts.resolution}")
+        print(f"regions ->\n\t{opts.regions}")
         print(f"cutoffs ->\n\t{cutoffs}")
-        print(f"absolute ->\n\t{absolute}")
-        print(f"persistence_length ->\n\t{persistence_length}")
-        print(f"force ->\n\t{force}")
-        print(f"save_plots ->\n\t{save_plots}")
-        print(f"multiprocess ->\n\t{multiprocess}")
-        print(f"cores ->\n\t{threads}")
+        print(f"absolute ->\n\t{opts.absolute}")
+        print(f"persistence_length ->\n\t{opts.persistence_length}")
+        print(f"force ->\n\t{opts.force}")
+        print(f"save_plots ->\n\t{opts.save_plots}")
+        print(f"multiprocess ->\n\t{opts.multiprocess}")
+        print(f"cores ->\n\t{opts.threads}")
 
         sys.exit()
 
     # Checking if the resolution supplied by the user is within the resolutions of the cool/mcool/hic files
-    if hic_path.endswith(".cool"):
+    if opts.hic_file.endswith(".cool"):
 
-        available_resolutions = cooler.Cooler(hic_path).binsize
+        available_resolutions = cooler.Cooler(opts.hic_file).binsize
 
-        if resolution != available_resolutions:
+        if opts.resolution != available_resolutions:
 
             sys.exit("The given resolution is not the same as the provided cooler file. Exiting...")
 
-    elif hic_path.endswith(".mcool"):
+    elif opts.hic_file.endswith(".mcool"):
 
-        available_resolutions = [int(x) for x in list(h5py.File(hic_path)["resolutions"].keys())]
+        available_resolutions = [int(x) for x in list(h5py.File(opts.hic_file)["resolutions"].keys())]
 
-        if resolution not in available_resolutions:
+        if opts.resolution not in available_resolutions:
 
             print(
-                f"The given resolution is not in the provided mcooler file.\nThe available resolutions are: \
-                {', '.join(misc.natural_sort([str(x) for x in available_resolutions]))}"
+                f"The given resolution is not in the provided mcooler file.\nThe available resolutions are: {', '.join(misc.natural_sort([str(x) for x in available_resolutions]))}"
             )
             sys.exit("Exiting...")
 
-    elif hic_path.endswith(".hic"):
+    elif opts.hic_file.endswith(".hic"):
 
-        available_resolutions = hicstraw.HiCFile(hic_path).getResolutions()
+        available_resolutions = hicstraw.HiCFile(opts.hic_file).getResolutions()
 
-        if resolution not in available_resolutions:
+        if opts.resolution not in available_resolutions:
 
             print(
-                f"The given resolution is not in the provided mcooler file.\nThe available resolutions are: \
-                {', '.join(misc.natural_sort([str(x) for x in available_resolutions]))}"
+                f"The given resolution is not in the provided mcooler file.\nThe available resolutions are: {', '.join(misc.natural_sort([str(x) for x in available_resolutions]))}"
             )
             sys.exit("Exiting...")
 
@@ -591,20 +557,20 @@ def run(opts: list):
         print("HiC file format not supported. Supported formats are: cool, mcool, hic.")
         sys.exit("Exiting...")
 
-    parsed_args = pd.Series({"work_dir": work_dir,
-                             "hic_path": hic_path,
-                             "resolution": resolution,
+    parsed_args = pd.Series({"work_dir": opts.work_dir,
+                             "hic_path": opts.hic_file,
+                             "resolution": opts.resolution,
                              "cutoffs": cutoffs,
-                             "persistence_length": persistence_length,
-                             "force": force,
-                             "save_plots": save_plots,
+                             "persistence_length": opts.persistence_length,
+                             "force": opts.force,
+                             "save_plots": opts.save_plots,
                              "total_num": len(df_regions)})
 
     start_timer = time()
 
-    pathlib.Path(os.path.join(work_dir)).mkdir(parents=True, exist_ok=True)
+    pathlib.Path(os.path.join(opts.work_dir)).mkdir(parents=True, exist_ok=True)
 
-    if multiprocess:
+    if opts.multiprocess:
 
         print(f"\n------> {len(df_regions)} regions will be computed.\n")
 
@@ -612,7 +578,7 @@ def run(opts: list):
 
             progress = mp.Manager().dict(value=0, timer=start_timer, done=False, plots=False)
 
-            with mp.Pool(processes=threads) as pool:
+            with mp.Pool(processes=opts.threads) as pool:
 
                 pool.starmap(get_region_layout, [(row, parsed_args, progress) for _, row in df_regions.iterrows()])
 
@@ -622,7 +588,7 @@ def run(opts: list):
 
                 if progress["plots"]:
 
-                    print(f"\n\tKamada-Kawai layout plots saved to '{work_dir}chr/plots/KK'", end="")
+                    print(f"\n\tKamada-Kawai layout plots saved to '{opts.work_dir}chr/plots/KK'", end="")
 
                 pool.close()
                 pool.join()

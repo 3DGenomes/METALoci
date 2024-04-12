@@ -19,6 +19,9 @@ from scipy.spatial import Voronoi
 from shapely.errors import ShapelyDeprecationWarning
 from shapely.geometry import LineString, Point
 from shapely.ops import polygonize
+import bioframe
+from scipy.stats import zscore
+
 
 warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
 
@@ -189,7 +192,7 @@ def load_region_signals(mlobject: mlo.MetalociObject, signal_data: dict, signal_
 
 
 def compute_lmi(mlobject: mlo.MetalociObject, signal_type: str, neighbourhood: float,
-                n_permutations: int = 9999, signipval: float = 0.05, silent: bool = False) -> pd.DataFrame:
+                n_permutations: int = 9999, signipval: float = 0.05, silent: bool = False, poi_only=False) -> pd.DataFrame:
     """
     Computes Local Moran's Index for a signal type and outputs information of the LMI value and its p-value
     for each bin for a given signal, as well as some other information.
@@ -220,18 +223,18 @@ def compute_lmi(mlobject: mlo.MetalociObject, signal_type: str, neighbourhood: f
         LMI score, LMI p-value and LMI inverse of p-value for this signal.
     """
 
-    signal = []
+    signal_values = []
     filtered_signal_type = dict(filter(lambda item: signal_type == item[0], mlobject.signals_dict.items()))
 
     for _, row in mlobject.lmi_geometry.iterrows():
 
-        signal.append(np.nanmedian([filtered_signal_type[key][row.bin_index] for key in filtered_signal_type]))
+        signal_values.append(np.nanmedian([filtered_signal_type[key][row.bin_index] for key in filtered_signal_type]))
 
     signal_geometry = {"v": [], "geometry": []}
 
     for _, poly in mlobject.lmi_geometry.sort_values(by="moran_index").reset_index().iterrows():
 
-        signal_geometry["v"].append(signal[poly.bin_index])
+        signal_geometry["v"].append(signal_values[poly.bin_index])
         signal_geometry["geometry"].append(poly.geometry)
 
     gpd_signal = gpd.GeoDataFrame(signal_geometry)  # Stored in Geopandas DataFrame to do LMI
@@ -245,7 +248,9 @@ def compute_lmi(mlobject: mlo.MetalociObject, signal_type: str, neighbourhood: f
     moran_local_object = Moran_Local(
         y, weights, permutations=n_permutations, n_jobs=1
     )  # geoda_quadsbool (default=False) If False use PySAL Scheme: HH=1, LH=2, LL=3, HL=4
-    lags = lag_spatial(moran_local_object.w, moran_local_object.z)
+
+    ZSig = zscore(y)
+    ZLag = zscore(lag_spatial(moran_local_object.w, moran_local_object.z))
 
     if not silent:
 
@@ -256,7 +261,12 @@ def compute_lmi(mlobject: mlo.MetalociObject, signal_type: str, neighbourhood: f
 
     df_lmi = defaultdict(list)
 
-    for _, row in mlobject.lmi_geometry.iterrows():
+    for i, row in mlobject.lmi_geometry.iterrows():
+
+        # if poi_only is True, only the points of interest will be saved
+        if poi_only and mlobject.poi != row.bin_index:
+
+            continue
 
         bin_start = int(mlobject.start) + (mlobject.resolution * row.bin_index) + row.bin_index
         bin_end = bin_start + mlobject.resolution
@@ -266,13 +276,15 @@ def compute_lmi(mlobject: mlo.MetalociObject, signal_type: str, neighbourhood: f
         df_lmi["bin_chr"].append(mlobject.chrom[3:])
         df_lmi["bin_start"].append(bin_start)
         df_lmi["bin_end"].append(bin_end)
-        df_lmi["signal"].append(signal[row.bin_index])
+        df_lmi["signal"].append(signal_values[row.bin_index])
         df_lmi["moran_index"].append(row.moran_index)
         df_lmi["moran_quadrant"].append(moran_local_object.q[row.moran_index])
         df_lmi["LMI_score"].append(round(moran_local_object.Is[row.moran_index], 9))
         df_lmi["LMI_pvalue"].append(round(moran_local_object.p_sim[row.moran_index], 9))
-        df_lmi["ZSig"].append(y[row.moran_index])
-        df_lmi["ZLag"].append(lags[row.moran_index])
+        # df_lmi["ZSig"].append(y[row.moran_index])
+        # df_lmi["ZLag"].append(lags[row.moran_index])
+        df_lmi["ZSig"].append(ZSig[row.moran_index])
+        df_lmi["ZLag"].append(ZLag[row.moran_index])
 
     df_lmi = pd.DataFrame(df_lmi)
     # Changing the data types to the proper ones so the pickle file has a smaller size.
@@ -311,3 +323,69 @@ def aggregate_signals(mlobject: mlo.MetalociObject):
         mlobject.signals_dict[condition] = np.nanmedian(
             np.array([mlobject.signals_dict[signal] for signal in signal_type]), axis=0
         )
+
+
+def get_bed(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, neighbourhood: float, bfact: float,
+            quadrants: list = None, signipval: float = 0.05, poi: int = None, silent: bool = True) -> pd.DataFrame:
+    """
+    _summary_
+
+    Parameters
+    ----------
+    mlobject : mlo.MetalociObject
+        A METALoci object.
+    lmi_geometry : pd.DataFrame
+        A DataFrame containing LMI information and geometry of all bins in the region.
+    neighbourhood : float
+        Radius of the circle that determines the neighbourhood of each of the points in the Kamada-Kawai layout.
+    bfact : float
+        Factor used to draw the circle.
+    quadrants : list, optional
+       The list of quadrants to consider for selecting bins (default is [1, 3]).
+    signipval : float, optional
+        The significance p-value threshold for selecting bins (default is 0.05).
+    poi : int, optional
+        The point of interest to plot, by default None
+    plotit : bool, optional
+        Plot a circle representing the neighbourhood of the poi, by default False
+
+    Returns
+    -------hesoyam1
+
+    bed : pd.DataFrame
+        _description_
+    """
+
+    if poi is None:
+
+        poi = mlobject.poi
+
+    if quadrants is None:
+
+        quadrants = [1, 3]
+
+    signal = lmi_geometry.ID[0]  # Extract signal name from lmi_geometry
+    data = mlobject.lmi_info[signal]
+    # Check tha the point of interest is significant in the given quadrant
+    significants = len(data[(data.bin_index == poi) &
+                            (data.moran_quadrant.isin(quadrants)) &
+                            (data.LMI_pvalue <= signipval)])
+
+    if significants == 0:
+
+        if not silent:
+
+            print(
+                f"\t-> Point of interest {poi} is not significant for quadrant(s) {quadrants} (p-value > {signipval})")
+
+        return None
+
+    # Get bins within a distance to point and plot them in a gaudi plot
+    indices = np.nonzero(mlobject.kk_distances[mlobject.poi] < neighbourhood)[0]
+
+    neighbouring_bins = lmi_geometry.iloc[indices]
+    neighbouring_bins = neighbouring_bins[['bin_chr', 'bin_start', 'bin_end']]
+    neighbouring_bins.columns = ['chrom', 'start', 'end']
+
+    # Merge overlapping intervals and create a continuous BED file
+    return pd.DataFrame(bioframe.merge(neighbouring_bins, min_dist=2))

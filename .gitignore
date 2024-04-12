@@ -133,3 +133,4 @@ dmypy.json
 
 # ignore Marcs code
 metaloci/tools/from_Marc/
+.vscode/settings.json

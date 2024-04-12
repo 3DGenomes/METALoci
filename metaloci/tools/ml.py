@@ -17,6 +17,7 @@ from time import time
 
 import pandas as pd
 from metaloci.spatial_stats import lmi
+from metaloci.misc import misc
 
 DESCRIPTION = """
 Adds signal data to a Kamada-Kawai layout and calculates Local Moran's I for every bin in the layout.
@@ -64,7 +65,7 @@ def populate_args(parser):
         dest="region_file",
         metavar="PATH",
         type=str,
-        help="Region to apply LMI in format chrN:start-end_midpoint or file containing the regions of interest."
+        help="Region to apply LMI in format chrN:start-end_poi or file containing the regions of interest."
     )
 
     optional_arg = parser.add_argument_group(title="Optional arguments")
@@ -109,7 +110,7 @@ def populate_args(parser):
     optional_arg.add_argument(
         "-i",
         "--info",
-        dest="info",
+        dest="moran_info",
         action="store_true",
         help="Flag to unpickle LMI info."
     )
@@ -148,8 +149,39 @@ def populate_args(parser):
         action="store_true",
         help=SUPPRESS)
 
+    optional_arg.add_argument(
+        "-b",
+        "--bed",
+        dest="save_bed",
+        action="store_true",
+        help="Flag to save the bed file with the metalocis location."
+    )
 
-def get_lmi(row: pd.Series, args_2_use: pd.Series,
+    optional_arg.add_argument(
+        "-q",
+        "--quadrants",
+        dest="quadrants",
+        metavar="INT",
+        type=int,
+        nargs="+",
+        default=[1, 3],
+        help="Space-separated list with the LMI quadrants to highlight (default: %(default)s). \
+        1: High-high (signal in bin is high, signal on neighbours is high). \
+        2: High-Low (signal in bin is high, signal on neighbours is low). \
+        3: Low-Low (signal in bin is low, signal on neighbours is low). \
+        4: Low-High (signal in bin is low, signal on neighbours is high).",
+    )
+
+    optional_arg.add_argument(
+        "-po",
+        "--poi_only",
+        dest="poi_only",
+        action="store_true",
+        help="Flag to only save the point of interest row in the LMI dataframes. Useful for large datasets."
+    )
+
+
+def get_lmi(row: pd.Series, args: pd.Series,
             progress=None, counter: int = None, silent: bool = True):
     """
     This function get the Local Moran's I given the arguments.
@@ -176,31 +208,23 @@ def get_lmi(row: pd.Series, args_2_use: pd.Series,
     INFLUENCE = 1.5
     BFACT = 2
 
-    work_dir = args_2_use.work_dir
-    signals = args_2_use.signals
-    n_permutations = args_2_use.n_permutations
-    signipval = args_2_use.signipval
-    aggregate = args_2_use.aggr
-    moran_info = args_2_use.moran_info
-    agg_dict = args_2_use.agg_dict
-    force = args_2_use.force
-    total_num = args_2_use.total_num
-
     region_timer = time()
 
     if not silent:
 
-        print(f"\n------> Working on region {row.coords} [{counter+1}/{total_num}]\n")
+        print(f"\n------> Working on region {row.coords} [{counter+1}/{args.total_num}]\n")
 
-    save_path = f"{work_dir}{row.coords.split(':', 1)[0]}/{re.sub(':|-', '_', row.coords)}.mlo"
+    save_path = f"{args.work_dir}{row.coords.split(':', 1)[0]}/{re.sub(':|-', '_', row.coords)}.mlo"
 
+    # The chunk below checks if the region can be processed (has a valid .mlo that has KK information and has signal
+    # data). If it can't be processed, it will skip to the next region.
     try:
 
         with open(save_path, "rb",) as mlobject_handler:
 
             mlobject = pickle.load(mlobject_handler)
-            # Save path seems to be the same as the one defined in the layout
-            mlobject.save_path = f"{work_dir}{row.coords.split(':', 1)[0]}/{re.sub(':|-', '_', row.coords)}.mlo"
+            # This ensures the path is still right even if the user changes the working directory.
+            mlobject.save_path = f"{args.work_dir}{row.coords.split(':', 1)[0]}/{re.sub(':|-', '_', row.coords)}.mlo"
 
     except FileNotFoundError:
 
@@ -220,7 +244,8 @@ def get_lmi(row: pd.Series, args_2_use: pd.Series,
 
     try:
 
-        signal_data = pd.read_pickle(glob.glob(f"{os.path.join(work_dir, 'signal', mlobject.chrom)}/*_signal.pkl")[0])
+        signal_data = pd.read_pickle(
+            glob.glob(f"{os.path.join(args.work_dir, 'signal', mlobject.chrom)}/*_signal.pkl")[0])
 
     except IndexError:
 
@@ -232,70 +257,62 @@ def get_lmi(row: pd.Series, args_2_use: pd.Series,
 
             progress['value'] += 1
             time_spent = time() - progress['timer']
-            time_remaining = int(time_spent / progress['value'] * (total_num - progress['value']))
+            time_remaining = int(time_spent / progress['value'] * (args.total_num - progress['value']))
 
             print(f"\033[A{'  '*int(sp.Popen(['tput','cols'], stdout=sp.PIPE).communicate()[0].strip())}\033[A")
-            print(f"\t[{progress['value']}/{total_num}] | Time spent: {timedelta(seconds=round(time_spent))} | "
+            print(f"\t[{progress['value']}/{args.total_num}] | Time spent: {timedelta(seconds=round(time_spent))} | "
                   f"ETR: {timedelta(seconds=round(time_remaining))}", end='\r')
 
         return
 
-    mlobject.signals_dict = lmi.load_region_signals(mlobject, signal_data, signals)
+    # Load signals and aggregate them if needed.
+    mlobject.signals_dict = lmi.load_region_signals(mlobject, signal_data, args.signals)
 
-    if aggregate is not None:
+    if args.aggregate is not None:
 
-        mlobject.agg = agg_dict
+        mlobject.agg = args.agg_dict
 
         lmi.aggregate_signals(mlobject)
 
-    # If the signal is not present in the signals folder (has not been processed with prep)
-    # but it is in the list of signal to process, raise an exception and print which signals need
-    # to be processed.
+    # If the signal is not present in the signals folder (has not been processed with prep) but it is in the list of
+    # signal to process, raise an exception and print which signals need to be processed.
     if mlobject.signals_dict is None and progress is not None:
 
         progress["missing_signal"] = list(mlobject.signals_dict.keys())
 
         raise Exception()
 
+    # Get average distance between consecutive points to define influence, which should be ~2 particles of radius.
+    neighbourhood = mlobject.kk_distances.diagonal(1).mean() * INFLUENCE * BFACT
+
     # This checks if every signal you want to process is already computed. If the user works with a
     # few signals but decides to add some more later, the user can use the same working directory and
     # KK, and the LMI will be computed again with the new signals. If everything is already
     # computed, does nothing.
-    if mlobject.lmi_info is not None and force is False:
+    if mlobject.lmi_info is not None and args.force is False:
 
-        # Better version of the code, I think
+        # If the list of signals already processed is equal to the list of signals to process, skip to the next region.
         if [signal for signal in mlobject.lmi_info.keys()] == list(mlobject.signals_dict.keys()):
 
             if progress is not None:
 
                 progress["done"] = True
 
-            if moran_info:
+            for signal, df in mlobject.lmi_info.items():
 
-                for signal, df in mlobject.lmi_info.items():
+                if args.moran_info:
 
-                    moran_data_path = os.path.join(work_dir, mlobject.chrom, "moran_data", signal)
+                    misc.write_moran_data(mlobject, args, silent)
 
-                    pathlib.Path(moran_data_path).mkdir(parents=True, exist_ok=True)
-                    df.to_csv(
-                        os.path.join(
-                            moran_data_path,
-                            f"{re.sub(':|-', '_', mlobject.region)}_{mlobject.poi}_{signal}.tsv"),
-                        sep="\t", index=False, float_format="%.12f")
+                if args.save_bed:
 
-                    if not silent:
-
-                        print(F"\tMoran data saved to \
-                              '{moran_data_path}/{re.sub(':|-', '_', mlobject.region)}_{mlobject.poi}_{signal}.tsv'")
+                    misc.write_bed(mlobject, signal, neighbourhood, BFACT, args, silent)
 
             if not silent:
 
                 print("\tLMI already computed for this region.\n\tSkipping to next region...")
 
             return
-
-    # Get average distance between consecutive points to define influence, which should be ~2 particles of radius.
-    neighbourhood = mlobject.kk_distances.diagonal(1).mean() * INFLUENCE * BFACT
 
     if mlobject.lmi_geometry is None:
 
@@ -312,7 +329,15 @@ def get_lmi(row: pd.Series, args_2_use: pd.Series,
         if signal_type not in mlobject.lmi_info:
 
             mlobject.lmi_info[signal_type] = lmi.compute_lmi(mlobject, signal_type, neighbourhood,
-                                                             n_permutations, signipval, silent)
+                                                             args.n_permutations, args.signipval, silent, args.poi_only)
+
+            if args.moran_info:
+
+                misc.write_moran_data(mlobject, args, silent)
+
+            if args.save_bed:
+
+                misc.write_bed(mlobject, signal_type, neighbourhood, BFACT, args, silent)
 
     if not silent:
 
@@ -323,33 +348,15 @@ def get_lmi(row: pd.Series, args_2_use: pd.Series,
 
         mlobject.save(hamlo_namendle)
 
-    if moran_info:
-
-        for signal, df in mlobject.lmi_info.items():
-
-            moran_data_path = os.path.join(work_dir, mlobject.chrom, "moran_data", signal)
-
-            pathlib.Path(moran_data_path).mkdir(parents=True, exist_ok=True)
-            df.to_csv(
-                os.path.join(
-                    moran_data_path,
-                    f"{re.sub(':|-', '_', mlobject.region)}_{mlobject.poi}_{signal}.tsv"),
-                sep="\t", index=False)
-
-            if not silent:
-
-                print(f"\tMoran data saved to "
-                      f"'{moran_data_path}/{re.sub(':|-', '_', mlobject.region)}_{mlobject.poi}_{signal}.tsv'")
-
     if progress is not None:
 
         progress['value'] += 1
 
         time_spent = time() - progress['timer']
-        time_remaining = int(time_spent / progress['value'] * (total_num - progress['value']))
+        time_remaining = int(time_spent / progress['value'] * (args.total_num - progress['value']))
 
         print(f"\033[A{'  '*int(sp.Popen(['tput','cols'], stdout=sp.PIPE).communicate()[0].strip())}\033[A")
-        print(f"\t[{progress['value']}/{total_num}] | Time spent: {timedelta(seconds=round(time_spent))} | "
+        print(f"\t[{progress['value']}/{args.total_num}] | Time spent: {timedelta(seconds=round(time_spent))} | "
               f"ETR: {timedelta(seconds=round(time_remaining))}", end='\r')
 
 
@@ -362,81 +369,73 @@ def run(opts):
     opts : list
         List of arguments
     """
+    if not opts.work_dir.endswith("/"):
 
-    work_dir = opts.work_dir
-    signals = opts.signals
-    regions = opts.region_file
-    n_permutations = opts.perms
-    signipval = opts.signipval
-    aggregate = opts.agg
-    moran_info = opts.info
-    multiprocess = opts.multiprocess
-    threads = opts.threads
-    force = opts.force
+        opts.work_dir += "/"
 
-    if not work_dir.endswith("/"):
+    if opts.region_file is None:
 
-        work_dir += "/"
-
-    if regions is None:
-
-        if len(glob.glob(f"{work_dir}*coords.txt")) > 1:
+        if len(glob.glob(f"{opts.work_dir}*coords.txt")) > 1:
 
             sys.exit("More than one region file found. Please provide a region or one file with regions of interest'.")
 
         try:
 
-            df_regions = pd.read_table(glob.glob(f"{work_dir}*coords.txt")[0])
+            df_regions = pd.read_table(glob.glob(f"{opts.work_dir}*coords.txt")[0])
 
         except IndexError:
 
             sys.exit("No regions provided. Please provide a region or a file with regions of interest or run \
                      'metaloci sniffer'.")
 
-    elif os.path.isfile(regions):
+    elif os.path.isfile(opts.region_file):
 
-        df_regions = pd.read_table(regions)
+        df_regions = pd.read_table(opts.region_file)
 
     else:
 
-        df_regions = pd.DataFrame({"coords": [regions], "symbol": ["symbol"], "id": ["id"]})
+        df_regions = pd.DataFrame({"coords": [opts.region_file], "symbol": ["symbol"], "id": ["id"]})
 
     if opts.debug:
 
-        print(f"work_dir ->\n\t{work_dir}")
-        print(f"signals ->\n\t{signals}")
-        print(f"regions ->\n\t{regions}")
-        print(f"n_permutations ->\n\t{n_permutations}")
-        print(f"signipval ->\n\t{signipval}")
-        print(f"aggregate ->\n\t{aggregate}")
-        print(f"moran_info ->\n\t{moran_info}")
-        print(f"multiprocess ->\n\t{multiprocess}")
-        print(f"cores ->\n\t{threads}")
-        print(f"force ->\n\t{force}")
+        print(f"work_dir ->\n\t{opts.work_dir}")
+        print(f"signals ->\n\t{opts.signals}")
+        print(f"regions ->\n\t{opts.region_file}")
+        print(f"n_permutations ->\n\t{opts.perms}")
+        print(f"signipval ->\n\t{opts.signipval}")
+        print(f"aggregate ->\n\t{opts.agg}")
+        print(f"moran_info ->\n\t{opts.moran_info}")
+        print(f"multiprocess ->\n\t{opts.multiprocess}")
+        print(f"cores ->\n\t{opts.threads}")
+        print(f"force ->\n\t{opts.force}")
+        print(f"poi_only ->\n\t{opts.poi_only}")
 
         sys.exit()
 
     agg_dict = defaultdict(list)
 
-    if aggregate is not None:
+    if opts.agg is not None:
 
-        for _, row in pd.read_csv(aggregate, sep="\t", header=None).iterrows():
+        for _, row in pd.read_csv(opts.agg, sep="\t", header=None).iterrows():
 
             agg_dict[row[0]].append(row[1])
 
-    parsed_args = pd.Series({"work_dir": work_dir,
-                             "signals": signals,
-                             "n_permutations": n_permutations,
-                             "signipval": signipval,
-                             "aggr": aggregate,
-                             "moran_info": moran_info,
-                             "agg_dict": agg_dict,
-                             "force": force,
-                             "total_num": len(df_regions)})
+    args = pd.Series({"work_dir": opts.work_dir,
+                      "signals": opts.signals,
+                      "n_permutations": opts.perms,
+                      "signipval": opts.signipval,
+                      "aggr": opts.agg,
+                      "moran_info": opts.moran_info,
+                      "agg_dict": agg_dict,
+                      "force": opts.force,
+                      "total_num": len(df_regions),
+                      "save_bed": opts.save_bed,
+                      "quadrants": opts.quadrants,
+                      "poi_only": opts.poi_only})
 
     start_timer = time()
 
-    if multiprocess:
+    if opts.multiprocess:
 
         print(f"\n------> {len(df_regions)} regions will be computed.\n")
 
@@ -444,19 +443,19 @@ def run(opts):
 
             progress = mp.Manager().dict(value=0, timer=start_timer, done=False, missing_signal=None)
 
-            with mp.Pool(processes=threads) as pool:
+            with mp.Pool(processes=opts.threads) as pool:
 
                 try:
 
-                    pool.starmap(get_lmi, [(row, parsed_args, progress) for _, row in df_regions.iterrows()])
+                    pool.starmap(get_lmi, [(row, args, progress) for _, row in df_regions.iterrows()])
 
                     if progress["done"]:
 
                         print("\tSome regions had already been computed and have been skipped.", end="")
 
-                        if moran_info:
+                        if opts.moran_info:
 
-                            print(f"\nMoran data saved to: '{work_dir}chr/moran_log/'", end="")
+                            print(f"\nMoran data saved to: '{opts.work_dir}chr/moran_log/'", end="")
 
                 except Exception:
 
@@ -481,7 +480,7 @@ def run(opts):
 
         for counter, row in df_regions.iterrows():
 
-            get_lmi(row, parsed_args, counter=counter, silent=False)
+            get_lmi(row, args, counter=counter, silent=False)
 
     print(f"\n\nTotal time spent: {timedelta(seconds=round(time() - start_timer))}.")
     print("\nAll done.")

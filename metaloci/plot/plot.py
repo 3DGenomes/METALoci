@@ -53,7 +53,7 @@ def get_kk_plot(mlobject: mlo.MetalociObject, restraints: bool = True, neighbour
     options = {"node_size": 50, "edge_color": "black", "linewidths": 0.1, "width": 0.05}
 
     if restraints == True:
-        
+
         nx.draw(
             mlobject.kk_graph,
             mlobject.kk_nodes,
@@ -78,7 +78,8 @@ def get_kk_plot(mlobject: mlo.MetalociObject, restraints: bool = True, neighbour
 
     if neighbourhood:
 
-        circle = plt.Circle((poi_x, poi_y), neighbourhood, color="red", fill=False, linestyle=":", alpha=0.5, lw=1, zorder=3)
+        circle = plt.Circle((poi_x, poi_y), neighbourhood, color="red",
+                            fill=False, linestyle=":", alpha=0.5, lw=1, zorder=3)
         plt.gca().add_patch(circle)
 
     sns.scatterplot(
@@ -531,7 +532,7 @@ def get_highlight(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, neig
     return bins_to_highlight
 
 
-def get_lmi_scatterplot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, neighbourhood: float,
+def get_lmi_scatterplot(mlobject: mlo.MetalociObject, merged_lmi_geometry: pd.DataFrame, neighbourhood: float,
                         signipval: float = 0.05, colors_lmi: dict = None) -> tuple:
     """
     Get a scatterplot of Z-scores of signal vs Z-score of signal spacial lag, given LMI values.
@@ -561,26 +562,26 @@ def get_lmi_scatterplot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame
     """
 
     if colors_lmi is None:
+
         colors_lmi = {1: "firebrick", 2: "lightskyblue", 3: "steelblue", 4: "orange"}
 
-    weights = lp.weights.DistanceBand.from_dataframe(lmi_geometry, neighbourhood)
+    weights = lp.weights.DistanceBand.from_dataframe(merged_lmi_geometry, neighbourhood)
     weights.transform = "r"
 
-    y_lag = lp.weights.lag_spatial(weights, lmi_geometry["signal"])
-
-    x = zscore(lmi_geometry.signal)
-    y = zscore(y_lag)
+    # The weird bit is to get the name of the signal it's currently being calculated.
+    x = mlobject.lmi_info[merged_lmi_geometry["ID"][0]]["ZSig"]
+    y = mlobject.lmi_info[merged_lmi_geometry["ID"][0]]["ZLag"]
 
     _, _, r_value_scat, p_value_scat, _ = linregress(x, y)
     scatter_fig, ax = plt.subplots(figsize=(5, 5))  # , subplot_kw={'aspect':'equal'})
 
-    alpha_sp = [1.0 if val < signipval else 0.1 for val in lmi_geometry.LMI_pvalue]
-    colors_sp = [colors_lmi[val] for val in lmi_geometry.moran_quadrant]
+    alpha_sp = [1.0 if val < signipval else 0.1 for val in merged_lmi_geometry.LMI_pvalue]
+    colors_sp = [colors_lmi[val] for val in merged_lmi_geometry.moran_quadrant]
 
     plt.scatter(x=x, y=y, s=100, ec="white", fc=colors_sp, alpha=alpha_sp)
 
     sns.scatterplot(
-        x=[x[mlobject.poi]], y=[y[mlobject.poi]], s=150, ec="lime", fc="none", zorder=len(lmi_geometry)
+        x=[x[mlobject.poi]], y=[y[mlobject.poi]], s=150, ec="lime", fc="none", zorder=len(merged_lmi_geometry)
     )
     sns.regplot(x=x, y=y, scatter=False, color="k")
     sns.despine(top=True, right=True, left=False, bottom=False, offset=10, trim=False)
@@ -589,8 +590,8 @@ def get_lmi_scatterplot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame
     plt.axvline(x=0, color="k", linestyle=":")
     plt.axhline(y=0, color="k", linestyle=":")
 
-    ax.set_xlabel(f"Z-score ({lmi_geometry.ID[0]})")
-    ax.set_ylabel(f"Z-score ({lmi_geometry.ID[0]} Spatial Lag)")
+    ax.set_xlabel(f"Z-score ({merged_lmi_geometry.ID[0]})")
+    ax.set_ylabel(f"Z-score ({merged_lmi_geometry.ID[0]} Spatial Lag)")
 
     r_value_scat = float(r_value_scat)
     p_value_scat = float(r_value_scat)
@@ -629,83 +630,83 @@ def place_composite(image: Image.Image, image_to_add: str, ifactor: float, ixloc
     return image
 
 
-def get_bed(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, neighbourhood: float, bfact: float,
-            quadrants: list = None, signipval: float = 0.05, poi: int = None, plotit: bool = False) -> pd.DataFrame:
-    """
-    _summary_
+# def get_bed(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, neighbourhood: float, bfact: float,
+#             quadrants: list = None, signipval: float = 0.05, poi: int = None, plotit: bool = False) -> pd.DataFrame:
+#     """
+#     _summary_
 
-    Parameters
-    ----------
-    mlobject : mlo.MetalociObject
-        A METALoci object.
-    lmi_geometry : pd.DataFrame
-        A DataFrame containing LMI information and geometry of all bins in the region.
-    neighbourhood : float
-        Radius of the circle that determines the neighbourhood of each of the points in the Kamada-Kawai layout.
-    bfact : float
-        Factor used to draw the circle.
-    quadrants : list, optional
-       The list of quadrants to consider for selecting bins (default is [1, 3]).
-    signipval : float, optional
-        The significance p-value threshold for selecting bins (default is 0.05).
-    poi : int, optional
-        The point of interest to plot, by default None
-    plotit : bool, optional
-        Plot a circle representing the neighbourhood of the poi, by default False
+#     Parameters
+#     ----------
+#     mlobject : mlo.MetalociObject
+#         A METALoci object.
+#     lmi_geometry : pd.DataFrame
+#         A DataFrame containing LMI information and geometry of all bins in the region.
+#     neighbourhood : float
+#         Radius of the circle that determines the neighbourhood of each of the points in the Kamada-Kawai layout.
+#     bfact : float
+#         Factor used to draw the circle.
+#     quadrants : list, optional
+#        The list of quadrants to consider for selecting bins (default is [1, 3]).
+#     signipval : float, optional
+#         The significance p-value threshold for selecting bins (default is 0.05).
+#     poi : int, optional
+#         The point of interest to plot, by default None
+#     plotit : bool, optional
+#         Plot a circle representing the neighbourhood of the poi, by default False
 
-    Returns
-    -------
-    bed : pd.DataFrame
-        _description_
-    """
+#     Returns
+#     -------
+#     bed : pd.DataFrame
+#         _description_
+#     """
 
-    if poi is None:
+#     if poi is None:
 
-        poi = mlobject.poi
+#         poi = mlobject.poi
 
-    if quadrants is None:
+#     if quadrants is None:
 
-        quadrants = [1, 3]
+#         quadrants = [1, 3]
 
-    signal = lmi_geometry.ID[0]  # Extract signal name from lmi_geometry
-    data = mlobject.lmi_info[signal]
-    # Check tha the point of interest is significant in the given quadrant
-    significants = len(data[(data.bin_index == poi) &
-                            (data.moran_quadrant.isin(quadrants)) &
-                            (data.LMI_pvalue <= signipval)])
+#     signal = lmi_geometry.ID[0]  # Extract signal name from lmi_geometry
+#     data = mlobject.lmi_info[signal]
+#     # Check tha the point of interest is significant in the given quadrant
+#     significants = len(data[(data.bin_index == poi) &
+#                             (data.moran_quadrant.isin(quadrants)) &
+#                             (data.LMI_pvalue <= signipval)])
 
-    if significants == 0:
+#     if significants == 0:
 
-        print(f"\t\tPoint of interest {poi} is not significant for quadrant(s) {quadrants} (p-value > {signipval})")
-        return None
+#         print(f"\t\tPoint of interest {poi} is not significant for quadrant(s) {quadrants} (p-value > {signipval})")
+#         return None
 
-    # Get bins within a distance to point and plot them in a gaudi plot
-    indices = np.nonzero(mlobject.kk_distances[mlobject.poi] < neighbourhood)[0]
+#     # Get bins within a distance to point and plot them in a gaudi plot
+#     indices = np.nonzero(mlobject.kk_distances[mlobject.poi] < neighbourhood)[0]
 
-    if plotit:
+#     if plotit:
 
-        print(f"\tGetting data for point of interest: {poi}...")
+#         print(f"\tGetting data for point of interest: {poi}...")
 
-        # g = get_gaudi_type_plot(mlobject,lmi_geometry)
-        x_poi = lmi_geometry.X[lmi_geometry.bin_index == poi]
-        y_poi = lmi_geometry.Y[lmi_geometry.bin_index == poi]
-        circle = Circle((x_poi, y_poi), bfact, color='yellow', fill=False)
-        xs = lmi_geometry.X.iloc[indices]
-        ys = lmi_geometry.Y.iloc[indices]
+#         # g = get_gaudi_type_plot(mlobject,lmi_geometry)
+#         x_poi = lmi_geometry.X[lmi_geometry.bin_index == poi]
+#         y_poi = lmi_geometry.Y[lmi_geometry.bin_index == poi]
+#         circle = Circle((x_poi, y_poi), bfact, color='yellow', fill=False)
+#         xs = lmi_geometry.X.iloc[indices]
+#         ys = lmi_geometry.Y.iloc[indices]
 
-        sns.scatterplot(x=lmi_geometry.X, y=lmi_geometry.Y, color='lime', s=10)
-        sns.scatterplot(x=x_poi, y=y_poi, color='yellow', s=100)
-        plt.gcf().gca().add_artist(circle)
-        sns.scatterplot(x=xs, y=ys, color='yellow')
-        plt.show()
-        plt.close()
+#         sns.scatterplot(x=lmi_geometry.X, y=lmi_geometry.Y, color='lime', s=10)
+#         sns.scatterplot(x=x_poi, y=y_poi, color='yellow', s=100)
+#         plt.gcf().gca().add_artist(circle)
+#         sns.scatterplot(x=xs, y=ys, color='yellow')
+#         plt.show()
+#         plt.close()
 
-    neighbouring_bins = lmi_geometry.iloc[indices]
-    neighbouring_bins = neighbouring_bins[['bin_chr', 'bin_start', 'bin_end']]
-    neighbouring_bins.columns = ['chrom', 'start', 'end']
+#     neighbouring_bins = lmi_geometry.iloc[indices]
+#     neighbouring_bins = neighbouring_bins[['bin_chr', 'bin_start', 'bin_end']]
+#     neighbouring_bins.columns = ['chrom', 'start', 'end']
 
-    # Merge overlapping intervals and create a continuous BED file
-    return pd.DataFrame(bioframe.merge(neighbouring_bins, min_dist=2))
+#     # Merge overlapping intervals and create a continuous BED file
+#     return pd.DataFrame(bioframe.merge(neighbouring_bins, min_dist=2))
 
 
 def get_x_axis_label_signal_plot(mlobject):

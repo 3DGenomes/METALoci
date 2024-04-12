@@ -376,21 +376,21 @@ def run(opts: list):
             plt.close()
             print(f"\t\tFinal composite figure for region '{region_row.coords}' and signal '{signal}' -> done.")
 
-            bed = plot.get_bed(mlobject, merged_lmi_geometry, neighbourhood, BFACT, quadrants, signipval)
+            # bed = plot.get_bed(mlobject, merged_lmi_geometry, neighbourhood, BFACT, quadrants, signipval, plotit=True)
 
-            if bed is not None and len(bed) > 0:
+            # if bed is not None and len(bed) > 0:
 
-                metaloci_bed_path = os.path.join(work_dir, mlobject.chrom, "metalocis_log", signal)
+            #     metaloci_bed_path = os.path.join(work_dir, mlobject.chrom, "metalocis_log", signal)
 
-                bed_file_name = os.path.join(
-                    metaloci_bed_path,
-                    f"{mlobject.chrom}_{mlobject.start}_{mlobject.end}_{mlobject.poi}_{signal}_\
-                    q-{'_'.join([str(q) for q in quadrants])}_metalocis.bed")
+            #     bed_file_name = os.path.join(
+            #         metaloci_bed_path,
+            #         f"{mlobject.chrom}_{mlobject.start}_{mlobject.end}_{mlobject.poi}_{signal}_\
+            #         q-{'_'.join([str(q) for q in quadrants])}_metalocis.bed")
 
-                pathlib.Path(metaloci_bed_path).mkdir(parents=True, exist_ok=True)
-                bed.to_csv(bed_file_name, sep="\t", index=False)
+            #     pathlib.Path(metaloci_bed_path).mkdir(parents=True, exist_ok=True)
+            #     bed.to_csv(bed_file_name, sep="\t", index=False)
 
-                print(f"\t\tBed file with metalocis location saved to: {bed_file_name}")
+            #     print(f"\t\tBed file with metalocis location saved to: {bed_file_name}")
 
             for signal_key, df in mlobject.lmi_info.items():
 

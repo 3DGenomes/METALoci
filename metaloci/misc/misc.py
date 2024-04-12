@@ -3,6 +3,7 @@ Script that contains helper functions of the METALoci package
 """
 import gzip
 import re
+import os
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -12,6 +13,8 @@ import hicstraw
 import numpy as np
 import pandas as pd
 from metaloci import mlo
+import pathlib
+from metaloci.spatial_stats import lmi
 
 
 def signal_binnarize(data: pd.DataFrame, sum_type: str) -> pd.DataFrame:
@@ -554,3 +557,80 @@ def binsearcher(id_tss_f: dict, id_chrom_f: dict, id_name_f: dict, bin_genome_f:
     data_f[["gene_id"]] = data_f[["gene_id"]].astype(str)
 
     return data_f
+
+
+def write_bed(mlobject: mlo.MetalociObject, signal_type: str, neighbourhood: int, BFACT: float, args=None,
+              silent: bool = False) -> None:
+    """
+    Writes the bed file with the metalocis location.
+
+    Parameters
+    ----------
+    mlobject : mlo.MetalociObject
+        METALoci object.
+    signal_type : str
+        Signal type to be used.
+    neighbourhood : int
+        Neighbourhood to be used.
+    BFACT : float
+        BFACT value to be used.
+    args : argparse.Namespace
+        Arguments from the command line.
+    silent : bool, optional
+        Variable that controls the verbosity of the function (useful for multiprocessing), by default False.
+    """
+
+    merged_lmi_geometry = pd.merge(
+        mlobject.lmi_info[signal_type],
+        mlobject.lmi_geometry,
+        on=["bin_index", "moran_index"],
+        how="inner",
+    )
+    bed = lmi.get_bed(mlobject, merged_lmi_geometry, neighbourhood, BFACT, args.quadrants, args.signipval,
+                      silent=silent)
+
+    if bed is not None and len(bed) > 0:
+
+        metaloci_bed_path = os.path.join(args.work_dir, mlobject.chrom, "metalocis_log", signal_type)
+        bed_file_name = os.path.join(
+            metaloci_bed_path,
+            f"{mlobject.chrom}_{mlobject.start}_{mlobject.end}_{mlobject.poi}_{signal_type}_"
+            f"q-{'_'.join([str(q) for q in args.quadrants])}_metalocis.bed")
+
+        pathlib.Path(metaloci_bed_path).mkdir(parents=True, exist_ok=True)
+        bed.to_csv(bed_file_name, sep="\t", index=False)
+
+        if not silent:
+
+            print(f"\t-> Bed file with metalocis location saved to: {bed_file_name}")
+
+
+def write_moran_data(mlobject: mlo.MetalociObject, args, silent=False) -> None:
+    """
+    Writes the Moran data to a file.
+
+    Parameters
+    ----------
+    mlobject : mlo.MetalociObject
+        METALoci object with the Moran data.
+    args : argparse.Namespace
+        Arguments from the command line.
+    silent : bool, optional
+        Variable that controls the verbosity of the function (useful for multiprocessing), by default False.
+    """
+
+    for signal, df in mlobject.lmi_info.items():
+
+        moran_data_path = os.path.join(args.work_dir, mlobject.chrom, "moran_data", signal)
+
+        pathlib.Path(moran_data_path).mkdir(parents=True, exist_ok=True)
+        df.to_csv(
+            os.path.join(
+                moran_data_path,
+                f"{re.sub(':|-', '_', mlobject.region)}_{signal}.tsv"),
+            sep="\t", index=False, float_format="%.12f")
+
+        if not silent:
+
+            print(F"\t-> Moran data saved to "
+                  f"'{moran_data_path}/{re.sub(':|-', '_', mlobject.region)}_{signal}.tsv'")

@@ -27,6 +27,8 @@ It creates the following plots:\n
 \tGaudí plot for LMI quadrant\n
 and a composite image with all the above."""
 
+# TODO add a function so the user can "paint" certain parts of the KK/Gaudi plots to mark them in the plots.
+
 
 def populate_args(parser):
     """
@@ -38,8 +40,8 @@ def populate_args(parser):
         ArgumentParser to populate the arguments through the normal METALoci caller
     """
 
-    parser.formatter_class=lambda prog: HelpFormatter(prog, width=120,
-                                                      max_help_position=60)
+    parser.formatter_class = lambda prog: HelpFormatter(prog, width=120,
+                                                        max_help_position=60)
 
     input_arg = parser.add_argument_group(title="Input arguments")
 
@@ -74,7 +76,7 @@ def populate_args(parser):
         required=True,
         help="Region to apply LMI in format chrN:start-end_midpoint or file with the regions of interest. "
         "If a file is provided, it must contain as a header 'coords', 'symbol' and 'id', and one region per line, "
-        "tab separated."    
+        "tab separated."
     )
 
     optional_arg = parser.add_argument_group(title="Optional arguments")
@@ -122,7 +124,7 @@ def populate_args(parser):
         default=[1, 3],
         metavar="INT",
         nargs="*",
-        ## TODO We should pass this help text with new-line characters, as it look really messy.
+        # TODO We should pass this help text with new-line characters, as it look really messy.
         help="Space-separated list with the LMI quadrants to highlight (default: %(default)s) "
         "1: High-high (signal in bin is high, signal on neighbours is high). "
         "2: High-Low (signal in bin is high, signal on neighbours is low). "
@@ -141,6 +143,16 @@ def populate_args(parser):
     )
 
     optional_arg.add_argument(
+        "-k",
+        "--mark_regions",
+        dest="mark_regions",
+        metavar="PATH",
+        type=str,
+        help="Path to a file to makr certain regions on the gaudí plots. The file must have the following columns: "
+        "region_metaloci chr:start-end"
+    )
+
+    optional_arg.add_argument(
         "-u",
         "--debug",
         dest="debug",
@@ -148,7 +160,7 @@ def populate_args(parser):
         help=SUPPRESS)
 
 
-def run(opts : list):
+def run(opts: list):
     """
     Funtion to run this section of METALoci with the needed arguments
 
@@ -166,6 +178,7 @@ def run(opts : list):
     signipval = opts.signipval
     rmtypes = opts.rm_types
     agg = opts.agg
+    mark_regions = opts.mark_regions
     debug = opts.debug
 
     quadrants = [int(x) for x in quadrants]
@@ -177,8 +190,8 @@ def run(opts : list):
     INFLUENCE = 1.5
     BFACT = 2
 
-    ## Changed the scatterplot and gaudi_type functions so they don't need the color dictionary anymore.
-    ## Functions assume this schema of colors if the user says nothing.
+    # Changed the scatterplot and gaudi_type functions so they don't need the color dictionary anymore.
+    # Functions assume this schema of colors if the user says nothing.
     # colors = {1: "firebrick", 2: "lightskyblue", 3: "steelblue", 4: "orange"}
 
     if os.path.isfile(regions):
@@ -195,6 +208,11 @@ def run(opts : list):
         with open(signals[0], "r", encoding="utf-8") as handler:
 
             signals = [line.strip() for line in handler]
+
+    if mark_regions is not None:
+        regions2mark = pd.read_table(mark_regions, names=["region_metaloci", "coords", "mark"], sep="\t")
+    else:
+        regions2mark = None
 
     plot_opt = {"bbox_inches": "tight", "dpi": 300, "transparent": True}
 
@@ -293,14 +311,14 @@ def run(opts : list):
             print("\t\tKamada-Kawai plot -> done.")
 
             print("\t\tGaudi Signal plot", end="\r")
-            gs_plt = plot.get_gaudi_signal_plot(mlobject, merged_lmi_geometry)
+            gs_plt = plot.get_gaudi_signal_plot(mlobject, merged_lmi_geometry, regions2mark=regions2mark)
             gs_plt.savefig(f"{plot_filename}_gsp.pdf", **plot_opt)
             gs_plt.savefig(f"{plot_filename}_gsp.png", **plot_opt)
             plt.close()
             print("\t\tGaudi Signal plot -> done.")
 
             print("\t\tGaudi Type plot", end="\r")
-            gt_plt = plot.get_gaudi_type_plot(mlobject, merged_lmi_geometry, signipval)
+            gt_plt = plot.get_gaudi_type_plot(mlobject, merged_lmi_geometry, signipval, regions2mark=regions2mark)
             gt_plt.savefig(f"{plot_filename}_gtp.pdf", **plot_opt)
             gt_plt.savefig(f"{plot_filename}_gtp.png", **plot_opt)
             plt.close()
@@ -342,7 +360,7 @@ def run(opts : list):
 
             maxx = int((img1.size[1] * 0.4 + img2.size[1] * 0.25 + img3.size[1] * 0.25) * 1.3)
             yticks_signal = [f"{round(i, 3):.2f}" for i in ax.get_yticks()[1:-1]]
-            signal_left = {3 : 39, 4 : 32, 5 : 21, 6 : 10, 7: -1, 8: -11}
+            signal_left = {3: 39, 4: 32, 5: 21, 6: 10, 7: -1, 8: -11}
             max_chr_yax = max(len(str(i)) for i in yticks_signal)
 
             if float(min(yticks_signal)) < 0:
@@ -392,14 +410,14 @@ def run(opts : list):
             plt.close()
             print(f"\t\tFinal composite figure for region '{region_row.coords}' and signal '{signal}' -> done.")
 
-            bed = plot.get_bed(mlobject, merged_lmi_geometry, nhood_region, quadrants, signipval)
+            bed = plot.get_bed(mlobject, merged_lmi_geometry, nhood_region, BFACT, quadrants, signipval)
 
             if bed is not None and len(bed) > 0:
 
                 metaloci_bed_path = os.path.join(work_dir, mlobject.chrom, "metalocis_log", signal)
 
                 fn = os.path.join(metaloci_bed_path,
-                                  f"{mlobject.chrom}_{mlobject.start}_{mlobject.end}_{mlobject.poi}_{signal}_" + \
+                                  f"{mlobject.chrom}_{mlobject.start}_{mlobject.end}_{mlobject.poi}_{signal}_" +
                                   f"q-{'_'.join([str(q) for q in quadrants])}_metalocis.bed")
 
                 pathlib.Path(metaloci_bed_path).mkdir(parents=True, exist_ok=True)
@@ -443,7 +461,7 @@ def run(opts : list):
                         handler.write(log)
 
             # Remove image used for composite figure.
-            ## TODO This variable is always png?
+            # TODO This variable is always png?
             if rmtypes:
 
                 for ext in rmtypes:

@@ -268,7 +268,7 @@ def get_hic_plot(mlobject: mlo.MetalociObject,
 
 
 def get_gaudi_signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame,
-                          cmap_user: str = "PuOr_r"):
+                          cmap_user: str = "PuOr_r", regions2mark=None):
     """
     Get a Gaudí signal plot.
 
@@ -294,10 +294,33 @@ def get_gaudi_signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFra
 
     min_value = lmi_geometry.signal.min()
     max_value = lmi_geometry.signal.max()
-    gaudi_signal_fig, ax = plt.subplots(figsize=(12, 10), subplot_kw={"aspect": "equal"})
 
+    gaudi_signal_fig, ax = plt.subplots(figsize=(12, 10), subplot_kw={"aspect": "equal"})
     lmi_geometry.plot(column="signal", cmap=cmap_user, linewidth=2, edgecolor="white", ax=ax)
-    sns.scatterplot(x=[lmi_geometry.X[mlobject.poi]], y=[lmi_geometry.Y[mlobject.poi]], s=50, ec="none", fc="lime")
+
+    if regions2mark is not None:
+
+        for _, region in regions2mark.iterrows():
+
+            if region.region_metaloci == mlobject.region:
+
+                _, region_start, region_end = re.split(r'[:-]', region["coords"])
+                region_start = int(region_start)
+                region_end = int(region_end)
+
+                region_data = lmi_geometry[(lmi_geometry["bin_start"] >= region_start)
+                                           & (lmi_geometry["bin_end"] <= region_end)]
+
+                sns.scatterplot(x=region_data.X, y=region_data.Y, s=10, ec="none", fc="green")
+
+                for _, row in region_data.iterrows():
+                    plt.text(x=row.X, y=row.Y, s=region.mark, fontsize=10, color="black")
+
+    sns.scatterplot(
+        x=[lmi_geometry.X[mlobject.poi]],
+        y=[lmi_geometry.Y[mlobject.poi]],
+        s=50, ec="none", fc="lime", zorder=len(lmi_geometry))
+
     sm = plt.cm.ScalarMappable(cmap=cmap_user, norm=plt.Normalize(vmin=min_value, vmax=max_value))
     sm.set_array([1, 2, 3, 4])
 
@@ -310,7 +333,6 @@ def get_gaudi_signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFra
         format=FormatStrFormatter("%.2f"),
         ax=ax,
     )
-
     cbar.set_label(f"{lmi_geometry.ID[0]}", rotation=270, size=20, labelpad=35)
     plt.axis("off")
 
@@ -318,7 +340,7 @@ def get_gaudi_signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFra
 
 
 def get_gaudi_type_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame,
-                        signipval: float = 0.05, colors_lmi: dict = None
+                        signipval: float = 0.05, colors_lmi: dict = None, regions2mark=None
                         ):
     """
     Get a Gaudí type plot.
@@ -349,7 +371,6 @@ def get_gaudi_type_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame
     """
 
     if colors_lmi is None:
-
         colors_lmi = {1: "firebrick", 2: "lightskyblue", 3: "steelblue", 4: "orange"}
 
     legend_elements = [
@@ -361,10 +382,28 @@ def get_gaudi_type_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame
 
     cmap = LinearSegmentedColormap.from_list("Custom cmap", [colors_lmi[nu] for nu in colors_lmi], len(colors_lmi))
     alpha = [1.0 if pval <= signipval else 0.3 for pval in lmi_geometry.LMI_pvalue]
-    gaudi_type_fig, ax = plt.subplots(figsize=(12, 10), subplot_kw={"aspect": "equal"})
 
+    gaudi_type_fig, ax = plt.subplots(figsize=(12, 10), subplot_kw={"aspect": "equal"})
     lmi_geometry.plot(column="moran_quadrant", cmap=cmap, alpha=alpha, linewidth=2, edgecolor="white", ax=ax)
     plt.axis("off")
+
+    if regions2mark is not None:
+
+        for _, region in regions2mark.iterrows():
+
+            if region.region_metaloci == mlobject.region:
+
+                _, region_start, region_end = re.split(r'[:-]', region.coords)
+                region_start = int(region_start)
+                region_end = int(region_end)
+
+                region_data = lmi_geometry[(lmi_geometry["bin_start"] >= region_start)
+                                           & (lmi_geometry["bin_end"] <= region_end)]
+
+                sns.scatterplot(x=region_data.X, y=region_data.Y, s=10, ec="none", fc="green")
+
+                for _, row in region_data.iterrows():
+                    plt.text(x=row.X, y=row.Y, s=region.mark, fontsize=10, color="black")
 
     sns.scatterplot(
         x=[lmi_geometry.X[mlobject.poi]],

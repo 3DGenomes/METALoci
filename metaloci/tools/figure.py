@@ -138,6 +138,16 @@ def populate_args(parser):
     )
 
     optional_arg.add_argument(
+        "-k",
+        "--mark_regions",
+        dest="mark_regions",
+        metavar="PATH",
+        type=str,
+        help="Path to a file to makr certain regions on the gaudí plots. The file must have the following columns: "
+        "region_metaloci chr:start-end"
+    )
+
+    optional_arg.add_argument(
         "-u",
         "--debug",
         dest="debug",
@@ -163,6 +173,7 @@ def run(opts: list):
     signipval = opts.signipval
     rmtypes = opts.rm_types
     agg = opts.agg
+    mark_regions = opts.mark_regions
     debug = opts.debug
     quadrants = [int(x) for x in quadrants]
 
@@ -189,6 +200,11 @@ def run(opts: list):
         with open(signals[0], "r", encoding="utf-8") as handler:
 
             signals = [line.strip() for line in handler]
+
+    if mark_regions is not None:
+        regions2mark = pd.read_table(mark_regions, names=["region_metaloci", "coords", "mark"], sep="\t")
+    else:
+        regions2mark = None
 
     plot_opt = {"bbox_inches": "tight", "dpi": 300, "transparent": True}
 
@@ -285,18 +301,16 @@ def run(opts: list):
             kk_plt.savefig(f"{plot_filename}_kk.png", **plot_opt)
             plt.close()
             print("\t\tKamada-Kawai plot -> done.")
+
             print("\t\tGaudi Signal plot", end="\r")
-
-            gs_plt = plot.get_gaudi_signal_plot(mlobject, merged_lmi_geometry)
-
+            gs_plt = plot.get_gaudi_signal_plot(mlobject, merged_lmi_geometry, regions2mark=regions2mark)
             gs_plt.savefig(f"{plot_filename}_gsp.pdf", **plot_opt)
             gs_plt.savefig(f"{plot_filename}_gsp.png", **plot_opt)
             plt.close()
             print("\t\tGaudi Signal plot -> done.")
+
             print("\t\tGaudi Type plot", end="\r")
-
-            gt_plt = plot.get_gaudi_type_plot(mlobject, merged_lmi_geometry, signipval)
-
+            gt_plt = plot.get_gaudi_type_plot(mlobject, merged_lmi_geometry, signipval, regions2mark=regions2mark)
             gt_plt.savefig(f"{plot_filename}_gtp.pdf", **plot_opt)
             gt_plt.savefig(f"{plot_filename}_gtp.png", **plot_opt)
             plt.close()

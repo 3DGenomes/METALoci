@@ -9,7 +9,7 @@ from importlib.metadata import version
 import metaloci
 from metaloci.tests import test_tools
 from metaloci.tools import figure, layout, ml, prep
-from metaloci.utility_scripts import sniffer
+from metaloci.utility_scripts import sniffer, param_search, gene_selector
 
 
 def main(arguments: list) -> None:
@@ -89,9 +89,29 @@ def main(arguments: list) -> None:
 
     # test
     args_pp["test"] = subparser.add_parser("test",
-                                          add_help=False,
-                                          formatter_class=RawDescriptionHelpFormatter)
+                                           add_help=False,
+                                           formatter_class=RawDescriptionHelpFormatter)
     args_pp["test"].set_defaults(func=test_tools.run)
+
+    # param_search
+    args_pp["param_search"] = subparser.add_parser("param_search",
+                                                   formatter_class=RawDescriptionHelpFormatter,
+                                                   description=param_search.DESCRIPTION,
+                                                   help=param_search.HELP,
+                                                   add_help=False,
+                                                   )
+    args_pp["param_search"].set_defaults(func=param_search.run)
+    param_search.populate_args(args_pp["param_search"])
+
+    # param_search
+    args_pp["gene_selector"] = subparser.add_parser("gene_selector",
+                                                    formatter_class=RawDescriptionHelpFormatter,
+                                                    description=gene_selector.DESCRIPTION,
+                                                    help=gene_selector.HELP,
+                                                    add_help=False,
+                                                    )
+    args_pp["gene_selector"].set_defaults(func=gene_selector.run)
+    gene_selector.populate_args(args_pp["gene_selector"])
 
     if len(arguments) == 1:
 
@@ -113,5 +133,6 @@ def main(arguments: list) -> None:
     args = parser.parse_args(arguments[1:])
 
     args.func(args)
+
 
 sys.exit(main(sys.argv))

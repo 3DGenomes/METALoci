@@ -2,18 +2,21 @@
 Script that contains helper functions of the METALoci package
 """
 import gzip
+from pickle import UnpicklingError
 import re
 import os
 import sys
 from collections import defaultdict
+import pathlib
 from pathlib import Path
+import subprocess as sp
 
 import cooler
 import hicstraw
 import numpy as np
 import pandas as pd
 from metaloci import mlo
-import pathlib
+
 from metaloci.spatial_stats import lmi
 
 
@@ -634,3 +637,135 @@ def write_moran_data(mlobject: mlo.MetalociObject, args, silent=False) -> None:
 
             print(F"\t-> Moran data saved to "
                   f"'{moran_data_path}/{re.sub(':|-', '_', mlobject.region)}_{signal}.tsv'")
+
+
+def meta_param_search(work_dir_f: str, hic_f: str, reso_f: int, reso_file: str, pl_f: list, cutoff_f: float,
+                      sample_num_f: int, seed_f: int):
+    """
+    Test MetaLoci parameters to optimise Kamada-Kawai layout.
+
+    Parameters
+    ----------
+    work_dir_f : str
+        Path to working directory.
+    hic_f : str
+        Complete path to the cool/mcool/hic file.
+    reso_f : int
+        Hi-C resolution to be tested (in bp).
+    reso_file : str
+        Path to region file to be tested.
+    pl_f : _type_
+        Persistent length; amount of possible rotation of points in layout.
+    cutoff_f : float
+        Percent of top interactions to use from HiC.
+    sample_num_f : int
+        Number of regions to sample from the region file.
+    seed_f : int
+        Random seed for region sampling.
+    """
+
+    save_dir_f = os.path.join(work_dir_f, f"reso_{reso_f}_cutoff_{cutoff_f*100:.0f}_pl_{pl_f}")
+    Path(save_dir_f).mkdir(parents=True, exist_ok=True)
+
+    ml_comm = f"metaloci layout -w {save_dir_f} -c {hic_f}" + " -r {} -g {} --cutoff {} --pl {} --plot > /dev/null 2>&1"
+
+    regions = pd.read_table(reso_file)
+    sample = regions.sample(sample_num_f, random_state=seed_f)
+
+    for region_coords in sample['coords']:
+        com2run = ml_comm.format(reso_f, region_coords, cutoff_f, pl_f)
+        sp.check_call(com2run, shell=True)
+
+
+def get_poi_data(
+        line_f: pd.Series, signals_f: list, work_dir_f: str,
+        bf_f: str, of: str,
+        pval: float, quadrant_list: str,
+        region_file_f: bool = False, rf_h=None):
+    """
+    Function to extract data from the METALoci objects and parse it into a table.
+
+    Parameters
+    ----------
+    line_f : pd.Series
+        Row of the gene file to parse.
+    signals_f : list
+        List of signals to parse.
+    work_dir_f : str
+        Path to working directory.
+    bf_f : str
+        Bad file name.
+    of : str
+        Output file name.
+    pval : float
+        P-value threshold.
+    quadrant_list : list
+        List of quadrants to consider.
+    region_file_f : bool, optional
+        Select whether or not to store a metaloci region file with the significant regions.
+    rf_h : TextIOWrapper, optional
+        Region file name.
+
+    Returns
+    -------
+    None
+    """
+
+    mlo_fn = f"{line_f.coords.replace(':', '_').replace('-', '_')}.mlo"
+
+    bfh_f = open(bf_f, mode="a", encoding="utf-8")
+
+    if not os.path.exists(os.path.join(work_dir_f, mlo_fn.split("_")[0], mlo_fn)):
+
+        bfh_f.write(f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}\tno_file\n")
+        bfh_f.flush()
+        return None
+
+    table_line_f = f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}"
+
+    try:
+
+        mlo_data_f = pd.read_pickle(os.path.join(work_dir_f, mlo_fn.split("_")[0], mlo_fn))
+
+    except UnpicklingError:
+
+        bfh_f.write(f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}\tcorrupt_file\n")
+        bfh_f.flush()
+        return None
+
+    if mlo_data_f.bad_region:
+
+        bfh_f.write(f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}\t{mlo_data_f.bad_region}\n")
+        bfh_f.flush()
+        return None
+
+    of_h = open(of, mode="a", encoding="utf-8")
+
+    for sig_f in signals_f:
+
+        try:
+
+            poi_data_f = mlo_data_f.lmi_info[sig_f][mlo_data_f.lmi_info[sig_f]["bin_index"] == mlo_data_f.poi]
+            poi_lmi_f = poi_data_f.LMI_score.squeeze()
+            poi_quadrant_f = poi_data_f.moran_quadrant.squeeze()
+            poi_pval_f = poi_data_f.LMI_pvalue.squeeze()
+            poi_signal_f = poi_data_f.ZSig.squeeze()
+            poi_lag_f = poi_data_f.ZLag.squeeze()
+
+            table_line_f += f"\t{poi_quadrant_f}\t{poi_lmi_f}\t{poi_pval_f}\t{poi_signal_f}\t{poi_lag_f}"
+
+            if poi_quadrant_f in quadrant_list and poi_pval_f <= pval and region_file_f:
+
+                regionfile_h = open(rf_h, mode="a", encoding="utf-8")
+                regionfile_h.write(f"{table_line_f}\n")
+                regionfile_h.flush()
+
+        except KeyError:
+
+            bfh_f.write(f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}\tno_signal_{sig_f}\n")
+            bfh_f.flush()
+
+    of_h.write(f"{table_line_f}\n")
+    of_h.flush()
+
+    return None

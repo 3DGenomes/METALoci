@@ -18,6 +18,8 @@ from PIL import Image
 
 from metaloci.plot import plot
 
+HELP = "Plots METALoci output."
+
 DESCRIPTION = """Outputs the different plots to show METALoci.
 It creates the following plots:\n
 \tHiC matrix
@@ -103,14 +105,6 @@ def populate_args(parser):
         interest will be highlighted (independently of the quadrant and significance of those bins, but only if the \
         point of interest is significant). If False, all significant regions that correspond to the quadrant selected \
         with -q will be highlighted (default: False)."
-    )
-
-    optional_arg.add_argument(
-        "-a",
-        "--aggregated",
-        dest="agg",
-        action="store_true",
-        help="Use the file with aggregated signals (*_LMI_byType.pkl)",
     )
 
     optional_arg.add_argument(

@@ -16,6 +16,8 @@ from tqdm import tqdm
 
 from metaloci.misc import misc
 
+HELP = "Converts a .gtf file to a list of regions for METALoci."
+
 DESCRIPTION = """Takes a .gft file or a .bed file and parses it into a region list, with a
 specific resolution and extension. The point of interest of the regions is the middle bin."""
 

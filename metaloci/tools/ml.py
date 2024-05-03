@@ -19,8 +19,12 @@ import pandas as pd
 from metaloci.spatial_stats import lmi
 from metaloci.misc import misc
 
+HELP = "Calculates Local Moran's I for every bin in a Kamada-Kawai layout."
+
 DESCRIPTION = """
-Adds signal data to a Kamada-Kawai layout and calculates Local Moran's I for every bin in the layout.
+Adds signal data to a Kamada-Kawai layout and calculates Local Moran's I for every bin in the layout. Outputs
+a .mlo file with the LMI data for each signal. It can also output a csv with info for each signal and bed files with
+the metalocis found, depending to the flags you set. 
 """
 
 
@@ -280,10 +284,15 @@ def get_lmi(row: pd.Series, args: pd.Series,
 
         progress["missing_signal"] = list(mlobject.signals_dict.keys())
 
-        raise Exception()
+        raise Exception()  # This exception is probably a bad idea
 
     # Get average distance between consecutive points to define influence, which should be ~2 particles of radius.
     neighbourhood = mlobject.kk_distances.diagonal(1).mean() * INFLUENCE * BFACT
+
+    if args.force:
+
+        mlobject.lmi_info = {}
+        mlobject.lmi_geometry = None
 
     # This checks if every signal you want to process is already computed. If the user works with a
     # few signals but decides to add some more later, the user can use the same working directory and

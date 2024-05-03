@@ -18,9 +18,7 @@ from tqdm import tqdm
 
 from metaloci.misc import misc
 
-HELP = """
-Extract data about the POI of your regions.
-"""
+HELP = "Extracts data about the point of interest of your regions."
 
 DESCRIPTION = """This script parses the LMI information files created by METALoci.
 
@@ -30,12 +28,12 @@ signal. In case it doesn't pass this filters, the script will output NA."""
 
 def populate_args(parser):
     """
-    Function to give the main METALoci script the arguments needed to run the layout step
+    Function to give the main METALoci script the arguments needed to run the layout step.
 
     Parameters
     ----------
     parser : ArgumentParser
-        ArgumentParser to populate the arguments through the normal METALoci caller
+        ArgumentParser to populate the arguments through the normal METALoci caller.
     """
 
     parser.formatter_class = lambda prog: HelpFormatter(prog, width=120,

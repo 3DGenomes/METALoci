@@ -26,6 +26,9 @@ warnings.simplefilter('ignore', category=NumbaDeprecationWarning)
 warnings.simplefilter('ignore', category=NumbaPendingDeprecationWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
 
+
+HELP = "Processes signal .bed files to METALoci format."
+
 DESCRIPTION = """
 Processes signal .bed files or .bedGraph files, binnarizing them at a given resolution,
 merging all signals in the same dataframe and subsetting by chromosomes.

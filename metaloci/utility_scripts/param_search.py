@@ -12,12 +12,11 @@ from itertools import product
 import multiprocessing as mp
 from time import time
 from datetime import timedelta
-from tqdm import tqdm
 
 from metaloci.misc import misc
 
 HELP = """
-Find the best combination of resolution, persistence length and cut-off for your HiC.
+Finds the best combination of parameters for your HiC.
 """
 
 DESCRIPTION = """
@@ -32,12 +31,12 @@ NOTE: Best practice is to optimise resolution and persistent length first, then 
 
 def populate_args(parser):
     """
-    Function to give the main METALoci script the arguments needed to run the layout step
+    Function to give the main METALoci script the arguments needed to run the layout step.
 
     Parameters
     ----------
     parser : ArgumentParser
-        ArgumentParser to populate the arguments through the normal METALoci caller
+        ArgumentParser to populate the arguments through the normal METALoci caller.
     """
 
     parser.formatter_class = lambda prog: HelpFormatter(prog, width=120,

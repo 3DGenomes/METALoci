@@ -45,7 +45,7 @@ def main(arguments: list) -> None:
     # prep
     args_pp["prep"] = subparser.add_parser("prep",
                                            description=prep.DESCRIPTION,
-                                           help=prep.DESCRIPTION,
+                                           help=prep.HELP,
                                            add_help=False,
                                            formatter_class=RawDescriptionHelpFormatter)
     args_pp["prep"].set_defaults(func=prep.run)
@@ -54,7 +54,7 @@ def main(arguments: list) -> None:
     # layout
     args_pp["layout"] = subparser.add_parser("layout",
                                              description=layout.DESCRIPTION,
-                                             help=layout.DESCRIPTION,
+                                             help=layout.HELP,
                                              add_help=False,
                                              formatter_class=RawDescriptionHelpFormatter)
     args_pp["layout"].set_defaults(func=layout.run)
@@ -63,7 +63,7 @@ def main(arguments: list) -> None:
     # ml
     args_pp["lm"] = subparser.add_parser("lm",
                                          description=ml.DESCRIPTION,
-                                         help=ml.DESCRIPTION,
+                                         help=ml.HELP,
                                          add_help=False,
                                          formatter_class=RawDescriptionHelpFormatter)
     args_pp["lm"].set_defaults(func=ml.run)
@@ -72,7 +72,7 @@ def main(arguments: list) -> None:
     # figure
     args_pp["figure"] = subparser.add_parser("figure",
                                              description=figure.DESCRIPTION,
-                                             help=figure.DESCRIPTION,
+                                             help=figure.HELP,
                                              add_help=False,
                                              formatter_class=RawTextHelpFormatter)
     args_pp["figure"].set_defaults(func=figure.run)
@@ -81,7 +81,7 @@ def main(arguments: list) -> None:
     # sniffer
     args_pp["sniffer"] = subparser.add_parser("sniffer",
                                               description=sniffer.DESCRIPTION,
-                                              help=sniffer.DESCRIPTION,
+                                              help=sniffer.HELP,
                                               add_help=False,
                                               formatter_class=RawDescriptionHelpFormatter)
     args_pp["sniffer"].set_defaults(func=sniffer.run)

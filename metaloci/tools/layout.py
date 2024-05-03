@@ -29,6 +29,8 @@ from scipy.spatial import distance
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
+HELP = "Creates a Kamada-Kawai layout from a Hi-C for a given region."
+
 DESCRIPTION = """
 Creates a Kamada-Kawai layout from a Hi-C for a given region.
 """

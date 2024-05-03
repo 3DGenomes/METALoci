@@ -2,7 +2,7 @@
 Script that contains the functions needed to run the plotting
 """
 from collections import defaultdict
-
+import re
 import bioframe
 import libpysal as lp
 import matplotlib.pyplot as plt
@@ -300,21 +300,26 @@ def get_gaudi_signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFra
 
     if regions2mark is not None:
 
-        for _, region in regions2mark.iterrows():
+        miniregions2mark = regions2mark[regions2mark.region_metaloci == mlobject.region]
 
-            if region.region_metaloci == mlobject.region:
+        # print(miniregions2mark)
 
-                _, region_start, region_end = re.split(r'[:-]', region["coords"])
-                region_start = int(region_start)
-                region_end = int(region_end)
+        mini_geometry = lmi_geometry[["bin_start", "bin_end", "X", "Y"]].copy()
 
-                region_data = lmi_geometry[(lmi_geometry["bin_start"] >= region_start)
-                                           & (lmi_geometry["bin_end"] <= region_end)]
+        mini_geometry["mark"] = mini_geometry.apply(
+            lambda x: ",".join(
+                miniregions2mark.loc
+                [(miniregions2mark["start"] >= x["bin_start"]) & (miniregions2mark["end"] <= x["bin_end"]),
+                 "mark"].values),
+            axis=1)
 
-                sns.scatterplot(x=region_data.X, y=region_data.Y, s=10, ec="none", fc="green")
+        mini_geometry = mini_geometry[mini_geometry["mark"] != ""]
 
-                for _, row in region_data.iterrows():
-                    plt.text(x=row.X, y=row.Y, s=region.mark, fontsize=10, color="black")
+        for _, mini_geo_row in mini_geometry.iterrows():
+
+            sns.scatterplot(x=[mini_geo_row.X], y=[mini_geo_row.Y], s=10, ec="none", fc="green")
+
+            plt.text(x=mini_geo_row.X, y=mini_geo_row.Y, s=mini_geo_row.mark, fontsize=10, color="black")
 
     sns.scatterplot(
         x=[lmi_geometry.X[mlobject.poi]],
@@ -389,21 +394,24 @@ def get_gaudi_type_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame
 
     if regions2mark is not None:
 
-        for _, region in regions2mark.iterrows():
+        miniregions2mark = regions2mark[regions2mark.region_metaloci == mlobject.region]
 
-            if region.region_metaloci == mlobject.region:
+        mini_geometry = lmi_geometry[["bin_start", "bin_end", "X", "Y"]].copy()
 
-                _, region_start, region_end = re.split(r'[:-]', region.coords)
-                region_start = int(region_start)
-                region_end = int(region_end)
+        mini_geometry["mark"] = mini_geometry.apply(
+            lambda x: ",".join(
+                miniregions2mark.loc
+                [(miniregions2mark["start"] >= x["bin_start"]) & (miniregions2mark["end"] <= x["bin_end"]),
+                 "mark"].values),
+            axis=1)
 
-                region_data = lmi_geometry[(lmi_geometry["bin_start"] >= region_start)
-                                           & (lmi_geometry["bin_end"] <= region_end)]
+        mini_geometry = mini_geometry[mini_geometry["mark"] != ""]
 
-                sns.scatterplot(x=region_data.X, y=region_data.Y, s=10, ec="none", fc="green")
+        for _, mini_geo_row in mini_geometry.iterrows():
 
-                for _, row in region_data.iterrows():
-                    plt.text(x=row.X, y=row.Y, s=region.mark, fontsize=10, color="black")
+            sns.scatterplot(x=[mini_geo_row.X], y=[mini_geo_row.Y], s=10, ec="none", fc="green")
+
+            plt.text(x=mini_geo_row.X, y=mini_geo_row.Y, s=mini_geo_row.mark, fontsize=10, color="black")
 
     sns.scatterplot(
         x=[lmi_geometry.X[mlobject.poi]],

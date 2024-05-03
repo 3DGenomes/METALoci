@@ -137,8 +137,8 @@ def populate_args(parser):
         dest="mark_regions",
         metavar="PATH",
         type=str,
-        help="Path to a file to makr certain regions on the gaudí plots. The file must have the following columns: "
-        "region_metaloci chr:start-end"
+        help="Path to a file to mark certain regions on the gaudí plots. The file must have the following columns "
+        "(tab-separated): region_metaloci chr start end label. The label will be used to mark the region on the plot."
     )
 
     optional_arg.add_argument(
@@ -196,7 +196,7 @@ def run(opts: list):
             signals = [line.strip() for line in handler]
 
     if mark_regions is not None:
-        regions2mark = pd.read_table(mark_regions, names=["region_metaloci", "coords", "mark"], sep="\t")
+        regions2mark = pd.read_table(mark_regions, names=["region_metaloci", "chr", "start", "end", "mark"], sep="\t")
     else:
         regions2mark = None
 

@@ -21,6 +21,7 @@ from scipy.ndimage import rotate
 from scipy.stats import linregress, zscore
 from shapely.geometry import Point
 import bioframe
+from pybedtools import BedTool
 
 from metaloci import mlo
 from metaloci.misc import misc
@@ -301,21 +302,23 @@ def get_gaudi_signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFra
     if regions2mark is not None:
 
         miniregions2mark = regions2mark[regions2mark.region_metaloci == mlobject.region]
+        miniregions2mark.drop(columns=["region_metaloci"], inplace=True)
 
-        # print(miniregions2mark)
+        mini_geometry = lmi_geometry[["bin_chr", "bin_start", "bin_end", "X", "Y"]].copy()
 
-        mini_geometry = lmi_geometry[["bin_start", "bin_end", "X", "Y"]].copy()
+        if not mini_geometry["bin_chr"].str.contains("chr").any():
+            mini_geometry["bin_chr"] = "chr" + mini_geometry["bin_chr"]
 
-        mini_geometry["mark"] = mini_geometry.apply(
-            lambda x: ",".join(
-                miniregions2mark.loc
-                [(miniregions2mark["start"] >= x["bin_start"]) & (miniregions2mark["end"] <= x["bin_end"]),
-                 "mark"].values),
-            axis=1)
+        intersected_bed = BedTool.from_dataframe(mini_geometry).intersect(
+            BedTool.from_dataframe(miniregions2mark), wa=True, wb=True)
 
-        mini_geometry = mini_geometry[mini_geometry["mark"] != ""]
+        intersected_bed = intersected_bed.to_dataframe(header=None,
+                                                       names=[*mini_geometry.columns, *miniregions2mark.columns])
 
-        for _, mini_geo_row in mini_geometry.iterrows():
+        intersected_bed = intersected_bed[["X", "Y", "mark"]]
+        intersected_bed = intersected_bed.groupby(["X", "Y"])["mark"].apply(lambda x: ",".join(x)).reset_index()
+
+        for _, mini_geo_row in intersected_bed.iterrows():
 
             sns.scatterplot(x=[mini_geo_row.X], y=[mini_geo_row.Y], s=10, ec="none", fc="green")
 
@@ -395,19 +398,23 @@ def get_gaudi_type_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame
     if regions2mark is not None:
 
         miniregions2mark = regions2mark[regions2mark.region_metaloci == mlobject.region]
+        miniregions2mark.drop(columns=["region_metaloci"], inplace=True)
 
-        mini_geometry = lmi_geometry[["bin_start", "bin_end", "X", "Y"]].copy()
+        mini_geometry = lmi_geometry[["bin_chr", "bin_start", "bin_end", "X", "Y"]].copy()
 
-        mini_geometry["mark"] = mini_geometry.apply(
-            lambda x: ",".join(
-                miniregions2mark.loc
-                [(miniregions2mark["start"] >= x["bin_start"]) & (miniregions2mark["end"] <= x["bin_end"]),
-                 "mark"].values),
-            axis=1)
+        if not mini_geometry["bin_chr"].str.contains("chr").any():
+            mini_geometry["bin_chr"] = "chr" + mini_geometry["bin_chr"]
 
-        mini_geometry = mini_geometry[mini_geometry["mark"] != ""]
+        intersected_bed = BedTool.from_dataframe(mini_geometry).intersect(
+            BedTool.from_dataframe(miniregions2mark), wa=True, wb=True)
 
-        for _, mini_geo_row in mini_geometry.iterrows():
+        intersected_bed = intersected_bed.to_dataframe(header=None,
+                                                       names=[*mini_geometry.columns, *miniregions2mark.columns])
+
+        intersected_bed = intersected_bed[["X", "Y", "mark"]]
+        intersected_bed = intersected_bed.groupby(["X", "Y"])["mark"].apply(lambda x: ",".join(x)).reset_index()
+
+        for _, mini_geo_row in intersected_bed.iterrows():
 
             sns.scatterplot(x=[mini_geo_row.X], y=[mini_geo_row.Y], s=10, ec="none", fc="green")
 

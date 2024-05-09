@@ -166,7 +166,6 @@ def run(opts: list):
     quadrants = opts.quart
     signipval = opts.signipval
     rmtypes = opts.rm_types
-    agg = opts.agg
     mark_regions = opts.mark_regions
     debug = opts.debug
     quadrants = [int(x) for x in quadrants]
@@ -196,8 +195,11 @@ def run(opts: list):
             signals = [line.strip() for line in handler]
 
     if mark_regions is not None:
+
         regions2mark = pd.read_table(mark_regions, names=["region_metaloci", "chr", "start", "end", "mark"], sep="\t")
+
     else:
+        
         regions2mark = None
 
     plot_opt = {"bbox_inches": "tight", "dpi": 300, "transparent": True}
@@ -211,7 +213,6 @@ def run(opts: list):
         print(f"quadrants ->\n\t{quadrants}")
         print(f"signipval ->\n\t{signipval}")
         print(f"rmtypes ->\n\t{rmtypes}")
-        print(f"aggregate ->\n\t{agg}")
         print(f"influence ->\n\t{INFLUENCE}")
         print(f"bfact ->\n\t{BFACT}")
 

@@ -1,7 +1,7 @@
 """
 This script parses the LMI information files created by METALoci.
 
-The output file will contain regions that pass the quadrant and p-value threshold for a given 
+The output file will contain regions that pass the quadrant and p-value threshold for a given
 signal. In case it doesn't pass this filters, the script will output NA.
 """
 import sys
@@ -22,8 +22,31 @@ HELP = "Extracts data about the point of interest of your regions."
 
 DESCRIPTION = """This script parses the LMI information files created by METALoci.
 
-The output file will contain regions that pass the quadrant and p-value threshold for a given 
+The output file will contain regions that pass the quadrant and p-value threshold for a given
 signal. In case it doesn't pass this filters, the script will output NA."""
+
+
+def has_exactly_one_line(file_path):
+    """
+    Function to check if a file has exactly one line.
+
+    Parameters
+    ----------
+    file_path : str
+        Path to the file to check.
+
+    Returns
+    -------
+    bool
+        True if the file has exactly one line, False otherwise.
+    """
+    with open(file_path, mode="r", encoding="utf-8") as f:
+        line = f.readline()
+        if not line:
+            return False
+        if f.readline():
+            return False
+    return True
 
 
 def populate_args(parser):
@@ -77,8 +100,8 @@ def populate_args(parser):
         dest="signals",
         metavar="STR",
         type=str,
-        nargs="*",
-        action="extend",
+        # nargs="*",
+        # action="extend",
         required=True,
         help="Space separated list of signal names to use.",
     )
@@ -174,15 +197,20 @@ def run(opts: list):
 
     if debug:
 
-        print(f"work_dir is:\n\t{work_dir}")
-        print(f"out_dir is:\n\t{out_dir}")
-        print(f"gene_file is:\n\t{gene_file}")
-        print(f"signals is:\n\t{signals}")
-        print(f"quadrants is:\n\t{quadrant_list}")
-        print(f"pval is:\n\t{pval}")
-        print(f"region_file is:\n\t{region_file}")
-        print(f"outname is:\n\t{outname}s")
-        print(f"ncpus is:\n\t{ncpus}")
+        debug_info = f"""
+        Debug Information:
+        ------------------
+        work_dir: {work_dir}
+        out_dir: {out_dir}
+        gene_file: {gene_file}
+        signals: {signals}
+        quadrants: {quadrant_list}
+        pval: {pval}
+        region_file: {region_file}
+        outname: {outname}
+        ncpus: {ncpus}
+        """
+        print(debug_info)
 
         sys.exit()
 
@@ -194,7 +222,17 @@ def run(opts: list):
 
     start_timer = time()
 
-    if len(signals) != 1 and region_file:
+    # check if signals is a file. if it is read it and store it in a list
+
+    if os.path.isfile(signals):
+        with open(signals, mode="r", encoding="utf-8") as f:
+            signal_list = [line.strip() for line in f]
+    elif isinstance(signals, str):
+        signal_list = signals.split()
+    else:
+        sys.exit("--signals must be a string or a file with the signals to use.")
+
+    if len(signal_list) != 1 and region_file:
 
         print("Region file will not be computed because more than one signal was selected.")
         region_file = False
@@ -212,54 +250,50 @@ def run(opts: list):
 
     HEADER = "coords\tsymbol\tid"
 
-    for sig in signals:
+    header_parts = [f"\t{sig}_LMIq\t{sig}_LMIscore\t{sig}_LMIpval\t{sig}_signal\t{sig}_lag" for sig in signal_list]
 
-        HEADER += f"\t{sig}_LMIq\t{sig}_LMIscore\t{sig}_LMIpval\t{sig}_signal\t{sig}_lag"
+    HEADER += ''.join(header_parts)
 
-    out_file_handler = open(out_file_name, mode="w", encoding="utf-8")
-    out_file_handler.write(f"{HEADER}\n")
-    out_file_handler.flush()
+    with open(out_file_name, mode="w", encoding="utf-8") as out_file_handler:
+        out_file_handler.write(f"{HEADER}\n")
 
-    bad_file_handler = open(bad_file_name, mode="w", encoding="utf-8")
-    bad_file_handler.write("coords\tsymbol\tid\treason\n")
-    bad_file_handler.flush()
+    with open(bad_file_name, mode="w", encoding="utf-8") as bad_file_handler:
+        bad_file_handler.write("coords\tsymbol\tid\treason\n")
 
     if region_file:
 
-        region_file_handler = open(region_file_name, mode="w", encoding="utf-8")
-        region_file_handler.write(f"{HEADER}\n")
-        region_file_handler.flush()
+        with open(region_file_name, mode="w", encoding="utf-8") as region_file_handler:
+            region_file_handler.write(f"{HEADER}\n")
 
-        args2do = [(line, signals, work_dir, bad_file_name, out_file_name, pval,
-                    quadrant_list, region_file, region_file_name) for _, line in genes.iterrows()]
+        args2do = [(line, signal_list, work_dir, bad_file_name, out_file_name, pval,
+                    quadrant_list, region_file, region_file_name) for line in genes.itertuples(index=False)]
 
     else:
 
-        args2do = [(line, signals, work_dir, bad_file_name, out_file_name, pval,
+        args2do = [(line, signal_list, work_dir, bad_file_name, out_file_name, pval,
                     quadrant_list, region_file) for _, line in genes.iterrows()]
 
-    with mp.Pool(processes=ncpus) as pool:
-        pool.starmap(misc.get_poi_data, args2do)
+    try:
+        with mp.Pool(processes=ncpus) as pool:
+            # _ = tqdm(pool.imap_unordered(misc.get_poi_data, args2do), total=len(args2do))
+            pool.starmap(misc.get_poi_data, args2do)
+    except KeyboardInterrupt:
+        pool.terminate()
+        pool.join()
+        print("\nKeyboard interrupt detected. Exiting...")
 
-    out_file_handler.close()
-
-    if region_file:
-        region_file_handler.close()
-
-    bad_file_handler.close()
-
-    print(f"Total time spent: {timedelta(seconds=round(time() - start_timer))}.")
-
-    if os.path.exists(region_file_name) and int(sp.getoutput(f"wc -l {region_file_name} | cut -f 1 -d' '")) == 1:
+    if os.path.exists(region_file_name) and has_exactly_one_line(region_file_name):
 
         print("There were no significative regions using the following parameters:")
         print(f"\tquadrants: {','.join([str(i) for i in quadrant_list])}")
         print(f"\tp-value threshold: {pval}")
         os.remove(region_file_name)
 
-    if os.path.exists(bad_file_name) and int(sp.getoutput(f"wc -l {bad_file_name} | cut -f 1 -d' '")) == 1:
+    if os.path.exists(bad_file_name) and has_exactly_one_line(bad_file_name):
 
         os.remove(bad_file_name)
 
-    elif os.path.exists(bad_file_name) and int(sp.getoutput(f"wc -l {bad_file_name} | cut -f 1 -d' '")) > 1:
+    elif os.path.exists(bad_file_name) and not has_exactly_one_line(bad_file_name):
         print(f"Please, check {bad_file_name}. Some regions might be problematic.")
+
+    print(f"Total time spent: {timedelta(seconds=round(time() - start_timer))}.")

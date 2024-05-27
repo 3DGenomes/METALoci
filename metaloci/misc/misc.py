@@ -339,14 +339,14 @@ def natural_sort(element_list: list) -> list:
     return sorted_element_list
 
 
-def gtfparser(gene_file_f: Path, name: str, extend: int, resolution: int) -> tuple[dict, dict, dict, str]:
+def gtfparser(gene_file_f: str, name: str, extend: int, resolution: int) -> tuple[dict, dict, dict, str]:
     """
     Parses a gtf file and returns the information of the genes, excluding
     artifacts
 
     Parameters
     ----------
-    gene_file : path
+    gene_file : str
         Path to the file that contains the genes
     name : str
         Name of the project
@@ -369,19 +369,21 @@ def gtfparser(gene_file_f: Path, name: str, extend: int, resolution: int) -> tup
 
     gene_type_count = defaultdict(int)
 
-    if gene_file_f.endswith("gz"):
+    myopen = gzip.open if gene_file_f.endswith("gz") else open
 
-        myopen = gzip.open
-
-    else:
-
-        myopen = open
+    # Compile regular expressions
+    re_comment = re.compile("##")
+    re_chr = re.compile(r"chr\w+")
+    re_artifact = re.compile(r'gene_type "artifact";')
+    re_gene_type = re.compile(r'gene_type "(\w+)";')
+    re_gene_id = re.compile(r'gene_id "(ENS\w+)\.\d+"')
+    re_gene_name = re.compile(r'gene_name "([\w\-\_\.]+)";')
 
     with myopen(gene_file_f, mode="rt", encoding="utf-8") as gtf_reader:
 
         for line in gtf_reader:
 
-            if re.compile("##").search(line) or not re.compile(r"chr\w+").search(line):
+            if re_comment.search(line) or not re_chr.search(line):
 
                 continue
 
@@ -389,16 +391,17 @@ def gtfparser(gene_file_f: Path, name: str, extend: int, resolution: int) -> tup
 
             if line_s[2] == "gene" and line_s[0] != "chrM":
 
-                if re.compile(r'gene_type "artifact";').search(line):
+                if re_artifact.search(line):
 
                     continue
 
-                gene_type_count[re.compile(r'gene_type "(\w+)";').search(line).group(1)] += 1
+                gene_type_count[re_gene_type.search(line).group(1)] += 1
 
     print("Index: 0; All genes")
 
-    for type_index, type_name in enumerate(gene_type_count.keys()):
+    gene_type_keys = list(gene_type_count.keys())
 
+    for type_index, type_name in enumerate(gene_type_keys):
         print(f"Index: {type_index+1}; {type_name}")
 
     ch_index = None
@@ -429,9 +432,9 @@ def gtfparser(gene_file_f: Path, name: str, extend: int, resolution: int) -> tup
 
     else:
 
-        ch_type_pat = re.compile(f'gene_type "{list(gene_type_count.keys())[ch_index - 1]}";')
-        fn_f = f"{name}_{list(gene_type_count.keys())[ch_index - 1]}_{extend}_{resolution}_gene_coords.txt"
-        print(f"Gene type chosen: {list(gene_type_count.keys())[ch_index - 1]}")
+        ch_type_pat = re.compile(f'gene_type "{gene_type_keys[ch_index - 1]}";')
+        fn_f = f"{name}_{gene_type_keys[ch_index - 1]}_{extend}_{resolution}_gene_coords.txt"
+        print(f"Gene type chosen: {gene_type_keys[ch_index - 1]}")
 
     id_tss_f = defaultdict(int)
     id_name_f = defaultdict(str)
@@ -443,7 +446,7 @@ def gtfparser(gene_file_f: Path, name: str, extend: int, resolution: int) -> tup
 
         for line in gtf_reader:
 
-            if re.compile("##").search(line) or not re.compile(r"chr\w+").search(line):
+            if re_comment.search(line) or not re_chr.search(line):
 
                 continue
 
@@ -451,18 +454,12 @@ def gtfparser(gene_file_f: Path, name: str, extend: int, resolution: int) -> tup
 
             if line_s[2] == "gene" and line_s[0] != "chrM" and ch_type_pat.search(line):
 
-                gene_id = re.compile(r'gene_id "(ENS\w+)\.\d+"').search(line).group(1)
-                gene_name = re.compile(r'gene_name "([\w\-\_\.]+)";').search(line).group(1)
+                gene_id = re_gene_id.search(line).group(1)
+                gene_name = re_gene_name.search(line).group(1)
+
                 id_chrom_f[gene_id] = line_s[0]
                 id_name_f[gene_id] = gene_name
-
-                if line_s[6] == "+":
-
-                    id_tss_f[gene_id] = int(line_s[3])
-
-                else:
-
-                    id_tss_f[gene_id] = int(line_s[4])
+                id_tss_f[gene_id] = int(line_s[3]) if line_s[6] == "+" else int(line_s[4])
 
     return id_chrom_f, id_tss_f, id_name_f, fn_f
 
@@ -507,8 +504,10 @@ def bedparser(gene_file_f: Path, name: str, extend: int, resolution: int) -> tup
 
     for _, row_f in bed_file.iterrows():
 
-        id_chrom_f[row_f.id] = row_f.coords.split(":")[0]
-        id_tss_f[row_f.id] = int(row_f.coords.split(":")[1])
+        coords = row_f.coords.split(":")
+
+        id_chrom_f[row_f.id] = coords[0]
+        id_tss_f[row_f.id] = int(coords[1])
         id_name_f[row_f.id] = row_f.symbol
 
     return id_chrom_f, id_tss_f, id_name_f, fn_f
@@ -535,24 +534,21 @@ def binsearcher(id_tss_f: dict, id_chrom_f: dict, id_name_f: dict, bin_genome_f:
         DataFrame containing the information of the genes and the bin index
     """
 
-    data_f = defaultdict(list)
+    data_f = pd.DataFrame(columns=["chrom", "bin_index", "gene_name", "gene_id"])
+    data_f.set_index(["chrom", "bin_index"], inplace=True)
 
     for g_id, tss_pos in id_tss_f.items():
 
-        chrom_bin_f = bin_genome_f[(bin_genome_f["chrom"] == id_chrom_f[g_id])].reset_index()
+        chrom_bin_f = bin_genome_f[(bin_genome_f["chrom"] == id_chrom_f[g_id])]
 
-        sub_bin_index = chrom_bin_f[(chrom_bin_f["start"] <= tss_pos) &
-                                    (chrom_bin_f["end"] >= tss_pos)].index.tolist()[0]
+        sub_bin_index = chrom_bin_f.loc[(chrom_bin_f["start"] <= tss_pos) & (chrom_bin_f["end"] >= tss_pos)].index[0]
 
-        data_f["chrom"].append(id_chrom_f[g_id])
-        data_f["bin_index"].append(sub_bin_index)
-        data_f["gene_name"].append(id_name_f[g_id])
-        data_f["gene_id"].append(g_id)
+        data_f.at[(id_chrom_f[g_id], sub_bin_index), "gene_name"] = id_name_f[g_id]
+        data_f.at[(id_chrom_f[g_id], sub_bin_index), "gene_id"] = g_id
 
     print("Aggregating genes that are located in the same bin...")
 
-    data_f = pd.DataFrame(data_f)
-    data_f = data_f.groupby(["chrom", "bin_index"])[data_f.columns].agg(",".join).reset_index()
+    data_f.reset_index(inplace=True)
 
     data_f[["chrom"]] = data_f[["chrom"]].astype(str)
     data_f[["bin_index"]] = data_f[["bin_index"]].astype(int)
@@ -703,7 +699,7 @@ def get_poi_data(
         List of quadrants to consider.
     region_file_f : bool, optional
         Select whether or not to store a metaloci region file with the significant regions.
-    rf_h : TextIOWrapper, optional
+    rf_h : str, optional
         Region file name.
 
     Returns
@@ -713,12 +709,11 @@ def get_poi_data(
 
     mlo_fn = f"{line_f.coords.replace(':', '_').replace('-', '_')}.mlo"
 
-    bfh_f = open(bf_f, mode="a", encoding="utf-8")
-
     if not os.path.exists(os.path.join(work_dir_f, mlo_fn.split("_")[0], mlo_fn)):
 
-        bfh_f.write(f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}\tno_file\n")
-        bfh_f.flush()
+        with open(bf_f, mode="a", encoding="utf-8") as bfh_f:
+            bfh_f.write(f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}\tno_file\n")
+
         return None
 
     table_line_f = f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}"
@@ -729,43 +724,48 @@ def get_poi_data(
 
     except UnpicklingError:
 
-        bfh_f.write(f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}\tcorrupt_file\n")
-        bfh_f.flush()
+        with open(bf_f, mode="a", encoding="utf-8") as bfh_f:
+            bfh_f.write(f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}\tcorrupt_file\n")
+
         return None
 
     if mlo_data_f.bad_region:
 
-        bfh_f.write(f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}\t{mlo_data_f.bad_region}\n")
-        bfh_f.flush()
+        with open(bf_f, mode="a", encoding="utf-8") as bfh_f:
+            bfh_f.write(f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}\t{mlo_data_f.bad_region}\n")
+
         return None
 
-    of_h = open(of, mode="a", encoding="utf-8")
+    bad_lines = []
+    output_lines = []
+    region_lines = []
 
     for sig_f in signals_f:
 
         try:
 
-            poi_data_f = mlo_data_f.lmi_info[sig_f][mlo_data_f.lmi_info[sig_f]["bin_index"] == mlo_data_f.poi]
-            poi_lmi_f = poi_data_f.LMI_score.squeeze()
-            poi_quadrant_f = poi_data_f.moran_quadrant.squeeze()
-            poi_pval_f = poi_data_f.LMI_pvalue.squeeze()
-            poi_signal_f = poi_data_f.ZSig.squeeze()
-            poi_lag_f = poi_data_f.ZLag.squeeze()
+            poi_data_f = mlo_data_f.lmi_info[sig_f].loc[mlo_data_f.poi].to_dict()
 
-            table_line_f += f"\t{poi_quadrant_f}\t{poi_lmi_f}\t{poi_pval_f}\t{poi_signal_f}\t{poi_lag_f}"
+            table_line_f += f"\t{poi_data_f['moran_quadrant']}\t{poi_data_f['LMI_score']}\t{poi_data_f['LMI_pvalue']}\t{poi_data_f['ZSig']}\t{poi_data_f['ZLag']}"
 
-            if poi_quadrant_f in quadrant_list and poi_pval_f <= pval and region_file_f:
+            if poi_data_f['moran_quadrant'] in quadrant_list and poi_data_f['LMI_pvalue'] <= pval and region_file_f:
 
-                regionfile_h = open(rf_h, mode="a", encoding="utf-8")
-                regionfile_h.write(f"{table_line_f}\n")
-                regionfile_h.flush()
+                region_lines.append(table_line_f)
 
         except KeyError:
 
-            bfh_f.write(f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}\tno_signal_{sig_f}\n")
-            bfh_f.flush()
+            bad_lines.append(f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}\tno_signal_{sig_f}")
 
-    of_h.write(f"{table_line_f}\n")
-    of_h.flush()
+    output_lines.append(table_line_f)
+
+    with open(bf_f, mode="a", encoding="utf-8") as bfh_f:
+        bfh_f.write('\n'.join(bad_lines))
+
+    with open(of, mode="a", encoding="utf-8") as of_h:
+        of_h.write('\n'.join(output_lines))
+
+    if region_file_f:
+        with open(rf_h, mode="a", encoding="utf-8") as regionfile_h:
+            regionfile_h.write('\n'.join(region_lines))
 
     return None

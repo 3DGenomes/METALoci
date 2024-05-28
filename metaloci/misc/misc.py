@@ -717,6 +717,7 @@ def get_poi_data(
         return None
 
     table_line_f = f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}"
+    region_line = f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}"
 
     try:
 
@@ -737,8 +738,6 @@ def get_poi_data(
         return None
 
     bad_lines = []
-    output_lines = []
-    region_lines = []
 
     for sig_f in signals_f:
 
@@ -748,24 +747,24 @@ def get_poi_data(
 
             table_line_f += f"\t{poi_data_f['moran_quadrant']}\t{poi_data_f['LMI_score']}\t{poi_data_f['LMI_pvalue']}\t{poi_data_f['ZSig']}\t{poi_data_f['ZLag']}"
 
-            if poi_data_f['moran_quadrant'] in quadrant_list and poi_data_f['LMI_pvalue'] <= pval and region_file_f:
-
-                region_lines.append(table_line_f)
+            if region_file_f:
+                if poi_data_f['moran_quadrant'] in quadrant_list and poi_data_f['LMI_pvalue'] <= pval:
+                    region_line += table_line_f
+                else:
+                    region_line += "\tNA\tNA\tNA\tNA\tNA"
 
         except KeyError:
 
             bad_lines.append(f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}\tno_signal_{sig_f}")
 
-    output_lines.append(table_line_f)
-
     with open(bf_f, mode="a", encoding="utf-8") as bfh_f:
         bfh_f.write('\n'.join(bad_lines))
 
     with open(of, mode="a", encoding="utf-8") as of_h:
-        of_h.write('\n'.join(output_lines))
+        of_h.write(f"{table_line_f}\n")
 
     if region_file_f:
         with open(rf_h, mode="a", encoding="utf-8") as regionfile_h:
-            regionfile_h.write('\n'.join(region_lines))
+            regionfile_h.write(f"{region_line}\n")
 
     return None

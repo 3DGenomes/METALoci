@@ -427,7 +427,7 @@ def run(opts):
 
         for _, row in pd.read_csv(opts.agg, sep="\t", header=None).iterrows():
 
-            agg_dict[row[0]].append(row[1])
+            agg_dict[row[1]].append(row[0])
 
     args = pd.Series({"work_dir": opts.work_dir,
                       "signals": opts.signals,

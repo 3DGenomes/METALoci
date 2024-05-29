@@ -346,7 +346,7 @@ def gtfparser(gene_file: Path, name: str, extend: int, resolution: int) -> tuple
 
     Parameters
     ----------
-    gene_file : path
+    gene_file : str
         Path to the file that contains the genes
     name : str
         Name of the project
@@ -369,19 +369,21 @@ def gtfparser(gene_file: Path, name: str, extend: int, resolution: int) -> tuple
 
     gene_type_count = defaultdict(int)
 
-    if gene_file.endswith("gz"):
+    myopen = gzip.open if gene_file.endswith("gz") else open
 
-        myopen = gzip.open
-
-    else:
-
-        myopen = open
+    # Compile regular expressions
+    re_comment = re.compile("##")
+    re_chr = re.compile(r"chr\w+")
+    re_artifact = re.compile(r'gene_type "artifact";')
+    re_gene_type = re.compile(r'gene_type "(\w+)";')
+    re_gene_id = re.compile(r'gene_id "(ENS\w+)\.\d+"')
+    re_gene_name = re.compile(r'gene_name "([\w\-\_\.]+)";')
 
     with myopen(gene_file, mode="rt", encoding="utf-8") as gtf_reader:
 
         for line in gtf_reader:
 
-            if re.compile("##").search(line) or not re.compile(r"chr\w+").search(line):
+            if re_comment.search(line) or not re_chr.search(line):
 
                 continue
 
@@ -389,16 +391,17 @@ def gtfparser(gene_file: Path, name: str, extend: int, resolution: int) -> tuple
 
             if line_s[2] == "gene" and line_s[0] != "chrM":
 
-                if re.compile(r'gene_type "artifact";').search(line):
+                if re_artifact.search(line):
 
                     continue
 
-                gene_type_count[re.compile(r'gene_type "(\w+)";').search(line).group(1)] += 1
+                gene_type_count[re_gene_type.search(line).group(1)] += 1
 
     print("Index: 0; All genes")
 
-    for type_index, type_name in enumerate(gene_type_count.keys()):
+    gene_type_keys = list(gene_type_count.keys())
 
+    for type_index, type_name in enumerate(gene_type_keys):
         print(f"Index: {type_index+1}; {type_name}")
 
     chrom_index = None
@@ -429,9 +432,9 @@ def gtfparser(gene_file: Path, name: str, extend: int, resolution: int) -> tuple
 
     else:
 
-        chrom_type_patttern = re.compile(f'gene_type "{list(gene_type_count.keys())[chrom_index - 1]}";')
-        filename = f"{name}_{list(gene_type_count.keys())[chrom_index - 1]}_{extend}_{resolution}_gene_coords.txt"
-        print(f"Gene type chosen: {list(gene_type_count.keys())[chrom_index - 1]}")
+        chrom_type_patttern = re.compile(f'gene_type "{gene_type_keys[chrom_index - 1]}";')
+        filename = f"{name}_{gene_type_keys[chrom_index - 1]}_{extend}_{resolution}_gene_coords.txt"
+        print(f"Gene type chosen: {gene_type_keys[ch_index - 1]}")
 
     id_tss = defaultdict(int)
     id_name = defaultdict(str)
@@ -443,7 +446,7 @@ def gtfparser(gene_file: Path, name: str, extend: int, resolution: int) -> tuple
 
         for line in gtf_reader:
 
-            if re.compile("##").search(line) or not re.compile(r"chr\w+").search(line):
+            if re_comment.search(line) or not re_chr.search(line):
 
                 continue
 
@@ -451,18 +454,12 @@ def gtfparser(gene_file: Path, name: str, extend: int, resolution: int) -> tuple
 
             if line_s[2] == "gene" and line_s[0] != "chrM" and chrom_type_patttern.search(line):
 
-                gene_id = re.compile(r'gene_id "(ENS\w+)\.\d+"').search(line).group(1)
-                gene_name = re.compile(r'gene_name "([\w\-\_\.]+)";').search(line).group(1)
+                gene_id = re_gene_id.search(line).group(1)
+                gene_name = re_gene_name.search(line).group(1)
+
                 id_chrom[gene_id] = line_s[0]
                 id_name[gene_id] = gene_name
-
-                if line_s[6] == "+":
-
-                    id_tss[gene_id] = int(line_s[3])
-
-                else:
-
-                    id_tss[gene_id] = int(line_s[4])
+                id_tss_f[gene_id] = int(line_s[3]) if line_s[6] == "+" else int(line_s[4])
 
     return id_chrom, id_tss, id_name, filename
 
@@ -504,11 +501,13 @@ def bedparser(gene_file_f: Path, name: str, extend: int, resolution: int) -> tup
     filename = f"{name}_all_{extend}_{resolution}_agg.txt"
     bed_file = pd.read_table(gene_file_f, names=["coords", "symbol", "id"])
 
-    for _, row_f in bed_file.iterrows():
+    for _, row in bed_file.iterrows():
 
-        id_chrom[row_f.id] = row_f.coords.split(":")[0]
-        id_tss[row_f.id] = int(row_f.coords.split(":")[1])
-        id_name[row_f.id] = row_f.symbol
+        coords = row.coords.split(":")
+
+        id_chrom[row.id] = coords[0]
+        id_tss[row.id] = int(coords[1])
+        id_name[row.id] = row.symbol
 
     return id_chrom, id_tss, id_name, filename
 
@@ -534,13 +533,13 @@ def binsearcher(id_tss_f: dict, id_chrom_f: dict, id_name_f: dict, bin_genome_f:
         DataFrame containing the information of the genes and the bin index
     """
 
-    data = defaultdict(list)
+    data = pd.DataFrame(columns=["chrom", "bin_index", "gene_name", "gene_id"])
+    data.set_index(["chrom", "bin_index"], inplace=True)
 
     for g_id, tss_pos in id_tss_f.items():
 
-        chrom_bin_f = bin_genome_f[(bin_genome_f["chrom"] == id_chrom_f[g_id])].reset_index()
-        sub_bin_index = chrom_bin_f[(chrom_bin_f["start"] <= tss_pos) &
-                                    (chrom_bin_f["end"] >= tss_pos)].index.tolist()[0]
+        chrom_bin = bin_genome_f[(bin_genome_f["chrom"] == id_chrom_f[g_id])]
+        sub_bin_index = chrom_bin.loc[(chrom_bin["start"] <= tss_pos) & (chrom_bin["end"] >= tss_pos)].index[0]
 
         data["chrom"].append(id_chrom_f[g_id])
         data["bin_index"].append(sub_bin_index)
@@ -551,6 +550,7 @@ def binsearcher(id_tss_f: dict, id_chrom_f: dict, id_name_f: dict, bin_genome_f:
 
     data = pd.DataFrame(data)
     data = data.groupby(["chrom", "bin_index"])[data.columns].agg(",".join).reset_index()
+
     data[["chrom"]] = data[["chrom"]].astype(str)
     data[["bin_index"]] = data[["bin_index"]].astype(int)
     data[["gene_name"]] = data[["gene_name"]].astype(str)
@@ -677,7 +677,7 @@ def meta_param_search(work_dir_f: str, hic_f: str, reso_f: int, reso_file: str, 
 
 def get_poi_data(
         line_f: pd.Series, signals: list, work_dir_f: str,
-        bf_f: str, of: str,
+        bad_file_filename: str, output_file: str,
         pval: float, quadrant_list: str,
         region_file: bool = False, rf_h=None):
     """
@@ -701,7 +701,7 @@ def get_poi_data(
         List of quadrants to consider.
     region_file_f : bool, optional
         Select whether or not to store a metaloci region file with the significant regions.
-    rf_h : TextIOWrapper, optional
+    rf_h : str, optional
         Region file name.
 
     Returns
@@ -711,62 +711,72 @@ def get_poi_data(
 
     mlo_filename = f"{line_f.coords.replace(':', '_').replace('-', '_')}.mlo"
 
-    bad_file_handler = open(bf_f, mode="a", encoding="utf-8")
-
     if not os.path.exists(os.path.join(work_dir_f, mlo_filename.split("_")[0], mlo_filename)):
 
-        bad_file_handler.write(f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}\tno_file\n")
-        bad_file_handler.flush()
+        with open(bad_file_filename, mode="a", encoding="utf-8") as bad_file_handler:
+
+            bad_file_handler.write(f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}\tno_file\n")
 
         return None
 
     table_line = f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}"
+    region_line = f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}"
 
     try:
 
-        mlo_data_f = pd.read_pickle(os.path.join(work_dir_f, mlo_filename.split("_")[0], mlo_filename))
+        mlo_data = pd.read_pickle(os.path.join(work_dir_f, mlo_filename.split("_")[0], mlo_filename))
 
     except UnpicklingError:
 
-        bad_file_handler.write(f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}\tcorrupt_file\n")
-        bad_file_handler.flush()
+        with open(bad_file_filename, mode="a", encoding="utf-8") as bad_file_handler:
+
+            bad_file_handler.write(f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}\tcorrupt_file\n")
 
         return None
 
-    if mlo_data_f.bad_region:
+    if mlo_data.bad_region:
 
-        bad_file_handler.write(f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}\t{mlo_data_f.bad_region}\n")
-        bad_file_handler.flush()
+        with open(bad_file_filename, mode="a", encoding="utf-8") as bad_file_handler:
+
+            bad_file_handler.write(f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}\t{mlo_data.bad_region}\n")
 
         return None
 
-    output_file_handler = open(of, mode="a", encoding="utf-8")
+    bad_lines = []
 
     for signal in signals:
 
         try:
 
-            poi_data = mlo_data_f.lmi_info[signal][mlo_data_f.lmi_info[signal]["bin_index"] == mlo_data_f.poi]
-            poi_lmi = poi_data.LMI_score.squeeze()
-            poi_quadrant = poi_data.moran_quadrant.squeeze()
-            poi_pval = poi_data.LMI_pvalue.squeeze()
-            poi_signal = poi_data.ZSig.squeeze()
-            poi_lag = poi_data.ZLag.squeeze()
+            poi_data = mlo_data.lmi_info[signal].loc[mlo_data.poi].to_dict()
 
-            table_line += f"\t{poi_quadrant}\t{poi_lmi}\t{poi_pval}\t{poi_signal}\t{poi_lag}"
+            table_line += f"\t{poi_data['moran_quadrant']}\t{poi_data['LMI_score']}\t{poi_data['LMI_pvalue']}\t{poi_data['ZSig']}\t{poi_data['ZLag']}"
 
-            if poi_quadrant in quadrant_list and poi_pval <= pval and region_file:
+            if region_file:
 
-                regionfile = open(rf_h, mode="a", encoding="utf-8")
-                regionfile.write(f"{table_line}\n")
-                regionfile.flush()
+                if poi_data['moran_quadrant'] in quadrant_list and poi_data['LMI_pvalue'] <= pval:
+
+                    region_line += table_line
+
+                else:
+
+                    region_line += "\tNA\tNA\tNA\tNA\tNA"
 
         except KeyError:
 
-            bad_file_handler.write(f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}\tno_signal_{signal}\n")
-            bad_file_handler.flush()
+            bad_lines.append(f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}\tno_signal_{signal}")
 
-    output_file_handler.write(f"{table_line}\n")
-    output_file_handler.flush()
+    with open(bad_file_filename, mode="a", encoding="utf-8") as bad_file_handler:
+
+        bad_file_handler.write('\n'.join(bad_lines))
+
+    with open(output_file, mode="a", encoding="utf-8") as output_file_handler:
+
+        output_file_handler.write(f"{table_line}\n")
+
+    if region_file:
+        with open(rf_h, mode="a", encoding="utf-8") as regionfile_h:
+
+            regionfile_h.write(f"{region_line}\n")
 
     return None

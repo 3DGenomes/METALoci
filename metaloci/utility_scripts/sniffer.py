@@ -32,8 +32,8 @@ def populate_args(parser):
         ArgumentParser to populate the arguments through the normal METALoci caller
     """
 
-    parser.formatter_class=lambda prog: HelpFormatter(prog, width=120,
-                                                      max_help_position=60)
+    parser.formatter_class = lambda prog: HelpFormatter(prog, width=120,
+                                                        max_help_position=60)
 
     input_arg = parser.add_argument_group(title="Input arguments")
 
@@ -113,7 +113,7 @@ def populate_args(parser):
         help=SUPPRESS)
 
 
-def run(opts : list):
+def run(opts: list):
     """
     Funtion to run this section of METALoci with the needed arguments
 
@@ -141,12 +141,17 @@ def run(opts : list):
 
     if debug:
 
-        print(f"work_dir ->\n\t{work_dir}")
-        print(f"chrom_sizes ->\n\t{chrom_sizes}")
-        print(f"gene_file ->\n\t{gene_file}")
-        print(f"resolution ->\n\t{resolution}")
-        print(f"extension ->\n\t{extension}")
-        print(f"name ->\n\t{name}")
+        debug_info = f"""
+        Debug Information:
+        ------------------
+        work_dir: {work_dir}
+        chrom_sizes: {chrom_sizes}
+        gene_file: {gene_file}
+        resolution: {resolution}
+        extension: {extension}
+        name: {name}
+        """
+        print(debug_info)
 
         sys.exit()
 
@@ -167,11 +172,10 @@ def run(opts : list):
 
     sp.call(sort_com, shell=True)
 
-    bin_genome = pd.read_table(f"{temp_fn_sorted}", names=["chrom", "start", "end"])
+    bin_genome = pd.read_table(f"{temp_fn_sorted}", names=["chrom", "start", "end"],
+                               dtype={"chrom": str, "start": int, "end": int})
 
-    bin_genome[["chrom"]] = bin_genome[["chrom"]].astype(str)
-    bin_genome[["start"]] = bin_genome[["start"]].astype(int)
-    bin_genome[["end"]] = bin_genome[["end"]].astype(int)
+    print("Parsing the gene annotation file...")
 
     if "gtf" in gene_file:
 
@@ -187,48 +191,42 @@ def run(opts : list):
 
     data = misc.binsearcher(ID_TSS, ID_CHROM, ID_NAME, bin_genome)
 
+    print("Parsing the gene annotation file... Done.")
+
     print("Gathering information about bin index where the gene is located...")
     print(f"A total of {data.shape[0]} entries will be written to {os.path.join(work_dir, FN)}")
 
+    bins_by_chrom = bin_genome.groupby("chrom")
+
+    lines = ["coords\tsymbol\tid"]
+
+    for row in tqdm(data.itertuples(), total=len(data)):
+
+        chrom_bin = bins_by_chrom.get_group(row.chrom)
+
+        bin_start = max(0, (row.bin_index - n_of_bins))
+        bin_end = min(chrom_bin.index.max(), (row.bin_index + n_of_bins))
+
+        region_bin = chrom_bin.loc[(chrom_bin.index >= bin_start) & (chrom_bin.index <= bin_end)].reset_index()
+
+        coords = f"{row.chrom}:{region_bin.iloc[0].start}-{region_bin.iloc[-1].end}"
+
+        try:
+            POI = region_bin[region_bin["index"] == row.bin_index].index.tolist()[0]
+        except IndexError:
+            print(row, region_bin.tail(), f"bin_start: {bin_start}", f"bin_end: {bin_end}",
+                  f"bin_start pos from gene: {(row.bin_index - n_of_bins)}",
+                  f"bin_end pos from gene: {(row.bin_index + n_of_bins)}",
+                  f"{chrom_bin.index.max()}", sep="\n")
+            continue
+
+        lines.append(f"{coords}_{POI}\t{row.gene_name}\t{row.gene_id}")
+
     with open(os.path.join(work_dir, FN), mode="w", encoding="utf-8") as handler:
-
-        handler.write("coords\tsymbol\tid\n")
-
-        for counter, row in tqdm(data.iterrows()):
-
-            chrom_bin = bin_genome[(bin_genome["chrom"] == row.chrom)].reset_index()
-
-            bin_start = max(0, (row.bin_index - n_of_bins))
-            bin_end = min(chrom_bin.index.max(), (row.bin_index + n_of_bins))
-
-            region_bin = chrom_bin.iloc[bin_start:bin_end + 1].reset_index()
-
-            coords = f"{row.chrom}:{region_bin.iloc[0].start}-{region_bin.iloc[-1].end}"
-
-            try:
-                POI = region_bin[region_bin["level_0"] == row.bin_index].index.tolist()[0]
-            except IndexError:
-                print()
-                print(row)
-                print(region_bin.tail())
-
-                print(f"bin_start: {bin_start}")
-                print(f"bin_end: {bin_end}")
-                print(f"bin_start pos from gene: {(row.bin_index - n_of_bins)}")
-                print(f"bin_end pos from gene: {(row.bin_index + n_of_bins)}")
-                print(f"{chrom_bin.index.max()}")
-
-                continue
-
-            handler.write(f"{coords}_{POI}\t{row.gene_name}\t{row.gene_id}\n")
-
-            ## Print of the status of writting the file, so the user has a bit of feedback
-            if counter % 1000 == 0 and counter != 0:
-                print(f"\t{counter} entries written out of {data.shape[0]}", end = "\r")
+        handler.write("\n".join(lines))
 
     print("Cleaning temporary files...")
-    sp.check_call(f"rm -rf {tmp_dir}/{resolution}bp_bin.bed", shell=True)
-    sp.check_call(f"rm -rf {tmp_dir}/{resolution}bp_bin_unsorted.bed", shell=True)
+    sp.check_call(f"rm -rf {tmp_dir}/{resolution}bp_bin.bed {tmp_dir}/{resolution}bp_bin_unsorted.bed", shell=True)
 
     print(f"\nTotal time spent: {timedelta(seconds=round(time() - start_timer))}.")
     print("All done.")

@@ -121,8 +121,9 @@ def populate_args(parser):
         "-l",
         "--pl",
         dest="persistence_length",
-        metavar="INT",
+        metavar="FLOAT",
         action="store",
+        type=float,
         help="Set a persistence length for the Kamada-Kawai layout.",
     )
 
@@ -317,6 +318,7 @@ def get_region_layout(row: pd.Series, args: pd.Series,
         for i, cutoff in enumerate(args.cutoffs["values"]):
 
             time_per_cutoff = time()
+
             mlobject.kk_cutoff["values"] = args.cutoffs["values"][i]  # Select cut-off for this iteration
             mlobject = kk.get_restraints_matrix(mlobject, silent)  # Get submatrix of restraints
 
@@ -406,6 +408,7 @@ def get_region_layout(row: pd.Series, args: pd.Series,
 
                     progress["plots"] = True
 
+            
 
             elif len(args.cutoffs["values"]) == 1:
 
@@ -434,7 +437,13 @@ def get_region_layout(row: pd.Series, args: pd.Series,
 
             if not silent:
 
-                print(f"\tdone in {timedelta(seconds=round(time() - time_per_region))}.\n")
+                print(f"\tKamada-Kawai layout of region '{mlobject.region}' at {int(cutoff * 100)} % cutoff done in "
+                      f"{timedelta(seconds=round(time() - time_per_cutoff))}.\n")
+
+
+        if not silent:
+
+            print(f"\tdone in {timedelta(seconds=round(time() - time_per_region))}.\n")
 
     if progress is not None:
 
@@ -479,12 +488,12 @@ def run(opts: list):
     elif opts.absolute:
 
         cutoffs["cutoff_type"] = "absolute"
-        cutoffs["values"] = opts.cutoff
+        cutoffs["values"] = [float(i) for i in opts.cutoff]
 
     else:
 
         cutoffs["cutoff_type"] = "percentage"
-        cutoffs["values"] = opts.cutoff
+        cutoffs["values"] = [float(i) for i in opts.cutoff]
 
     if cutoffs["cutoff_type"] == "percentage" and not 0 < cutoffs["values"][0] <= 1:
 

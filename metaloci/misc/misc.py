@@ -434,7 +434,7 @@ def gtfparser(gene_file: Path, name: str, extend: int, resolution: int) -> tuple
 
         chrom_type_patttern = re.compile(f'gene_type "{gene_type_keys[chrom_index - 1]}";')
         filename = f"{name}_{gene_type_keys[chrom_index - 1]}_{extend}_{resolution}_gene_coords.txt"
-        print(f"Gene type chosen: {gene_type_keys[ch_index - 1]}")
+        print(f"Gene type chosen: {gene_type_keys[chrom_index - 1]}")
 
     id_tss = defaultdict(int)
     id_name = defaultdict(str)
@@ -459,7 +459,7 @@ def gtfparser(gene_file: Path, name: str, extend: int, resolution: int) -> tuple
 
                 id_chrom[gene_id] = line_s[0]
                 id_name[gene_id] = gene_name
-                id_tss_f[gene_id] = int(line_s[3]) if line_s[6] == "+" else int(line_s[4])
+                id_tss[gene_id] = int(line_s[3]) if line_s[6] == "+" else int(line_s[4])
 
     return id_chrom, id_tss, id_name, filename
 
@@ -675,11 +675,11 @@ def meta_param_search(work_dir_f: str, hic_f: str, reso_f: int, reso_file: str, 
         sp.check_call(com2run, shell=True)
 
 
-def get_poi_data(
-        line_f: pd.Series, signals: list, work_dir_f: str,
-        bad_file_filename: str, output_file: str,
-        pval: float, quadrant_list: str,
-        region_file: bool = False, rf_h=None):
+def get_poi_data(info_tuple: tuple):
+    # line_f: pd.Series, signals: list, work_dir_f: str,
+    # bad_file_filename: str, output_file: str,
+    # pval: float, quadrant_list: str,
+    # region_file: bool = False, rf_h=None):
     """
     Function to extract data from the METALoci objects and parse it into a table.
 
@@ -709,13 +709,19 @@ def get_poi_data(
     None
     """
 
+    if len(info_tuple) == 9:
+        line_f, signals, work_dir_f, bad_file_filename, output_file, pval, quadrant_list, region_file, rf_h = info_tuple
+    else:
+        line_f, signals, work_dir_f, bad_file_filename, output_file, pval, quadrant_list = info_tuple
+        region_file = False
+        rf_h = None
+
     mlo_filename = f"{line_f.coords.replace(':', '_').replace('-', '_')}.mlo"
 
     if not os.path.exists(os.path.join(work_dir_f, mlo_filename.split("_")[0], mlo_filename)):
 
-        with open(bad_file_filename, mode="a", encoding="utf-8") as bad_file_handler:
-
-            bad_file_handler.write(f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}\tno_file\n")
+        with open(bad_file_filename, mode="a", encoding="utf-8") as bfh_f:
+            bfh_f.write(f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}\tno_file\n")
 
         return None
 

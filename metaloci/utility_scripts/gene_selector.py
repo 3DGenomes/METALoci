@@ -11,7 +11,6 @@ from time import time
 from datetime import timedelta
 from argparse import SUPPRESS, HelpFormatter
 import multiprocessing as mp
-import subprocess as sp
 import pandas as pd
 
 from tqdm import tqdm
@@ -180,15 +179,11 @@ def run(opts: list):
         List of arguments
     """
 
-    if opts.quadrant_list is None:
-
-        opts.quadrant_list = [1, 3]
-
     work_dir = opts.work_dir
     out_dir = opts.out_dir
     gene_file = opts.gene_file
     signals = opts.signals
-    quadrant_list = opts.quadrant_list
+    quadrant_list = opts.quadrant_list if opts.quadrant_list else [1, 3]
     pval = opts.pval
     region_file = opts.region_file
     outname = opts.outname
@@ -271,12 +266,29 @@ def run(opts: list):
     else:
 
         args2do = [(line, signal_list, work_dir, bad_file_name, out_file_name, pval,
-                    quadrant_list, region_file) for _, line in genes.iterrows()]
+                    quadrant_list) for _, line in genes.iterrows()]
 
     try:
+        # This piece of code works, but not progress bar
+        # with mp.Pool(processes=ncpus) as pool:
+        #     pool.starmap(misc.get_poi_data, args2do)
+        # pool.close()
+        # pool.join()
+
+        # This piece of code works, has a progress bar, but the way it "counts" is weird (it counts the start of
+        # the process, not the end of it)
+        pbar = tqdm(total=len(args2do))
+
+        def update(*a):
+            pbar.update()
+
         with mp.Pool(processes=ncpus) as pool:
-            # _ = tqdm(pool.imap_unordered(misc.get_poi_data, args2do), total=len(args2do))
-            pool.starmap(misc.get_poi_data, args2do)
+            for i in range(pbar.total):
+                pool.apply_async(misc.get_poi_data, args=(args2do[i]), callback=update)
+
+        pool.close()
+        pool.join()
+
     except KeyboardInterrupt:
         pool.terminate()
         pool.join()

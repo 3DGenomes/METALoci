@@ -233,9 +233,10 @@ def get_region_layout(row: pd.Series, args: pd.Series,
                     parents=True, exist_ok=True
                 )
 
-                plot_name = f"{re.sub(':|-', '_', row.coords)}_"
-                f"{mlobject.kk_cutoff['cutoff_type']}_"
-                f"{mlobject.kk_cutoff['values']:.4f}_" + "{}.pdf"
+                plot_name = f"{re.sub(':|-', '_', row.coords)}_"\
+                f"{mlobject.kk_cutoff['cutoff_type']}_"\
+                f"{mlobject.kk_cutoff['values']:.2f}_"\
+                f"pl-{mlobject.persistence_length:.2f}_" + "{}.pdf"
 
                 plot.get_kk_plot(mlobject).savefig(
                     os.path.join(
@@ -315,6 +316,7 @@ def get_region_layout(row: pd.Series, args: pd.Series,
 
         for i, cutoff in enumerate(args.cutoffs["values"]):
 
+            time_per_cutoff = time()
             mlobject.kk_cutoff["values"] = args.cutoffs["values"][i]  # Select cut-off for this iteration
             mlobject = kk.get_restraints_matrix(mlobject, silent)  # Get submatrix of restraints
 
@@ -360,7 +362,9 @@ def get_region_layout(row: pd.Series, args: pd.Series,
 
             if len(args.cutoffs["values"]) > 1 or args.save_plots:
 
+
                 if not silent:
+                    
                     print("\tPlotting Kamada-Kawai...")
 
                 pathlib.Path(os.path.join(args.work_dir, region_chrom, "plots", "KK")
@@ -369,9 +373,10 @@ def get_region_layout(row: pd.Series, args: pd.Series,
                     parents=True, exist_ok=True
                 )
 
-                plot_name = f"{re.sub(':|-', '_', row.coords)}_"
-                f"{mlobject.kk_cutoff['cutoff_type']}_"
-                f"{mlobject.kk_cutoff['values']:.4f}_" + "{}.pdf"
+                plot_name = f"{re.sub(':|-', '_', row.coords)}_"\
+                f"{mlobject.kk_cutoff['cutoff_type']}_"\
+                f"{mlobject.kk_cutoff['values']:.2f}_"\
+                f"pl-{mlobject.persistence_length:.2f}_" + "{}.pdf"
 
                 plot.get_kk_plot(mlobject).savefig(
                     os.path.join(
@@ -400,6 +405,7 @@ def get_region_layout(row: pd.Series, args: pd.Series,
                 if progress is not None:
 
                     progress["plots"] = True
+
 
             elif len(args.cutoffs["values"]) == 1:
 

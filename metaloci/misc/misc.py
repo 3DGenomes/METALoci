@@ -673,11 +673,11 @@ def meta_param_search(work_dir_f: str, hic_f: str, reso_f: int, reso_file: str, 
         sp.check_call(com2run, shell=True)
 
 
-def get_poi_data(
-        line_f: pd.Series, signals_f: list, work_dir_f: str,
-        bf_f: str, of: str,
-        pval: float, quadrant_list: str,
-        region_file_f: bool = False, rf_h=None):
+def get_poi_data(info_tuple: tuple):
+    # line_f: pd.Series, signals_f: list, work_dir_f: str,
+    # bf_f: str, of: str,
+    # pval: float, quadrant_list: str,
+    # region_file_f: bool = False, rf_h=None):
     """
     Function to extract data from the METALoci objects and parse it into a table.
 
@@ -706,6 +706,13 @@ def get_poi_data(
     -------
     None
     """
+
+    if len(info_tuple) == 9:
+        line_f, signals_f, work_dir_f, bf_f, of, pval, quadrant_list, region_file_f, rf_h = info_tuple
+    else:
+        line_f, signals_f, work_dir_f, bf_f, of, pval, quadrant_list = info_tuple
+        region_file_f = False
+        rf_h = None
 
     mlo_fn = f"{line_f.coords.replace(':', '_').replace('-', '_')}.mlo"
 

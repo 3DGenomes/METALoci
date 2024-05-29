@@ -22,6 +22,7 @@ from scipy.stats import linregress, zscore
 from shapely.geometry import Point
 import bioframe
 from pybedtools import BedTool
+from adjustText import adjust_text
 
 from metaloci import mlo
 from metaloci.misc import misc
@@ -301,7 +302,7 @@ def get_gaudi_signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFra
 
     if regions2mark is not None:
 
-        miniregions2mark = regions2mark[regions2mark.region_metaloci == mlobject.region]
+        miniregions2mark = regions2mark[regions2mark.region_metaloci == mlobject.region].copy()
         miniregions2mark.drop(columns=["region_metaloci"], inplace=True)
 
         mini_geometry = lmi_geometry[["bin_chr", "bin_start", "bin_end", "X", "Y"]].copy()
@@ -316,13 +317,22 @@ def get_gaudi_signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFra
                                                        names=[*mini_geometry.columns, *miniregions2mark.columns])
 
         intersected_bed = intersected_bed[["X", "Y", "mark"]]
-        intersected_bed = intersected_bed.groupby(["X", "Y"])["mark"].apply(lambda x: ",".join(x)).reset_index()
+        intersected_bed = intersected_bed.groupby(["X", "Y"])["mark"].value_counts().unstack(fill_value=0)
 
-        for _, mini_geo_row in intersected_bed.iterrows():
+        texts = []
 
-            sns.scatterplot(x=[mini_geo_row.X], y=[mini_geo_row.Y], s=10, ec="none", fc="green")
+        for mini_geo_row in intersected_bed.itertuples():
 
-            plt.text(x=mini_geo_row.X, y=mini_geo_row.Y, s=mini_geo_row.mark, fontsize=10, color="black")
+            sns.scatterplot(x=[mini_geo_row.Index[0]], y=[mini_geo_row.Index[1]], s=10, ec="none", fc="green")
+
+            text = [f" {name}({count})" for name, count in zip(mini_geo_row._fields, mini_geo_row) if name != "Index"]
+
+            texts.append(plt.text(mini_geo_row.Index[0], mini_geo_row.Index[1],
+                                  ",".join(text[1:]), ha='center', va="center", fontsize=6, color="black"))
+
+        adjust_text(texts,  force_static=(0.5, 0.5), force_explode=(0.5, 0.5),
+                    arrowprops={"arrowstyle": "->, head_length=1, head_width=1", "color": 'black', "lw": 1},
+                    ensure_inside_axes=False)
 
     sns.scatterplot(
         x=[lmi_geometry.X[mlobject.poi]],
@@ -397,7 +407,7 @@ def get_gaudi_type_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame
 
     if regions2mark is not None:
 
-        miniregions2mark = regions2mark[regions2mark.region_metaloci == mlobject.region]
+        miniregions2mark = regions2mark[regions2mark.region_metaloci == mlobject.region].copy()
         miniregions2mark.drop(columns=["region_metaloci"], inplace=True)
 
         mini_geometry = lmi_geometry[["bin_chr", "bin_start", "bin_end", "X", "Y"]].copy()
@@ -412,13 +422,22 @@ def get_gaudi_type_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame
                                                        names=[*mini_geometry.columns, *miniregions2mark.columns])
 
         intersected_bed = intersected_bed[["X", "Y", "mark"]]
-        intersected_bed = intersected_bed.groupby(["X", "Y"])["mark"].apply(lambda x: ",".join(x)).reset_index()
+        intersected_bed = intersected_bed.groupby(["X", "Y"])["mark"].value_counts().unstack(fill_value=0)
 
-        for _, mini_geo_row in intersected_bed.iterrows():
+        texts = []
 
-            sns.scatterplot(x=[mini_geo_row.X], y=[mini_geo_row.Y], s=10, ec="none", fc="green")
+        for mini_geo_row in intersected_bed.itertuples():
 
-            plt.text(x=mini_geo_row.X, y=mini_geo_row.Y, s=mini_geo_row.mark, fontsize=10, color="black")
+            sns.scatterplot(x=[mini_geo_row.Index[0]], y=[mini_geo_row.Index[1]], s=10, ec="none", fc="green")
+
+            text = [f" {name}({count})" for name, count in zip(mini_geo_row._fields, mini_geo_row) if name != "Index"]
+
+            texts.append(plt.text(mini_geo_row.Index[0], mini_geo_row.Index[1],
+                                  ",".join(text[1:]), ha='center', va="center", fontsize=6, color="black"))
+
+        adjust_text(texts,  force_static=(0.5, 0.5), force_explode=(0.5, 0.5),
+                    arrowprops={"arrowstyle": "->, head_length=1, head_width=1", "color": 'black', "lw": 1},
+                    ensure_inside_axes=False)
 
     sns.scatterplot(
         x=[lmi_geometry.X[mlobject.poi]],

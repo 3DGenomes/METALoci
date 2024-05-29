@@ -434,7 +434,7 @@ def gtfparser(gene_file: Path, name: str, extend: int, resolution: int) -> tuple
 
         chrom_type_patttern = re.compile(f'gene_type "{gene_type_keys[chrom_index - 1]}";')
         filename = f"{name}_{gene_type_keys[chrom_index - 1]}_{extend}_{resolution}_gene_coords.txt"
-        print(f"Gene type chosen: {gene_type_keys[ch_index - 1]}")
+        print(f"Gene type chosen: {gene_type_keys[chrom_index - 1]}")
 
     id_tss = defaultdict(int)
     id_name = defaultdict(str)
@@ -459,7 +459,7 @@ def gtfparser(gene_file: Path, name: str, extend: int, resolution: int) -> tuple
 
                 id_chrom[gene_id] = line_s[0]
                 id_name[gene_id] = gene_name
-                id_tss_f[gene_id] = int(line_s[3]) if line_s[6] == "+" else int(line_s[4])
+                id_tss[gene_id] = int(line_s[3]) if line_s[6] == "+" else int(line_s[4])
 
     return id_chrom, id_tss, id_name, filename
 

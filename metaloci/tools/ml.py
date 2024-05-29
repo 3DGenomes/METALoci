@@ -394,8 +394,8 @@ def run(opts):
 
         except IndexError:
 
-            sys.exit("No regions provided. Please provide a region or a file with regions of interest or run \
-                     'metaloci sniffer'.")
+            sys.exit("No regions provided. Please provide a region or a file with regions of interest or run "
+                     "'metaloci sniffer'.")
 
     elif os.path.isfile(opts.region_file):
 
@@ -470,10 +470,10 @@ def run(opts):
 
                     if progress["missing_signal"] is not None:
 
-                        print(f"\tSignal '{progress['missing_signal']}' is in the signal list but has not been \
-                                processed with prep.\
-                                \n\tProcess that signal or remove it from the signal list.\
-                                \n\tExiting...")
+                        print(f"\tSignal '{progress['missing_signal']}' is in the signal list but has not been"
+                                "processed with prep."
+                                "\n\tProcess that signal or remove it from the signal list."
+                                "\n\tExiting...")
 
                     pool.close()
                     pool.join()

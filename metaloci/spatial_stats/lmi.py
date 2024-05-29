@@ -192,7 +192,7 @@ def load_region_signals(mlobject: mlo.MetalociObject, signal_data: dict, signal_
 
 
 def compute_lmi(mlobject: mlo.MetalociObject, signal_type: str, neighbourhood: float,
-                n_permutations: int = 9999, signipval: float = 0.05, silent: bool = False, poi_only=False) -> pd.DataFrame:
+            n_permutations: int = 9999, signipval: float = 0.05, silent: bool = False, poi_only=False) -> pd.DataFrame:
     """
     Computes Local Moran's Index for a signal type and outputs information of the LMI value and its p-value
     for each bin for a given signal, as well as some other information.

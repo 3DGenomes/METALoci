@@ -233,10 +233,9 @@ def get_region_layout(row: pd.Series, args: pd.Series,
                     parents=True, exist_ok=True
                 )
 
-                plot_name = f"{re.sub(':|-', '_', row.coords)}_\
-                    {mlobject.kk_cutoff['cutoff_type']}_\
-                    {mlobject.kk_cutoff['values']:.4f}_" + \
-                    "{}.pdf"
+                plot_name = f"{re.sub(':|-', '_', row.coords)}_"
+                f"{mlobject.kk_cutoff['cutoff_type']}_"
+                f"{mlobject.kk_cutoff['values']:.4f}_" + "{}.pdf"
 
                 plot.get_kk_plot(mlobject).savefig(
                     os.path.join(
@@ -370,10 +369,9 @@ def get_region_layout(row: pd.Series, args: pd.Series,
                     parents=True, exist_ok=True
                 )
 
-                plot_name = f"{re.sub(':|-', '_', row.coords)}_" + \
-                    f"{mlobject.kk_cutoff['cutoff_type']}_" + \
-                    f"{mlobject.kk_cutoff['values']:.4f}_" + \
-                    "{}.pdf"
+                plot_name = f"{re.sub(':|-', '_', row.coords)}_"
+                f"{mlobject.kk_cutoff['cutoff_type']}_"
+                f"{mlobject.kk_cutoff['values']:.4f}_" + "{}.pdf"
 
                 plot.get_kk_plot(mlobject).savefig(
                     os.path.join(
@@ -381,7 +379,9 @@ def get_region_layout(row: pd.Series, args: pd.Series,
                         region_chrom,
                         "plots",
                         "KK",
-                        plot_name.format("KK")), dpi=300)
+                        plot_name.format("KK")
+                    ), dpi=300
+                )
 
                 plt.close()
 
@@ -391,7 +391,8 @@ def get_region_layout(row: pd.Series, args: pd.Series,
                         region_chrom,
                         "plots",
                         "mixed_matrices",
-                        plot_name.format("mixed_matrices")), dpi=300,
+                        plot_name.format("mixed_matrices")
+                    ), dpi=300,
                 )
 
                 plt.close()
@@ -405,7 +406,8 @@ def get_region_layout(row: pd.Series, args: pd.Series,
                 if not silent:
 
                     print(
-                        f"\tKamada-Kawai layout of region '{mlobject.region}' at {int(cutoff * 100)} % cutoff saved to file: '{mlobject.save_path}'"
+                        f"\tKamada-Kawai layout of region '{mlobject.region}' at {int(cutoff * 100)} % cutoff saved "
+                         f" to file: '{mlobject.save_path}'"
                     )
 
                 # Write to file a list of bad regions, according to the filters defined in clean_matrix().

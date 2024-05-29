@@ -13,7 +13,7 @@ import seaborn as sns
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.lines import Line2D
 from matplotlib.patches import Circle
-from matplotlib.ticker import FormatStrFormatter, MaxNLocator
+from matplotlib.ticker import FormatStrFormatter, MaxNLocator, NullLocator
 from metaloci import mlo
 from metaloci.graph_layout import kk
 from PIL import Image
@@ -27,73 +27,10 @@ from metaloci import mlo
 from metaloci.misc import misc
 
 
-def get_kk_plot(mlobject: mlo.MetalociObject, restraints: bool = True, neighbourhood: float = None):
-    """
-    Generate Kamada-Kawai plot from pre-calculated restraints.
-
-    Parameters
-    ----------
-    mlobject : mlo.MetalociObject
-        METALoci object with Kamada-Kawai graphs and nodes (MetalociObject.kk_nodes and MetalociObject.kk_graph)
-    restraints : bool, optional
-        Boolean to set whether or not to plot restraints, by default True
-
-    Returns
-    -------
-    matplotlib.pyplot.figure.Figure
-        Kamada-Kawai layout plot object
-    """
-    PLOTSIZE = 10
-    POINTSIZE = PLOTSIZE * 5
-
-    xs = [mlobject.kk_nodes[n][0] for n in mlobject.kk_nodes]
-    ys = [mlobject.kk_nodes[n][1] for n in mlobject.kk_nodes]
-
-    kk_plt = plt.figure(figsize=(PLOTSIZE, PLOTSIZE))
-    plt.axis("off")
-    options = {"node_size": 50, "edge_color": "black", "linewidths": 0.1, "width": 0.05}
-
-    if restraints == True:
-
-        nx.draw(
-            mlobject.kk_graph,
-            mlobject.kk_nodes,
-            node_color=range(len(mlobject.kk_nodes)),
-            cmap=plt.cm.coolwarm,
-            **options,
-        )
-
-    else:
-
-        sns.scatterplot(x=xs, y=ys, hue=range(len(xs)), palette="coolwarm", legend=False, s=POINTSIZE, zorder=2)
-
-    g = sns.lineplot(x=xs, y=ys, sort=False, lw=2, color="black", legend=False, zorder=1)
-    g.set_aspect("equal", adjustable="box")
-    g.set(ylim=(-1.1, 1.1))
-    g.set(xlim=(-1.1, 1.1))
-    g.tick_params(bottom=False, left=False)
-    g.annotate(f"       {mlobject.chrom}:{mlobject.start}", (xs[0], ys[0]), size=9)
-    g.annotate(f"       {mlobject.chrom}:{mlobject.end}", (xs[len(xs) - 1], ys[len(ys) - 1]), size=9)
-
-    poi_x, poi_y = xs[mlobject.poi], ys[mlobject.poi]
-
-    if neighbourhood:
-
-        circle = plt.Circle((poi_x, poi_y), neighbourhood, color="red",
-                            fill=False, linestyle=":", alpha=0.5, lw=1, zorder=3)
-        plt.gca().add_patch(circle)
-
-    sns.scatterplot(
-        x=[poi_x], y=[poi_y], s=POINTSIZE * 1.5, ec="lime", fc="none", zorder=4
-    )
-
-    return kk_plt
-
-
 def mixed_matrices_plot(mlobject: mlo.MetalociObject):
     """
     Get a plot of a subset of the Hi-C matrix with the top contact interactions in the matrix (defined by a cutoff) in
-    the lower diagonal and the original Hi-C matrix in the upper diagonal.
+    the lower diagonal and the original Hi-C matrix in the upper diagonal, including a Kamada-Kawai plot.
 
     Parameters
     ----------
@@ -109,14 +46,13 @@ def mixed_matrices_plot(mlobject: mlo.MetalociObject):
     Notes
     -----
     The mixed matrices plot is a plot of the Hi-C matrix for the region. Only the upper triangle of the array is
-    represented, rotated 45ª counter-clock wise. The top triangle is the original matrix, and the lower triange is the
+    represented, rotated 45º counter-clockwise. The top triangle is the original matrix, and the lower triangle is the
     subsetted matrix.
 
     """
 
     if mlobject.subset_matrix is None:
 
-        # Changed from misc to kk, as it is where the get_subset_matrix function is located
         mlobject.subset_matrix = kk.get_subset_matrix(mlobject)
 
     upper_triangle = np.triu(mlobject.matrix.copy(), k=1)  # Original matrix
@@ -124,18 +60,24 @@ def mixed_matrices_plot(mlobject: mlo.MetalociObject):
     mlobject.mixed_matrices = upper_triangle + lower_triangle
 
     if mlobject.flat_matrix is None:
-
+        
         print("Flat matrix not found in metaloci object. Run get_subset_matrix() first.")
         return None
 
-    fig_matrix, (ax1, _) = plt.subplots(1, 2, figsize=(20, 5))
+    fig_matrix, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(30, 8))
 
+    # Plot mixed Hi-C matrices
     ax1.imshow(
         mlobject.mixed_matrices,
         cmap="YlOrRd",
         vmax=np.nanquantile(mlobject.flat_matrix[mlobject.kk_top_indexes], 0.99),
     )
     ax1.patch.set_facecolor("black")
+    ax1.set_title("Mixed Hi-C Matrices")
+
+    # Kamada-Kawai plot
+    kk_plot_to_subplot(ax2, mlobject)
+    ax2.set_title("Kamada-Kawai Plot")
 
     # Density plot of the subsetted matrix
     sns.histplot(
@@ -146,12 +88,72 @@ def mixed_matrices_plot(mlobject: mlo.MetalociObject):
         legend=False,
         kde_kws={"cut": 3},
         **{"linewidth": 0},
+        ax=ax3
     )
+    ax3.set_title("Density Plot of Subsetted Matrix")
 
     fig_matrix.tight_layout()
-    fig_matrix.suptitle(f"Matrix for {mlobject.region} (cutoff: {mlobject.kk_cutoff})")
+    fig_matrix.suptitle(f"{mlobject.chrom}:{mlobject.start}-{mlobject.end}_{mlobject.poi} | "
+                        f"cut-off type: {mlobject.kk_cutoff['cutoff_type']}, "
+                        f"cut-off: {mlobject.kk_cutoff['values']:.4f} " 
+                        f"| persistence length: {mlobject.persistence_length:.2f}", y = 0.025)
 
     return fig_matrix
+
+def kk_plot_to_subplot(ax, mlobject: mlo.MetalociObject, restraints: bool = True, neighbourhood: float = None):
+    """
+    Generate Kamada-Kawai plot from pre-calculated restraints and plot it on the given axes.
+
+    Parameters
+    ----------
+    ax : matplotlib.axes._subplots.AxesSubplot
+        The axes on which to plot the Kamada-Kawai layout.
+    mlobject : mlo.MetalociObject
+        METALoci object with Kamada-Kawai graphs and nodes (MetalociObject.kk_nodes and MetalociObject.kk_graph)
+    restraints : bool, optional
+        Boolean to set whether or not to plot restraints, by default True
+    neighbourhood: float, optional
+        Draw a circle showing the neighbourhood around the point, by default False
+
+    Returns
+    -------
+    None
+    """
+    xs = [mlobject.kk_nodes[n][0] for n in mlobject.kk_nodes]
+    ys = [mlobject.kk_nodes[n][1] for n in mlobject.kk_nodes]
+
+    options = {"node_size": 50, "edge_color": "black", "linewidths": 0.1, "width": 0.05}
+
+    ax.axis("off")
+
+    if restraints:
+        nx.draw(
+            mlobject.kk_graph,
+            mlobject.kk_nodes,
+            node_color=range(len(mlobject.kk_nodes)),
+            cmap=plt.cm.coolwarm,
+            ax=ax,
+            **options,
+        )
+    else:
+        sns.scatterplot(x=xs, y=ys, hue=range(len(xs)), palette="coolwarm", legend=False, s=50, zorder=2, ax=ax)
+
+    g = sns.lineplot(x=xs, y=ys, sort=False, lw=2, color="black", legend=False, zorder=1, ax=ax)
+    g.set_aspect("equal", adjustable="box")
+    g.set(ylim=(-1.1, 1.1))
+    g.set(xlim=(-1.1, 1.1))
+    g.tick_params(bottom=False, left=False)
+    g.annotate(f"       {mlobject.chrom}:{mlobject.start}", (xs[0], ys[0]), size=9)
+    g.annotate(f"       {mlobject.chrom}:{mlobject.end}", (xs[len(xs) - 1], ys[len(ys) - 1]), size=9)
+
+    poi_x, poi_y = xs[mlobject.poi], ys[mlobject.poi]
+
+    if neighbourhood:
+        circle = plt.Circle((poi_x, poi_y), neighbourhood, color="red",
+                            fill=False, linestyle=":", alpha=0.5, lw=1, zorder=3)
+        ax.add_patch(circle)
+
+    sns.scatterplot(x=[poi_x], y=[poi_y], s=50 * 1.5, ec="lime", fc="none", zorder=4, ax=ax)
 
 
 def get_kk_plot(mlobject: mlo.MetalociObject,
@@ -173,9 +175,6 @@ def get_kk_plot(mlobject: mlo.MetalociObject,
     kk_plt : matplotlib.pyplot.figure.Figure
         Kamada-Kawai layout plot object
     """
-    # PLOTSIZE = 10
-    # POINTSIZE = PLOTSIZE * 5
-
     xs = [mlobject.kk_nodes[n][0] for n in mlobject.kk_nodes]
     ys = [mlobject.kk_nodes[n][1] for n in mlobject.kk_nodes]
 
@@ -185,7 +184,6 @@ def get_kk_plot(mlobject: mlo.MetalociObject,
     plt.axis("off")
 
     if restraints:
-
         nx.draw(
             mlobject.kk_graph,
             mlobject.kk_nodes,
@@ -193,9 +191,7 @@ def get_kk_plot(mlobject: mlo.MetalociObject,
             cmap=plt.cm.coolwarm,
             **options,
         )
-
     else:
-
         sns.scatterplot(x=xs, y=ys, hue=range(len(xs)), palette="coolwarm", legend=False, s=50, zorder=2)
 
     g = sns.lineplot(x=xs, y=ys, sort=False, lw=2, color="black", legend=False, zorder=1)
@@ -209,14 +205,11 @@ def get_kk_plot(mlobject: mlo.MetalociObject,
     poi_x, poi_y = xs[mlobject.poi], ys[mlobject.poi]
 
     if neighbourhood:
-
         circle = plt.Circle((poi_x, poi_y), neighbourhood, color="red",
                             fill=False, linestyle=":", alpha=0.5, lw=1, zorder=3)
         plt.gca().add_patch(circle)
 
-    sns.scatterplot(
-        x=[poi_x], y=[poi_y], s=50 * 1.5, ec="lime", fc="none", zorder=4
-    )
+    sns.scatterplot(x=[poi_x], y=[poi_y], s=50 * 1.5, ec="lime", fc="none", zorder=4)
 
     return kk_plt
 
@@ -301,7 +294,7 @@ def get_gaudi_signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFra
 
     if regions2mark is not None:
 
-        miniregions2mark = regions2mark[regions2mark.region_metaloci == mlobject.region]
+        miniregions2mark = regions2mark[regions2mark.region_metaloci == mlobject.region].copy()
         miniregions2mark.drop(columns=["region_metaloci"], inplace=True)
 
         mini_geometry = lmi_geometry[["bin_chr", "bin_start", "bin_end", "X", "Y"]].copy()
@@ -397,7 +390,7 @@ def get_gaudi_type_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame
 
     if regions2mark is not None:
 
-        miniregions2mark = regions2mark[regions2mark.region_metaloci == mlobject.region]
+        miniregions2mark = regions2mark[regions2mark.region_metaloci == mlobject.region].copy()
         miniregions2mark.drop(columns=["region_metaloci"], inplace=True)
 
         mini_geometry = lmi_geometry[["bin_chr", "bin_start", "bin_end", "X", "Y"]].copy()

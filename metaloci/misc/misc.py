@@ -720,7 +720,7 @@ def get_poi_data(info_tuple: tuple):
 
     if not os.path.exists(os.path.join(work_dir_f, mlo_filename.split("_")[0], mlo_filename)):
 
-        with open(bf_f, mode="a", encoding="utf-8") as bfh_f:
+        with open(bad_file_filename, mode="a", encoding="utf-8") as bfh_f:
             bfh_f.write(f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}\tno_file\n")
 
         return None

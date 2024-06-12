@@ -636,8 +636,8 @@ def write_moran_data(mlobject: mlo.MetalociObject, args, silent=False) -> None:
                   f"'{moran_data_path}/{re.sub(':|-', '_', mlobject.region)}_{signal}.tsv'")
 
 
-def meta_param_search(work_dir_f: str, hic_f: str, reso_f: int, reso_file: str, pl_f: list, cutoff_f: float,
-                      sample_num_f: int, seed_f: int):
+def meta_param_search(work_dir: str, hic: str, resolution: int, reso_file: str, pl: list, cutoff: float,
+                      sample_num: int, seed: int):
     """
     Test MetaLoci parameters to optimise Kamada-Kawai layout.
 
@@ -661,18 +661,17 @@ def meta_param_search(work_dir_f: str, hic_f: str, reso_f: int, reso_file: str, 
         Random seed for region sampling.
     """
 
-    save_dir_f = os.path.join(work_dir_f, f"reso_{reso_f}_cutoff_{cutoff_f*100:.0f}_pl_{pl_f}")
-    Path(save_dir_f).mkdir(parents=True, exist_ok=True)
+    save_path = os.path.join(work_dir, f"reso_{resolution}_cutoff_{cutoff*100:.0f}_pl_{pl}")
+    Path(save_path).mkdir(parents=True, exist_ok=True)
 
-    ml_comm = f"metaloci layout -w {save_dir_f} -c {hic_f}" + " -r {} -g {} --cutoff {} --pl {} --plot > /dev/null 2>&1"
+    ml_comm = f"metaloci layout -w {save_path} -c {hic}" + " -r {} -g {} --cutoff {} --pl {} --plot > /dev/null 2>&1"
 
     regions = pd.read_table(reso_file)
-    sample = regions.sample(sample_num_f, random_state=seed_f)
+    sample = regions.sample(sample_num, random_state=seed)
 
     for region_coords in sample['coords']:
 
-        com2run = ml_comm.format(reso_f, region_coords, cutoff_f, pl_f)
-        sp.check_call(com2run, shell=True)
+        sp.check_call(ml_comm.format(resolution, region_coords, cutoff, pl), shell=True)
 
 
 def get_poi_data(info_tuple: tuple):
@@ -710,33 +709,37 @@ def get_poi_data(info_tuple: tuple):
     """
 
     if len(info_tuple) == 9:
-        line_f, signals, work_dir_f, bad_file_filename, output_file, pval, quadrant_list, region_file, rf_h = info_tuple
+
+        line, signals, work_dir, bad_file_filename, output_file, pval, quadrant_list, region_file, rf = info_tuple
+
     else:
-        line_f, signals, work_dir_f, bad_file_filename, output_file, pval, quadrant_list = info_tuple
+        
+        line, signals, work_dir, bad_file_filename, output_file, pval, quadrant_list = info_tuple
         region_file = False
-        rf_h = None
+        rf = None
 
-    mlo_filename = f"{line_f.coords.replace(':', '_').replace('-', '_')}.mlo"
+    mlo_filename = f"{line.coords.replace(':', '_').replace('-', '_')}.mlo"
 
-    if not os.path.exists(os.path.join(work_dir_f, mlo_filename.split("_")[0], mlo_filename)):
+    if not os.path.exists(os.path.join(work_dir, mlo_filename.split("_")[0], 'objects', mlo_filename)):
 
-        with open(bad_file_filename, mode="a", encoding="utf-8") as bfh_f:
-            bfh_f.write(f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}\tno_file\n")
+        with open(bad_file_filename, mode="a", encoding="utf-8") as bad_file_handler:
+
+            bad_file_handler.write(f"{line.coords}\t{line.symbol}\t{line.id}\tno_file\n")
 
         return None
 
-    table_line = f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}"
-    region_line = f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}"
+    table_line = f"{line.coords}\t{line.symbol}\t{line.id}"
+    region_line = f"{line.coords}\t{line.symbol}\t{line.id}"
 
     try:
 
-        mlo_data = pd.read_pickle(os.path.join(work_dir_f, mlo_filename.split("_")[0], mlo_filename))
+        mlo_data = pd.read_pickle(os.path.join(work_dir, mlo_filename.split("_")[0],'objects', mlo_filename))
 
     except UnpicklingError:
 
         with open(bad_file_filename, mode="a", encoding="utf-8") as bad_file_handler:
 
-            bad_file_handler.write(f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}\tcorrupt_file\n")
+            bad_file_handler.write(f"{line.coords}\t{line.symbol}\t{line.id}\tcorrupt_file\n")
 
         return None
 
@@ -744,7 +747,7 @@ def get_poi_data(info_tuple: tuple):
 
         with open(bad_file_filename, mode="a", encoding="utf-8") as bad_file_handler:
 
-            bad_file_handler.write(f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}\t{mlo_data.bad_region}\n")
+            bad_file_handler.write(f"{line.coords}\t{line.symbol}\t{line.id}\t{mlo_data.bad_region}\n")
 
         return None
 
@@ -770,7 +773,7 @@ def get_poi_data(info_tuple: tuple):
 
         except KeyError:
 
-            bad_lines.append(f"{line_f.coords}\t{line_f.symbol}\t{line_f.id}\tno_signal_{signal}")
+            bad_lines.append(f"{line.coords}\t{line.symbol}\t{line.id}\tno_signal_{signal}")
 
     with open(bad_file_filename, mode="a", encoding="utf-8") as bad_file_handler:
 
@@ -781,7 +784,8 @@ def get_poi_data(info_tuple: tuple):
         output_file_handler.write(f"{table_line}\n")
 
     if region_file:
-        with open(rf_h, mode="a", encoding="utf-8") as regionfile_h:
+
+        with open(rf, mode="a", encoding="utf-8") as regionfile_h:
 
             regionfile_h.write(f"{region_line}\n")
 

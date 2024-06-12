@@ -40,11 +40,17 @@ def has_exactly_one_line(file_path):
         True if the file has exactly one line, False otherwise.
     """
     with open(file_path, mode="r", encoding="utf-8") as f:
+
         line = f.readline()
+
         if not line:
+
             return False
+        
         if f.readline():
+
             return False
+        
     return True
 
 
@@ -220,24 +226,36 @@ def run(opts: list):
     # check if signals is a file. if it is read it and store it in a list
 
     if os.path.isfile(signals):
+
         with open(signals, mode="r", encoding="utf-8") as f:
+
             signal_list = [line.strip() for line in f]
+
     elif isinstance(signals, str):
+
         signal_list = signals.split()
+
     else:
+
         sys.exit("--signals must be a string or a file with the signals to use.")
 
     if len(signal_list) != 1 and region_file:
 
         print("Region file will not be computed because more than one signal was selected.")
+
         region_file = False
 
     try:
+        
         genes = pd.read_table(gene_file)
+
     except FileNotFoundError:
+
         print(f"File {gene_file} not found.")
         sys.exit()
+
     except IsADirectoryError:
+
         print(f"File {gene_file} is a directory.")
         sys.exit()
 
@@ -250,14 +268,17 @@ def run(opts: list):
     HEADER += ''.join(header_parts)
 
     with open(out_file_name, mode="w", encoding="utf-8") as out_file_handler:
+
         out_file_handler.write(f"{HEADER}\n")
 
     with open(bad_file_name, mode="w", encoding="utf-8") as bad_file_handler:
+
         bad_file_handler.write("coords\tsymbol\tid\treason\n")
 
     if region_file:
 
         with open(region_file_name, mode="w", encoding="utf-8") as region_file_handler:
+
             region_file_handler.write(f"{HEADER}\n")
 
         args2do = [(line, signal_list, work_dir, bad_file_name, out_file_name, pval,
@@ -280,16 +301,20 @@ def run(opts: list):
         pbar = tqdm(total=len(args2do))
 
         def update(*a):
+
             pbar.update()
 
         with mp.Pool(processes=ncpus) as pool:
+
             for i in range(pbar.total):
+
                 pool.apply_async(misc.get_poi_data, args=(args2do[i]), callback=update)
 
         pool.close()
         pool.join()
 
     except KeyboardInterrupt:
+
         pool.terminate()
         pool.join()
         print("\nKeyboard interrupt detected. Exiting...")
@@ -306,6 +331,7 @@ def run(opts: list):
         os.remove(bad_file_name)
 
     elif os.path.exists(bad_file_name) and not has_exactly_one_line(bad_file_name):
+
         print(f"Please, check {bad_file_name}. Some regions might be problematic.")
 
     print(f"Total time spent: {timedelta(seconds=round(time() - start_timer))}.")

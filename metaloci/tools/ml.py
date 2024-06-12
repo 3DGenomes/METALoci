@@ -218,7 +218,7 @@ def get_lmi(row: pd.Series, args: pd.Series,
 
         print(f"\n------> Working on region {row.coords} [{counter+1}/{args.total_num}]\n")
 
-    save_path = f"{args.work_dir}{row.coords.split(':', 1)[0]}/{re.sub(':|-', '_', row.coords)}.mlo"
+    save_path = f"{args.work_dir}{row.coords.split(':', 1)[0]}/objects/{re.sub(':|-', '_', row.coords)}.mlo"
 
     # The chunk below checks if the region can be processed (has a valid .mlo that has KK information and has signal
     # data). If it can't be processed, it will skip to the next region.
@@ -228,8 +228,8 @@ def get_lmi(row: pd.Series, args: pd.Series,
 
             mlobject = pickle.load(mlobject_handler)
             # This ensures the path is still right even if the user changes the working directory.
-            mlobject.save_path = f"{args.work_dir}{row.coords.split(':', 1)[0]}/{re.sub(':|-', '_', row.coords)}.mlo"
-
+            mlobject.save_path = save_path
+            
     except FileNotFoundError:
 
         if not silent:

@@ -224,7 +224,7 @@ def run(opts: list):
 
         print(f"\n------> Working on region {region_row.coords} [{i + 1}/{len(df_regions)}]")
 
-        save_path = f"{work_dir}{region_row.coords.split(':', 1)[0]}/{re.sub(':|-', '_', region_row.coords)}.mlo"
+        save_path = f"{work_dir}{region_row.coords.split(':', 1)[0]}/objects/{re.sub(':|-', '_', region_row.coords)}.mlo"
 
         try:
 

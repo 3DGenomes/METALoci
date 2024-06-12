@@ -190,9 +190,9 @@ def get_region_layout(row: pd.Series, args: pd.Series,
     """
 
     region_chrom, _, _, _ = re.split(r":|-|_", row.coords)
-    save_path = os.path.join(args.work_dir, region_chrom, f"{re.sub(':|-', '_', row.coords)}.mlo")
+    save_path = os.path.join(args.work_dir, region_chrom, 'objects', f"{re.sub(':|-', '_', row.coords)}.mlo")
 
-    pathlib.Path(os.path.join(args.work_dir, region_chrom)).mkdir(parents=True, exist_ok=True)
+    pathlib.Path(os.path.join(args.work_dir, region_chrom, 'objects',)).mkdir(parents=True, exist_ok=True)
 
     if os.path.isfile(save_path):
 

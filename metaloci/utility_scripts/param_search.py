@@ -162,14 +162,17 @@ def run(opts: list):
     debug = opts.debug
 
     if cutoffs is None:
+
         cutoffs = [0.2]
 
     resolution_region_dict = {}
 
     for counter, reso in enumerate(resolutions):
+
         resolution_region_dict[reso] = region_files[counter]
 
     if debug:
+
         print(f"work_dir is:\n\t{work_dir}\n")
         print(f"hic is:\n\t{hic}\n")
         print(f"resolutions is:\n\t{resolutions}\n")
@@ -185,11 +188,12 @@ def run(opts: list):
     arg2do = [(work_dir, hic, f, resolution_region_dict[f], p, c, sample_num, seed)
               for f, p, c in product(resolution_region_dict, pls, cutoffs)]
 
-    print("\nWelcome to MetaLoci parameter search. Let's start optimising!\n")
+    print("\nWelcome to METALoci parameter search. Let's start optimising!\n")
 
     start_timer = time()
 
     with mp.Pool(processes=ncpus) as pool:
+
         pool.starmap(misc.meta_param_search, arg2do)
 
     print(f"\n\nTotal time spent: {timedelta(seconds=round(time() - start_timer))}.")

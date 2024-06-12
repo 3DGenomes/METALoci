@@ -362,8 +362,7 @@ def get_region_layout(row: pd.Series, args: pd.Series,
             mlobject.kk_coords = list(mlobject.kk_nodes.values())
             mlobject.kk_distances = distance.cdist(mlobject.kk_coords, mlobject.kk_coords, "euclidean")
 
-            if len(args.cutoffs["values"]) > 1 or args.save_plots:
-
+            if len(args.cutoffs["values"]) > 1:
 
                 if not silent:
                     
@@ -408,8 +407,6 @@ def get_region_layout(row: pd.Series, args: pd.Series,
 
                     progress["plots"] = True
 
-            
-
             elif len(args.cutoffs["values"]) == 1:
 
                 if not silent:
@@ -435,11 +432,47 @@ def get_region_layout(row: pd.Series, args: pd.Series,
 
                     mlobject.save(hamlo_namendle)
 
+                if args.save_plots:
+
+                    if not silent:
+
+                        print("\tPlotting Kamada-Kawai...")
+
+                    pathlib.Path(os.path.join(args.work_dir, region_chrom, "plots", "KK")).mkdir(
+                        parents=True, exist_ok=True
+                    )
+                    pathlib.Path(os.path.join(args.work_dir, region_chrom, "plots", "mixed_matrices")).mkdir(
+                        parents=True, exist_ok=True
+                    )
+
+                    plot.get_kk_plot(mlobject).savefig(
+                        os.path.join(
+                            args.work_dir,
+                            region_chrom,
+                            "plots",
+                            "KK",
+                            f"{re.sub(':|-', '_', row.coords)}_KK.pdf"
+                        ), dpi=300
+                    )
+
+                    plt.close()
+
+                    plot.mixed_matrices_plot(mlobject).savefig(
+                        os.path.join(
+                            args.work_dir,
+                            region_chrom,
+                            "plots",
+                            "mixed_matrices",
+                            f"{re.sub(':|-', '_', row.coords)}_mixed_matrices.pdf"
+                        ), dpi=300,
+                    )
+
+                    plt.close()
+
             if not silent:
 
-                print(f"\tKamada-Kawai layout of region '{mlobject.region}' at {int(cutoff * 100)} % cutoff done in "
+                print(f"\tRegion '{mlobject.region}' done in "
                       f"{timedelta(seconds=round(time() - time_per_cutoff))}.\n")
-
 
         if not silent:
 

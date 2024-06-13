@@ -224,44 +224,7 @@ def get_region_layout(row: pd.Series, args: pd.Series,
 
                     print("\tPlotting Kamada-Kawai...")
 
-                # Should the paths be created with the os.path.join?
-                # For example: os.path.join(work_dir, region_chrom, "plots", "KK")
-                pathlib.Path(os.path.join(args.work_dir, region_chrom, "plots", "KK")).mkdir(
-                    parents=True, exist_ok=True
-                )
-
-                pathlib.Path(os.path.join(args.work_dir, region_chrom, "plots", "mixed_matrices")).mkdir(
-                    parents=True, exist_ok=True
-                )
-
-                plot_name = f"{re.sub(':|-', '_', row.coords)}_"\
-                f"{mlobject.kk_cutoff['cutoff_type']}_"\
-                f"{mlobject.kk_cutoff['values']:.2f}_"\
-                f"pl-{mlobject.persistence_length:.2f}_" + "{}.pdf"
-
-                plot.get_kk_plot(mlobject).savefig(
-                    os.path.join(
-                        args.work_dir,
-                        region_chrom,
-                        "plots",
-                        "KK",
-                        plot_name.format("KK")
-                    ), dpi=300
-                )
-
-                plt.close()
-
-                plot.mixed_matrices_plot(mlobject).savefig(
-                    os.path.join(
-                        args.work_dir,
-                        region_chrom,
-                        "plots",
-                        "mixed_matrices",
-                        plot_name.format("mixed_matrices")
-                    ), dpi=300,
-                )
-
-                plt.close()
+                plot.save_mm_kk(mlobject, args.work_dir)
 
                 if progress is not None:
 
@@ -324,16 +287,7 @@ def get_region_layout(row: pd.Series, args: pd.Series,
 
             if mlobject.kk_restraints_matrix is None:
 
-                # Write to file a list of bad regions, according to the filters defined in clean_matrix().
-                with open(f"{args.work_dir}bad_regions.txt", "a+") as handler:
-
-                    log = f"{mlobject.region}\t{mlobject.bad_region}\n"
-
-                    handler.seek(0)
-
-                    if not any(log in line for line in handler) and mlobject.bad_region != None:
-
-                        handler.write(log)
+                misc.write_bad_region(mlobject, args.work_dir)
 
                 # Save mlobject.
                 with open(mlobject.save_path, "wb") as hamlo_namendle:
@@ -348,7 +302,8 @@ def get_region_layout(row: pd.Series, args: pd.Series,
                     time_remaining = int(time_spent / progress['value'] * (args.total_num - progress['value']))
 
                     print(f"\033[A{'  '*int(sp.Popen(['tput','cols'], stdout=sp.PIPE).communicate()[0].strip())}\033[A")
-                    print(f"\t[{progress['value']}/{args.total_num}] | Time spent: {timedelta(seconds=round(time_spent))} | "
+                    print(f"\t[{progress['value']}/{args.total_num}] | Time spent: "
+                          f"{timedelta(seconds=round(time_spent))} | "
                           f"ETR: {timedelta(seconds=round(time_remaining))}", end='\r')
 
                 return
@@ -368,40 +323,7 @@ def get_region_layout(row: pd.Series, args: pd.Series,
                     
                     print("\tPlotting Kamada-Kawai...")
 
-                pathlib.Path(os.path.join(args.work_dir, region_chrom, "plots", "KK")
-                             ).mkdir(parents=True, exist_ok=True)
-                pathlib.Path(os.path.join(args.work_dir, region_chrom, "plots", "mixed_matrices")).mkdir(
-                    parents=True, exist_ok=True
-                )
-
-                plot_name = f"{re.sub(':|-', '_', row.coords)}_"\
-                f"{mlobject.kk_cutoff['cutoff_type']}_"\
-                f"{mlobject.kk_cutoff['values']:.2f}_"\
-                f"pl-{mlobject.persistence_length:.2f}_" + "{}.pdf"
-
-                plot.get_kk_plot(mlobject).savefig(
-                    os.path.join(
-                        args.work_dir,
-                        region_chrom,
-                        "plots",
-                        "KK",
-                        plot_name.format("KK")
-                    ), dpi=300
-                )
-
-                plt.close()
-
-                plot.mixed_matrices_plot(mlobject).savefig(
-                    os.path.join(
-                        args.work_dir,
-                        region_chrom,
-                        "plots",
-                        "mixed_matrices",
-                        plot_name.format("mixed_matrices")
-                    ), dpi=300,
-                )
-
-                plt.close()
+                plot.save_mm_kk(mlobject, args.work_dir)
 
                 if progress is not None:
 
@@ -436,6 +358,8 @@ def get_region_layout(row: pd.Series, args: pd.Series,
 
                         handler.write(log)
 
+                misc.write_bad_region(mlobject, args.work_dir)
+
                 # Save mlobject.
                 with open(mlobject.save_path, "wb") as hamlo_namendle:
 
@@ -447,36 +371,7 @@ def get_region_layout(row: pd.Series, args: pd.Series,
 
                         print("\tPlotting Kamada-Kawai...")
 
-                    pathlib.Path(os.path.join(args.work_dir, region_chrom, "plots", "KK")).mkdir(
-                        parents=True, exist_ok=True
-                    )
-                    pathlib.Path(os.path.join(args.work_dir, region_chrom, "plots", "mixed_matrices")).mkdir(
-                        parents=True, exist_ok=True
-                    )
-
-                    plot.get_kk_plot(mlobject).savefig(
-                        os.path.join(
-                            args.work_dir,
-                            region_chrom,
-                            "plots",
-                            "KK",
-                            f"{re.sub(':|-', '_', row.coords)}_KK.pdf"
-                        ), dpi=300
-                    )
-
-                    plt.close()
-
-                    plot.mixed_matrices_plot(mlobject).savefig(
-                        os.path.join(
-                            args.work_dir,
-                            region_chrom,
-                            "plots",
-                            "mixed_matrices",
-                            f"{re.sub(':|-', '_', row.coords)}_mixed_matrices.pdf"
-                        ), dpi=300,
-                    )
-
-                    plt.close()
+                    plot.save_mm_kk(mlobject, args.work_dir)
 
             if not silent:
 
@@ -555,7 +450,8 @@ def run(opts: list):
 
         except IndexError:
 
-            sys.exit("No regions provided. Please provide a region or a file with regions of interest or run 'metaloci sniffer'.")
+            sys.exit("No regions provided. Please provide a region or a file with regions of interest or run "
+                     "'metaloci sniffer'.")
 
     elif os.path.isfile(opts.regions):
 
@@ -598,7 +494,8 @@ def run(opts: list):
         if opts.resolution not in available_resolutions:
 
             print(
-                f"The given resolution is not in the provided mcooler file.\nThe available resolutions are: {', '.join(misc.natural_sort([str(x) for x in available_resolutions]))}"
+                f"The given resolution is not in the provided mcooler file.\nThe available resolutions are: "
+                f"{', '.join(misc.natural_sort([str(x) for x in available_resolutions]))}"
             )
             sys.exit("Exiting...")
 
@@ -609,7 +506,8 @@ def run(opts: list):
         if opts.resolution not in available_resolutions:
 
             print(
-                f"The given resolution is not in the provided mcooler file.\nThe available resolutions are: {', '.join(misc.natural_sort([str(x) for x in available_resolutions]))}"
+                f"The given resolution is not in the provided mcooler file.\nThe available resolutions are: "
+                f"{', '.join(misc.natural_sort([str(x) for x in available_resolutions]))}"
             )
             sys.exit("Exiting...")
 

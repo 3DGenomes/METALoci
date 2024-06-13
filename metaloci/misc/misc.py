@@ -790,3 +790,16 @@ def get_poi_data(info_tuple: tuple):
             regionfile_h.write(f"{region_line}\n")
 
     return None
+
+
+def write_bad_region(mlobject, work_dir):
+
+    with open(f"{work_dir}bad_regions.txt", "a+", encoding="utf-8") as handler:
+
+        log = f"{mlobject.region}\t{mlobject.bad_region}\n"
+
+        handler.seek(0)
+
+        if not any(mlobject.region in line.split('\t', 1)[0] for line in handler) and mlobject.bad_region is not None:
+
+            handler.write(log)

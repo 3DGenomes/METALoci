@@ -4,6 +4,7 @@ Script that contains the functions needed to run the plotting
 from collections import defaultdict
 import re
 import bioframe
+import pathlib
 import libpysal as lp
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -23,6 +24,8 @@ from shapely.geometry import Point
 import bioframe
 from pybedtools import BedTool
 from adjustText import adjust_text
+import os
+
 
 from metaloci import mlo
 from metaloci.misc import misc
@@ -837,3 +840,42 @@ def get_color_alpha(quadrant):
    """
     colors = {1: "firebrick", 3: "steelblue", 2: "lightskyblue"}
     return colors.get(quadrant, "orange"), 0.5
+
+
+def save_mm_kk(mlobject, work_dir):
+
+        pathlib.Path(os.path.join(work_dir, mlobject.chrom, "plots", "KK")).mkdir(
+            parents=True, exist_ok=True
+        )
+        pathlib.Path(os.path.join(work_dir, mlobject.chrom, "plots", "mixed_matrices")).mkdir(
+            parents=True, exist_ok=True
+        )
+
+        plot_name = f"{re.sub(':|-', '_', mlobject.region)}_"\
+                f"{mlobject.kk_cutoff['cutoff_type']}_"\
+                f"{mlobject.kk_cutoff['values']:.2f}_"\
+                f"pl-{mlobject.persistence_length:.2f}_" + "{}.pdf"
+
+        get_kk_plot(mlobject).savefig(
+            os.path.join(
+                work_dir,
+                mlobject.chrom,
+                "plots",
+                "KK",
+                plot_name.format("KK")
+            ), dpi=300
+        )
+
+        plt.close()
+
+        mixed_matrices_plot(mlobject).savefig(
+            os.path.join(
+                work_dir,
+                mlobject.chrom,
+                "plots",
+                "mixed_matrices",
+                plot_name.format("mixed_matrices")
+            ), dpi=300,
+        )
+
+        plt.close()

@@ -411,10 +411,19 @@ def get_region_layout(row: pd.Series, args: pd.Series,
 
                 if not silent:
 
-                    print(
-                        f"\tKamada-Kawai layout of region '{mlobject.region}' at {int(cutoff * 100)} % cutoff saved "
-                         f" to file: '{mlobject.save_path}'"
-                    )
+                    if args.cutoffs["cutoff_type"] == "percentage":
+
+                        print(
+                            f"\tKamada-Kawai layout of region '{mlobject.region}' at {int(cutoff * 100)} % cutoff "
+                            f"saved to file: '{mlobject.save_path}'"
+                        )
+
+                    elif args.cutoffs["cutoff_type"] == "absolute":
+
+                        print(
+                            f"\tKamada-Kawai layout of region '{mlobject.region}' at {cutoff} cutoff saved "
+                            f" to file: '{mlobject.save_path}'"
+                        )
 
                 # Write to file a list of bad regions, according to the filters defined in clean_matrix().
                 with open(f"{args.work_dir}bad_regions.txt", "a+", encoding="utf-8") as handler:

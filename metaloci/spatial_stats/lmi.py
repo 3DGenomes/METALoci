@@ -322,13 +322,13 @@ def aggregate_signals(mlobject: mlo.MetalociObject):
 
         mlobject.signals_dict[condition] = np.nanmedian(
             np.array([mlobject.signals_dict[signal] for signal in signal_type]), axis=0
-        )
+        ) 
 
 
 def get_bed(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, neighbourhood: float, bfact: float,
             quadrants: list = None, signipval: float = 0.05, poi: int = None, silent: bool = True) -> pd.DataFrame:
     """
-    _summary_
+    Function to get the BED file for the bins that are significant in the Local Moran's I.
 
     Parameters
     ----------

@@ -404,9 +404,6 @@ def run(opts: list):
     for chrom in sorted(final_intersect["chrom"].unique()):
 
         pathlib.Path(os.path.join(work_dir, "signal", chrom)).mkdir(parents=True, exist_ok=True)
-        final_intersect[final_intersect.chrom == f"{chrom}"].to_pickle(
-            f"{work_dir}signal/{chrom}/{chrom}_signal.pkl"
-        )
         final_intersect[final_intersect.chrom == f"{chrom}"].to_csv(
             f"{work_dir}signal/{chrom}/{chrom}_signal.tsv",
             sep="\t", index=False

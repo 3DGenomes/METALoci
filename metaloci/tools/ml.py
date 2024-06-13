@@ -248,8 +248,8 @@ def get_lmi(row: pd.Series, args: pd.Series,
 
     try:
 
-        signal_data = pd.read_pickle(
-            glob.glob(f"{os.path.join(args.work_dir, 'signal', mlobject.chrom)}/*_signal.pkl")[0])
+        signal_data = pd.read_csv(
+            glob.glob(f"{os.path.join(args.work_dir, 'signal', mlobject.chrom)}/*_signal.tsv")[0], sep="\t", header=0)
 
     except IndexError:
 

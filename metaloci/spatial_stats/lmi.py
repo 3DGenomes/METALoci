@@ -162,6 +162,12 @@ def load_region_signals(mlobject: mlo.MetalociObject, signal_data: dict, signal_
 
         signal_types = [signal_file]
 
+    if not all(signal in signal_data.columns for signal in signal_types):
+
+        print("Trying to compute a signal that has not been previously processed in prep. Exiting.")
+
+        return None
+
     region_signal = signal_data[
         (signal_data["start"] >= int(np.floor(mlobject.start / mlobject.resolution)) * mlobject.resolution) &
         (signal_data["end"] <= int(np.ceil(mlobject.end / mlobject.resolution)) * mlobject.resolution)

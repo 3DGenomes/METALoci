@@ -266,7 +266,7 @@ def get_hic_plot(mlobject: mlo.MetalociObject,
 
 
 def get_gaudi_signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame,
-                          cmap_user: str = "PuOr_r", regions2mark=None):
+                          cmap_user: str = "PuOr_r", mark_regions=None):
     """
     Get a Gaudí signal plot.
 
@@ -296,10 +296,10 @@ def get_gaudi_signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFra
     gaudi_signal_fig, ax = plt.subplots(figsize=(12, 10), subplot_kw={"aspect": "equal"})
     lmi_geometry.plot(column="signal", cmap=cmap_user, linewidth=2, edgecolor="white", ax=ax)
 
-    if regions2mark is not None:
+    if mark_regions is not None:
 
-        miniregions2mark = regions2mark[regions2mark.region_metaloci == mlobject.region].copy()
-        miniregions2mark.drop(columns=["region_metaloci"], inplace=True)
+        mini_mark_regions = mark_regions[mark_regions.region_metaloci == mlobject.region].copy()
+        mini_mark_regions.drop(columns=["region_metaloci"], inplace=True)
 
         mini_geometry = lmi_geometry[["bin_chr", "bin_start", "bin_end", "X", "Y"]].copy()
 
@@ -307,10 +307,10 @@ def get_gaudi_signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFra
             mini_geometry["bin_chr"] = "chr" + mini_geometry["bin_chr"]
 
         intersected_bed = BedTool.from_dataframe(mini_geometry).intersect(
-            BedTool.from_dataframe(miniregions2mark), wa=True, wb=True)
+            BedTool.from_dataframe(mini_mark_regions), wa=True, wb=True)
 
         intersected_bed = intersected_bed.to_dataframe(header=None,
-                                                       names=[*mini_geometry.columns, *miniregions2mark.columns])
+                                                       names=[*mini_geometry.columns, *mini_mark_regions.columns])
 
         intersected_bed = intersected_bed[["X", "Y", "mark"]]
         intersected_bed = intersected_bed.groupby(["X", "Y"])["mark"].value_counts().unstack(fill_value=0)
@@ -354,7 +354,7 @@ def get_gaudi_signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFra
 
 
 def get_gaudi_type_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame,
-                        signipval: float = 0.05, colors_lmi: dict = None, regions2mark=None
+                        signipval: float = 0.05, colors_lmi: dict = None, mark_regions=None
                         ):
     """
     Get a Gaudí type plot.
@@ -401,9 +401,9 @@ def get_gaudi_type_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame
     lmi_geometry.plot(column="moran_quadrant", cmap=cmap, alpha=alpha, linewidth=2, edgecolor="white", ax=ax)
     plt.axis("off")
 
-    if regions2mark is not None:
+    if mark_regions is not None:
 
-        miniregions2mark = regions2mark[regions2mark.region_metaloci == mlobject.region].copy()
+        miniregions2mark = mark_regions[mark_regions.region_metaloci == mlobject.region].copy()
         miniregions2mark.drop(columns=["region_metaloci"], inplace=True)
 
         mini_geometry = lmi_geometry[["bin_chr", "bin_start", "bin_end", "X", "Y"]].copy()

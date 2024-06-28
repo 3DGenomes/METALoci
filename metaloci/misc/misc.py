@@ -533,8 +533,7 @@ def binsearcher(id_tss_f: dict, id_chrom_f: dict, id_name_f: dict, bin_genome_f:
         DataFrame containing the information of the genes and the bin index
     """
 
-    data = pd.DataFrame(columns=["chrom", "bin_index", "gene_name", "gene_id"])
-    data.set_index(["chrom", "bin_index"], inplace=True)
+    data = defaultdict(list)
 
     for g_id, tss_pos in id_tss_f.items():
 

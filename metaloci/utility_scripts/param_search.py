@@ -85,9 +85,9 @@ def populate_args(parser):
     input_arg.add_argument('-l',
                            '--pls',
                            dest='pls',
-                           metavar='INT',
+                           metavar='FLOAT',
                            required=True,
-                           type=int,
+                           type=float,
                            nargs='+',
                            help='Persistence length; amount of possible rotation of points in layout (Normally 8 - 14)')
 

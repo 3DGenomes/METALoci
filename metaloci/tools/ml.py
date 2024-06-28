@@ -433,7 +433,7 @@ def run(opts):
                       "signals": opts.signals,
                       "n_permutations": opts.perms,
                       "signipval": opts.signipval,
-                      "aggr": opts.agg,
+                      "aggregate": opts.agg,
                       "moran_info": opts.moran_info,
                       "agg_dict": agg_dict,
                       "force": opts.force,

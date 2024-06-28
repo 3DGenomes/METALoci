@@ -162,6 +162,12 @@ def load_region_signals(mlobject: mlo.MetalociObject, signal_data: dict, signal_
 
         signal_types = [signal_file]
 
+    if not all(signal in signal_data.columns for signal in signal_types):
+
+        print("Trying to compute a signal that has not been previously processed in prep. Exiting.")
+
+        return None
+
     region_signal = signal_data[
         (signal_data["start"] >= int(np.floor(mlobject.start / mlobject.resolution)) * mlobject.resolution) &
         (signal_data["end"] <= int(np.ceil(mlobject.end / mlobject.resolution)) * mlobject.resolution)
@@ -322,13 +328,13 @@ def aggregate_signals(mlobject: mlo.MetalociObject):
 
         mlobject.signals_dict[condition] = np.nanmedian(
             np.array([mlobject.signals_dict[signal] for signal in signal_type]), axis=0
-        )
+        ) 
 
 
 def get_bed(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, neighbourhood: float, bfact: float,
             quadrants: list = None, signipval: float = 0.05, poi: int = None, silent: bool = True) -> pd.DataFrame:
     """
-    _summary_
+    Function to get the BED file for the bins that are significant in the Local Moran's I.
 
     Parameters
     ----------

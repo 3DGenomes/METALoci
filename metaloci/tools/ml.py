@@ -269,9 +269,12 @@ def get_lmi(row: pd.Series, args: pd.Series,
 
         return
 
-    # Load signals and aggregate them if needed.
-    mlobject.signals_dict = lmi.load_region_signals(mlobject, signal_data, args.signals)
+    # Load signals if it has not already been done
+    if mlobject.signals_dict is None:
 
+        mlobject.signals_dict = lmi.load_region_signals(mlobject, signal_data, args.signals)
+
+    # Agreggate signals if needed
     if args.aggregate is not None:
 
         mlobject.agg = args.agg_dict

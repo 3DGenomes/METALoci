@@ -11,7 +11,7 @@ sphinx:
 python:
   install:
     - requirements: requirements.txt  # Ensure this file exists and lists your dependencies
-    - method: setuptools
+    - method: pip
       path: .
       extra_requirements:
         - docs  # Make sure this group exists in your setup.py

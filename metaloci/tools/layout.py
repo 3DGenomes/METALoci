@@ -17,7 +17,6 @@ from time import time
 import cooler
 import h5py
 import hicstraw
-import matplotlib.pyplot as plt
 import networkx as nx
 import pandas as pd
 from metaloci import mlo
@@ -283,7 +282,7 @@ def get_region_layout(row: pd.Series, args: pd.Series,
             time_per_cutoff = time()
 
             mlobject.kk_cutoff["values"] = args.cutoffs["values"][i]  # Select cut-off for this iteration
-            mlobject = kk.get_restraints_matrix(mlobject, silent)  # Get submatrix of restraints
+            mlobject = kk.get_restraints_matrix(mlobject, False, silent)  # Get submatrix of restraints
 
             if mlobject.kk_restraints_matrix is None:
 

@@ -2,21 +2,20 @@
 Script that contains helper functions of the METALoci package
 """
 import gzip
-from pickle import UnpicklingError
-import re
 import os
+import pathlib
+import re
+import subprocess as sp
 import sys
 from collections import defaultdict
-import pathlib
 from pathlib import Path
-import subprocess as sp
+from pickle import UnpicklingError
 
 import cooler
 import hicstraw
 import numpy as np
 import pandas as pd
 from metaloci import mlo
-
 from metaloci.spatial_stats import lmi
 
 
@@ -156,11 +155,11 @@ def clean_matrix(mlobject: mlo.MetalociObject) -> mlo.MetalociObject:
 
         return mlobject
 
-    if percentage_zeroes >= 20:
+    elif percentage_zeroes >= 20:
 
         mlobject.bad_region = "too many zeros"
 
-    if max_stretch >= 10:
+    elif max_stretch >= 10:
 
         mlobject.bad_region = "stretch"
 

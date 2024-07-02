@@ -1,13 +1,17 @@
 version: 2
 
+build:
+  os: ubuntu-20.04  # Specify a supported OS
+  tools:
+    python: "3.9"  # Specify the Python version
+
 sphinx:
-  configuration: docs/conf.py
+  configuration: docs/conf.py  # Path to your Sphinx configuration file
 
 python:
-  version: 3.9
   install:
-    - requirements: requirements.txt
+    - requirements: requirements.txt  # Ensure this file exists and lists your dependencies
     - method: setuptools
       path: .
       extra_requirements:
-        - docs
+        - docs  # Make sure this group exists in your setup.py

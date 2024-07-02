@@ -5,7 +5,7 @@ import numpy as np
 from metaloci import mlo
 
 
-def get_restraints_matrix(mlobject: mlo.MetalociObject, silent: bool = False) -> mlo.MetalociObject:
+def get_restraints_matrix(mlobject: mlo.MetalociObject, optimise: bool = False, silent: bool = False) -> mlo.MetalociObject:
     """
     Calculate top interaction matrix subset, plot matrix and get restraints.
 
@@ -26,7 +26,7 @@ def get_restraints_matrix(mlobject: mlo.MetalociObject, silent: bool = False) ->
     """
 
     # Get subset matrix
-    mlobject = get_subset_matrix(mlobject, silent)
+    mlobject = get_subset_matrix(mlobject, optimise, silent)
 
     if mlobject.subset_matrix is None:
 
@@ -45,7 +45,7 @@ def get_restraints_matrix(mlobject: mlo.MetalociObject, silent: bool = False) ->
     return mlobject
 
 
-def get_subset_matrix(mlobject: mlo.MetalociObject, silent=False) -> np.ndarray:
+def get_subset_matrix(mlobject: mlo.MetalociObject, optimise: bool = False, silent=False) -> np.ndarray:
     """
     Get a subset of the Hi-C matrix with the top contact interactions in the matrix, defined by a cutoff.
     The diagonal is also removed.
@@ -110,13 +110,14 @@ def get_subset_matrix(mlobject: mlo.MetalociObject, silent=False) -> np.ndarray:
 
     if top < len(np.diag(mlobject.matrix)):
 
-        # TODO Needs the code to add this to bad_regions file?
-        # mlobject.bad_region = "cutoff too high"
         if not silent:
 
             print(f"\tCut-off is too high for {mlobject.region}. Try lowering it.")
 
-            mlobject.bad_region = "cut-off"
+        mlobject.bad_region = "cut-off"
+
+        if not optimise:
+                
             mlobject.subset_matrix = None
 
             return mlobject

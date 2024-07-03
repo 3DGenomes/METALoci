@@ -1,2 +1,3 @@
 sphinx
 sphinx-rtd-theme
+dill>=0.3.8

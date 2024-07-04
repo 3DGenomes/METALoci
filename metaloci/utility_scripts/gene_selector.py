@@ -4,18 +4,17 @@ This script parses the LMI information files created by METALoci.
 The output file will contain regions that pass the quadrant and p-value threshold for a given
 signal. In case it doesn't pass this filters, the script will output NA.
 """
-import sys
+import multiprocessing as mp
 import os
 import pathlib
-from time import time
-from datetime import timedelta
+import sys
 from argparse import SUPPRESS, HelpFormatter
-import multiprocessing as mp
+from datetime import timedelta
+from time import time
+
 import pandas as pd
-
-from tqdm import tqdm
-
 from metaloci.misc import misc
+from tqdm import tqdm
 
 HELP = "Extracts data about the point of interest of your regions."
 
@@ -23,35 +22,6 @@ DESCRIPTION = """This script parses the LMI information files created by METALoc
 
 The output file will contain regions that pass the quadrant and p-value threshold for a given
 signal. In case it doesn't pass this filters, the script will output NA."""
-
-
-def has_exactly_one_line(file_path):
-    """
-    Function to check if a file has exactly one line.
-
-    Parameters
-    ----------
-    file_path : str
-        Path to the file to check.
-
-    Returns
-    -------
-    bool
-        True if the file has exactly one line, False otherwise.
-    """
-    with open(file_path, mode="r", encoding="utf-8") as f:
-
-        line = f.readline()
-
-        if not line:
-
-            return False
-        
-        if f.readline():
-
-            return False
-        
-    return True
 
 
 def populate_args(parser):
@@ -158,12 +128,13 @@ def populate_args(parser):
     )
 
     optional_arg.add_argument(
-        "--ncpus",
-        dest="ncpus",
+        "-t",
+        "--threads",
+        dest="threads",
         metavar="INT",
         default=int(mp.cpu_count() - 2),
         type=int,
-        help="Number of cpus for the multiprocessing (default: %(default)s).",
+        help="Number of threads for the multiprocessing (default: %(default)s).",
     )
 
     optional_arg.add_argument(
@@ -193,7 +164,7 @@ def run(opts: list):
     pval = opts.pval
     region_file = opts.region_file
     outname = opts.outname
-    ncpus = opts.ncpus
+    threads = opts.threads
     debug = opts.debug
 
     if debug:
@@ -209,7 +180,7 @@ def run(opts: list):
         pval: {pval}
         region_file: {region_file}
         outname: {outname}
-        ncpus: {ncpus}
+        ncpus: {threads}
         """
         print(debug_info)
 
@@ -281,15 +252,16 @@ def run(opts: list):
 
             region_file_handler.write(f"{HEADER}\n")
 
-        args2do = [(line, signal_list, work_dir, bad_file_name, out_file_name, pval,
+        args = [(line, signal_list, work_dir, bad_file_name, out_file_name, pval,
                     quadrant_list, region_file, region_file_name) for line in genes.itertuples(index=False)]
 
     else:
 
-        args2do = [(line, signal_list, work_dir, bad_file_name, out_file_name, pval,
+        args = [(line, signal_list, work_dir, bad_file_name, out_file_name, pval,
                     quadrant_list) for _, line in genes.iterrows()]
 
     try:
+        
         # This piece of code works, but not progress bar
         # with mp.Pool(processes=ncpus) as pool:
         #     pool.starmap(misc.get_poi_data, args2do)
@@ -298,17 +270,17 @@ def run(opts: list):
 
         # This piece of code works, has a progress bar, but the way it "counts" is weird (it counts the start of
         # the process, not the end of it)
-        pbar = tqdm(total=len(args2do))
+        pbar = tqdm(total=len(args))
 
         def update(*a):
 
             pbar.update()
 
-        with mp.Pool(processes=ncpus) as pool:
+        with mp.Pool(processes=threads) as pool:
 
             for i in range(pbar.total):
 
-                pool.apply_async(misc.get_poi_data, args=(args2do[i]), callback=update)
+                pool.apply_async(misc.get_poi_data, args=(args[i]), callback=update)
 
         pool.close()
         pool.join()
@@ -319,18 +291,18 @@ def run(opts: list):
         pool.join()
         print("\nKeyboard interrupt detected. Exiting...")
 
-    if os.path.exists(region_file_name) and has_exactly_one_line(region_file_name):
+    if os.path.exists(region_file_name) and misc.has_exactly_one_line(region_file_name):
 
         print("There were no significative regions using the following parameters:")
         print(f"\tquadrants: {','.join([str(i) for i in quadrant_list])}")
         print(f"\tp-value threshold: {pval}")
         os.remove(region_file_name)
 
-    if os.path.exists(bad_file_name) and has_exactly_one_line(bad_file_name):
+    if os.path.exists(bad_file_name) and misc.has_exactly_one_line(bad_file_name):
 
         os.remove(bad_file_name)
 
-    elif os.path.exists(bad_file_name) and not has_exactly_one_line(bad_file_name):
+    elif os.path.exists(bad_file_name) and not misc.has_exactly_one_line(bad_file_name):
 
         print(f"Please, check {bad_file_name}. Some regions might be problematic.")
 

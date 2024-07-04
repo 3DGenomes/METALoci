@@ -1,6 +1,11 @@
 metaloci package
 ================
 
+.. automodule:: metaloci
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Subpackages
 -----------
 
@@ -22,14 +27,6 @@ metaloci.mlo module
 -------------------
 
 .. automodule:: metaloci.mlo
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Module contents
----------------
-
-.. automodule:: metaloci
    :members:
    :undoc-members:
    :show-inheritance:

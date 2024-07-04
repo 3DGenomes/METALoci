@@ -1,5 +1,5 @@
 """
-Script that contains the functions needed to run the Local Moran's I
+Functions to compute Local Moran's I for a given signal in a METALoci object.
 """
 import os
 import warnings
@@ -7,6 +7,7 @@ from collections import defaultdict
 from itertools import product
 from pathlib import Path
 
+import bioframe
 import geopandas as gpd
 import libpysal as lp
 import numpy as np
@@ -16,12 +17,10 @@ from libpysal.weights.spatial_lag import lag_spatial
 from metaloci import mlo
 from metaloci.misc import misc
 from scipy.spatial import Voronoi
+from scipy.stats import zscore
 from shapely.errors import ShapelyDeprecationWarning
 from shapely.geometry import LineString, Point
 from shapely.ops import polygonize
-import bioframe
-from scipy.stats import zscore
-
 
 warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
 
@@ -93,7 +92,7 @@ def construct_voronoi(mlobject: mlo.MetalociObject, buffer: float) -> pd.DataFra
 def coord_to_id(mlobject: mlo.MetalociObject, poly_from_lines: list) -> dict:
     """
     Correlates the bin index, determined by genomic positions, and the LMI index, which is
-    determined by the LMI function. This is called in::
+    determined by the LMI function. This is called in:
 
     construct_voronoi()
 
@@ -104,7 +103,7 @@ def coord_to_id(mlobject: mlo.MetalociObject, poly_from_lines: list) -> dict:
     mlobject : mlo.MetalociObject
         METALoci object with Kamada-Kawai layout coordinates in it (MetalociObject.kk_coords).
     poly_from_lines : list
-        List of polygon information for gaudi plots, calculated in::
+        List of polygon information for gaudi plots, calculated in:
 
         construct_voronoi().
 
@@ -220,7 +219,7 @@ def compute_lmi(mlobject: mlo.MetalociObject, signal_type: str, neighbourhood: f
     signipval : float, optional
         Significancy threshold for p-value, by default 0.05.
     silent : bool, optional
-        Controls the verbosity of the function (useful for multiprocessing), by default False
+        Controls the verbosity of the function (useful for multiprocessing), by default False.
 
     Returns
     -------
@@ -312,7 +311,7 @@ def compute_lmi(mlobject: mlo.MetalociObject, signal_type: str, neighbourhood: f
 
 def aggregate_signals(mlobject: mlo.MetalociObject):
     """
-    Function to calculate the aggregated signal.
+    Aggregates the signals in the signals_dict of the METALoci object.
 
     Parameters
     ----------
@@ -331,35 +330,34 @@ def aggregate_signals(mlobject: mlo.MetalociObject):
         ) 
 
 
-def get_bed(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, neighbourhood: float, bfact: float,
+def get_bed(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, neighbourhood: float,
             quadrants: list = None, signipval: float = 0.05, poi: int = None, silent: bool = True) -> pd.DataFrame:
     """
-    Function to get the BED file for the bins that are significant in the Local Moran's I.
+    Get the bins that are significant in the Local Moran's I for a given point of interest.
 
     Parameters
     ----------
     mlobject : mlo.MetalociObject
-        A METALoci object.
+        METALoci object with the needed information.
     lmi_geometry : pd.DataFrame
-        A DataFrame containing LMI information and geometry of all bins in the region.
+        DataFrame with the geometry of the bins.
     neighbourhood : float
         Radius of the circle that determines the neighbourhood of each of the points in the Kamada-Kawai layout.
     bfact : float
-        Factor used to draw the circle.
+        Factor to multiply the neighbourhood by.
     quadrants : list, optional
-       The list of quadrants to consider for selecting bins (default is [1, 3]).
+        List of quadrants to consider, by default None.
     signipval : float, optional
-        The significance p-value threshold for selecting bins (default is 0.05).
+        Significancy threshold for p-value, by default 0.05.
     poi : int, optional
-        The point of interest to plot, by default None
-    plotit : bool, optional
-        Plot a circle representing the neighbourhood of the poi, by default False
-
+        Point of interest, by default None.
+    silent : bool, optional
+        Controls the verbosity of the function (useful for multiprocessing), by default True.
     Returns
-    -------hesoyam1
+    -------
 
     bed : pd.DataFrame
-        _description_
+        BED file with the bins that are significant in the Local Moran's I.
     """
 
     if poi is None:

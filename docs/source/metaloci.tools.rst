@@ -1,6 +1,11 @@
 metaloci.tools package
 ======================
 
+.. automodule:: metaloci.tools
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Submodules
 ----------
 
@@ -32,14 +37,6 @@ metaloci.tools.prep module
 --------------------------
 
 .. automodule:: metaloci.tools.prep
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Module contents
----------------
-
-.. automodule:: metaloci.tools
    :members:
    :undoc-members:
    :show-inheritance:

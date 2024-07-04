@@ -24,3 +24,4 @@ tqdm==4.65.0
 adjustText==1.1.1
 sphinx
 sphinx-rtd-theme
+sphinx-argparse

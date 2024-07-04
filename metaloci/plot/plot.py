@@ -1,34 +1,29 @@
 """
-Script that contains the functions needed to run the plotting
+Functions to generate plots from METALoci objects.
 """
-from collections import defaultdict
-import re
-import bioframe
+import os
 import pathlib
+import re
+from collections import defaultdict
+
 import libpysal as lp
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from adjustText import adjust_text
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.lines import Line2D
-from matplotlib.patches import Circle
-from matplotlib.ticker import FormatStrFormatter, MaxNLocator, NullLocator
+from matplotlib.ticker import FormatStrFormatter, MaxNLocator
 from metaloci import mlo
 from metaloci.graph_layout import kk
-from PIL import Image
-from scipy.ndimage import rotate
-from scipy.stats import linregress, zscore
-from shapely.geometry import Point
-import bioframe
-from pybedtools import BedTool
-from adjustText import adjust_text
-import os
-
-
-from metaloci import mlo
 from metaloci.misc import misc
+from PIL import Image
+from pybedtools import BedTool
+from scipy.ndimage import rotate
+from scipy.stats import linregress
+from shapely.geometry import Point
 
 
 def mixed_matrices_plot(mlobject: mlo.MetalociObject):
@@ -52,7 +47,6 @@ def mixed_matrices_plot(mlobject: mlo.MetalociObject):
     The mixed matrices plot is a plot of the Hi-C matrix for the region. Only the upper triangle of the array is
     represented, rotated 45º counter-clockwise. The top triangle is the original matrix, and the lower triangle is the
     subsetted matrix.
-
     """
 
     if mlobject.subset_matrix is None:
@@ -160,24 +154,23 @@ def kk_plot_to_subplot(ax, mlobject: mlo.MetalociObject, restraints: bool = True
     sns.scatterplot(x=[poi_x], y=[poi_y], s=50 * 1.5, ec="lime", fc="none", zorder=4, ax=ax)
 
 
-def get_kk_plot(mlobject: mlo.MetalociObject,
-                restraints: bool = True, neighbourhood: float = None):
+def get_kk_plot(mlobject: mlo.MetalociObject, restraints: bool = True, neighbourhood: float = None):
     """
     Generate Kamada-Kawai plot from pre-calculated restraints.
 
     Parameters
     ----------
     mlobject : mlo.MetalociObject
-        METALoci object with Kamada-Kawai graphs and nodes (MetalociObject.kk_nodes and MetalociObject.kk_graph)
+        METALoci object with Kamada-Kawai graphs and nodes (MetalociObject.kk_nodes and MetalociObject.kk_graph).
     restraints : bool, optional
-        Boolean to set whether or not to plot restraints, by default True
+        Boolean to set whether or not to plot restraints, by default True.
     neighbourhood: float, optional
-        Draw a circle showing the neighbourhood around the point, by default False
+        Draw a circle showing the neighbourhood around the point, by default False.
 
     Returns
     -------
     kk_plt : matplotlib.pyplot.figure.Figure
-        Kamada-Kawai layout plot object
+        Kamada-Kawai layout plot object.
     """
     xs = [mlobject.kk_nodes[n][0] for n in mlobject.kk_nodes]
     ys = [mlobject.kk_nodes[n][1] for n in mlobject.kk_nodes]
@@ -218,8 +211,7 @@ def get_kk_plot(mlobject: mlo.MetalociObject,
     return kk_plt
 
 
-def get_hic_plot(mlobject: mlo.MetalociObject,
-                 cmap_user: str = "YlOrRd"):
+def get_hic_plot(mlobject: mlo.MetalociObject, cmap_user: str = "YlOrRd"):
     """
     Create a plot of the HiC matrix for the region. Only the upper triangle of the array is represented, rotated
     45ª counter-clock wise.
@@ -229,7 +221,7 @@ def get_hic_plot(mlobject: mlo.MetalociObject,
     mlobject : mlo.MetalociObject
         METALoci object with a matrix (MetalociObject.matrix) in it.
     cmap_user : str
-        Color map used on the plotting of the HiC data, by default YlOrRd
+        Color map used on the plotting of the HiC data, by default YlOrRd.
 
     Returns
     -------
@@ -277,7 +269,7 @@ def get_gaudi_signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFra
     lmi_geometry : pd.DataFrame
         Merging from MetalociObject.lmi_info for a specific signal and MetalociObject.geometry for a specific region.
     cmap_user : str
-        Color map used on the plotting of the HiC data, by default PuOr_r
+        Color map used on the plotting of the HiC data, by default PuOr_r.
 
     Returns
     -------
@@ -366,10 +358,10 @@ def get_gaudi_type_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame
     lmi_geometry : pd.DataFrame
         Merging from MetalociObject.lmi_info for a specific signal and MetalociObject.geometry for a specific region.
     signipval : float, optional
-        Significance threshold for p-value, by default 0.05
-    colors : dict, optional
+        Significance threshold for p-value, by default 0.05.
+    colors_lmi: dict, optional
         Dictionary containing the colors of the quadrants to use in the plot, in matplotlib format;
-        by default {1: "firebrick", 2: "lightskyblue", 3: "steelblue", 4: "orange"}
+        by default {1: "firebrick", 2: "lightskyblue", 3: "steelblue", 4: "orange"}.
 
     Returns
     -------
@@ -615,10 +607,10 @@ def get_lmi_scatterplot(mlobject: mlo.MetalociObject, merged_lmi_geometry: pd.Da
     neighbourhood : float
         Radius of the circle that determines the neighbourhood of each of the points in the Kamada-Kawai layout.
     signipval : float, optional
-        Significance threshold for p-value, by default 0.05
+        Significance threshold for p-value, by default 0.05.
     colors_lmi : _type_, optional
         Dictionary containing the colors of the quadrants to use in the plot, in matplotlib format;
-        by default {1: "firebrick", 2: "lightskyblue", 3: "steelblue", 4: "orange"}
+        by default {1: "firebrick", 2: "lightskyblue", 3: "steelblue", 4: "orange"}.
 
     Returns
     -------
@@ -642,8 +634,7 @@ def get_lmi_scatterplot(mlobject: mlo.MetalociObject, merged_lmi_geometry: pd.Da
     y = mlobject.lmi_info[merged_lmi_geometry["ID"][0]]["ZLag"]
 
     _, _, r_value_scat, p_value_scat, _ = linregress(x, y)
-    scatter_fig, ax = plt.subplots(figsize=(5, 5))  # , subplot_kw={'aspect':'equal'})
-
+    scatter_fig, ax = plt.subplots(figsize=(5, 5)) 
     alpha_sp = [1.0 if val < signipval else 0.1 for val in merged_lmi_geometry.LMI_pvalue]
     colors_sp = [colors_lmi[val] for val in merged_lmi_geometry.moran_quadrant]
 
@@ -699,86 +690,7 @@ def place_composite(image: Image.Image, image_to_add: str, ifactor: float, ixloc
     return image
 
 
-# def get_bed(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, neighbourhood: float, bfact: float,
-#             quadrants: list = None, signipval: float = 0.05, poi: int = None, plotit: bool = False) -> pd.DataFrame:
-#     """
-#     _summary_
-
-#     Parameters
-#     ----------
-#     mlobject : mlo.MetalociObject
-#         A METALoci object.
-#     lmi_geometry : pd.DataFrame
-#         A DataFrame containing LMI information and geometry of all bins in the region.
-#     neighbourhood : float
-#         Radius of the circle that determines the neighbourhood of each of the points in the Kamada-Kawai layout.
-#     bfact : float
-#         Factor used to draw the circle.
-#     quadrants : list, optional
-#        The list of quadrants to consider for selecting bins (default is [1, 3]).
-#     signipval : float, optional
-#         The significance p-value threshold for selecting bins (default is 0.05).
-#     poi : int, optional
-#         The point of interest to plot, by default None
-#     plotit : bool, optional
-#         Plot a circle representing the neighbourhood of the poi, by default False
-
-#     Returns
-#     -------
-#     bed : pd.DataFrame
-#         _description_
-#     """
-
-#     if poi is None:
-
-#         poi = mlobject.poi
-
-#     if quadrants is None:
-
-#         quadrants = [1, 3]
-
-#     signal = lmi_geometry.ID[0]  # Extract signal name from lmi_geometry
-#     data = mlobject.lmi_info[signal]
-#     # Check tha the point of interest is significant in the given quadrant
-#     significants = len(data[(data.bin_index == poi) &
-#                             (data.moran_quadrant.isin(quadrants)) &
-#                             (data.LMI_pvalue <= signipval)])
-
-#     if significants == 0:
-
-#         print(f"\t\tPoint of interest {poi} is not significant for quadrant(s) {quadrants} (p-value > {signipval})")
-#         return None
-
-#     # Get bins within a distance to point and plot them in a gaudi plot
-#     indices = np.nonzero(mlobject.kk_distances[mlobject.poi] < neighbourhood)[0]
-
-#     if plotit:
-
-#         print(f"\tGetting data for point of interest: {poi}...")
-
-#         # g = get_gaudi_type_plot(mlobject,lmi_geometry)
-#         x_poi = lmi_geometry.X[lmi_geometry.bin_index == poi]
-#         y_poi = lmi_geometry.Y[lmi_geometry.bin_index == poi]
-#         circle = Circle((x_poi, y_poi), bfact, color='yellow', fill=False)
-#         xs = lmi_geometry.X.iloc[indices]
-#         ys = lmi_geometry.Y.iloc[indices]
-
-#         sns.scatterplot(x=lmi_geometry.X, y=lmi_geometry.Y, color='lime', s=10)
-#         sns.scatterplot(x=x_poi, y=y_poi, color='yellow', s=100)
-#         plt.gcf().gca().add_artist(circle)
-#         sns.scatterplot(x=xs, y=ys, color='yellow')
-#         plt.show()
-#         plt.close()
-
-#     neighbouring_bins = lmi_geometry.iloc[indices]
-#     neighbouring_bins = neighbouring_bins[['bin_chr', 'bin_start', 'bin_end']]
-#     neighbouring_bins.columns = ['chrom', 'start', 'end']
-
-#     # Merge overlapping intervals and create a continuous BED file
-#     return pd.DataFrame(bioframe.merge(neighbouring_bins, min_dist=2))
-
-
-def get_x_axis_label_signal_plot(mlobject):
+def get_x_axis_label_signal_plot(mlobject: mlo.MetalociObject):
     """
     Get bin indexes and corresponding coordinates for a given METALoci object.
 
@@ -822,7 +734,7 @@ def get_x_axis_label_signal_plot(mlobject):
     return bins, coords_b
 
 
-def get_color_alpha(quadrant):
+def get_color_alpha(quadrant: int):
     """
     Get the color and alpha value for a given quadrant.
 
@@ -842,40 +754,50 @@ def get_color_alpha(quadrant):
     return colors.get(quadrant, "orange"), 0.5
 
 
-def save_mm_kk(mlobject, work_dir):
+def save_mm_kk(mlobject: mlo.MetalociObject, work_dir: str):
+    """
+    Save the mixed matrices and Kamada-Kawai plot for a given METALoci object.
 
-        pathlib.Path(os.path.join(work_dir, mlobject.chrom, "plots", "KK")).mkdir(
-            parents=True, exist_ok=True
-        )
-        pathlib.Path(os.path.join(work_dir, mlobject.chrom, "plots", "mixed_matrices")).mkdir(
-            parents=True, exist_ok=True
-        )
+    Parameters
+    ----------
+    mlobject : mlo.MetalociObject
+        The METALoci object containing the mixed matrices and Kamada-Kawai plot.
+    work_dir : str
+        The directory path where the plots will be saved.
+    """
 
-        plot_name = f"{re.sub(':|-', '_', mlobject.region)}_"\
-                f"{mlobject.kk_cutoff['cutoff_type']}_"\
-                f"{mlobject.kk_cutoff['values']:.2f}_"\
-                f"pl-{mlobject.persistence_length:.2f}_" + "{}.pdf"
+    pathlib.Path(os.path.join(work_dir, mlobject.chrom, "plots", "KK")).mkdir(
+        parents=True, exist_ok=True
+    )
+    pathlib.Path(os.path.join(work_dir, mlobject.chrom, "plots", "mixed_matrices")).mkdir(
+        parents=True, exist_ok=True
+    )
 
-        get_kk_plot(mlobject).savefig(
-            os.path.join(
-                work_dir,
-                mlobject.chrom,
-                "plots",
-                "KK",
-                plot_name.format("KK")
-            ), dpi=300
-        )
+    plot_name = f"{re.sub(':|-', '_', mlobject.region)}_"\
+            f"{mlobject.kk_cutoff['cutoff_type']}_"\
+            f"{mlobject.kk_cutoff['values']:.2f}_"\
+            f"pl-{mlobject.persistence_length:.2f}_" + "{}.pdf"
 
-        plt.close()
+    get_kk_plot(mlobject).savefig(
+        os.path.join(
+            work_dir,
+            mlobject.chrom,
+            "plots",
+            "KK",
+            plot_name.format("KK")
+        ), dpi=300
+    )
 
-        mixed_matrices_plot(mlobject).savefig(
-            os.path.join(
-                work_dir,
-                mlobject.chrom,
-                "plots",
-                "mixed_matrices",
-                plot_name.format("mixed_matrices")
-            ), dpi=300,
-        )
+    plt.close()
 
-        plt.close()
+    mixed_matrices_plot(mlobject).savefig(
+        os.path.join(
+            work_dir,
+            mlobject.chrom,
+            "plots",
+            "mixed_matrices",
+            plot_name.format("mixed_matrices")
+        ), dpi=300,
+    )
+
+    plt.close()

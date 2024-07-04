@@ -16,8 +16,8 @@ from datetime import timedelta
 from time import time
 
 import pandas as pd
-from metaloci.spatial_stats import lmi
 from metaloci.misc import misc
+from metaloci.spatial_stats import lmi
 
 HELP = "Calculates Local Moran's I for every bin in a Kamada-Kawai layout."
 
@@ -30,15 +30,14 @@ the metalocis found, depending to the flags you set.
 
 def populate_args(parser):
     """
-    Function to give the main METALoci script the arguments needed to run the layout step
+    Function to give the main METALoci script the arguments needed to run the layout step.
 
     Parameters
     ----------
     parser : ArgumentParser
-        ArgumentParser to populate the arguments through the normal METALoci caller
+        ArgumentParser to populate the arguments through the normal METALoci caller.
     """
 
-    # TODO We do not have the silent argument in this parser, don't know if we have to add it...
     parser.formatter_class = lambda prog: HelpFormatter(prog, width=120, max_help_position=60)
 
     input_arg = parser.add_argument_group(title="Input arguments")
@@ -193,20 +192,20 @@ def get_lmi(row: pd.Series, args: pd.Series,
     Parameters
     ----------
     row : pd.Series
-        Data of the region
-    args_2_use : pd.Series
-        pd.Series with all the needed argument info to run the function
+        Data of the region.
+    args : pd.Series
+        pd.Series with all the needed argument info to run the function.
     progress : optional
-        Information about if this region has been completed, by default None
+        Information about if this region has been completed, by default None.
     counter : int, optional
-        Counter used for when multiprocessing is not active, by default None
+        Counter used for when multiprocessing is not active, by default None.
     silent : bool, optional
-        Verbosity of the function, by default True
+        Flag to enable or disable the print statements. Useful for multiprocessing.
 
     Raises
     ------
     Exception
-        Exception to handle if the user puts "extra" signals
+        Exception to handle if the user puts "extra" signals.
     """
 
     INFLUENCE = 1.5
@@ -374,12 +373,12 @@ def get_lmi(row: pd.Series, args: pd.Series,
 
 def run(opts):
     """
-    Funtion to run this section of METALoci with the needed arguments
+    Funtion to run this section of METALoci with the needed arguments.
 
     Parameters
     ----------
     opts : list
-        List of arguments
+        List of arguments.
     """
     if not opts.work_dir.endswith("/"):
 

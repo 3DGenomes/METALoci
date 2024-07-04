@@ -1,5 +1,5 @@
 """
-Creates a Kamada-Kawai layout from a Hi-C for a given region.
+Given a Hi-C and a region, this script creates a Kamada-Kawai layout for said region.
 """
 import glob
 import multiprocessing as mp
@@ -37,12 +37,12 @@ Creates a Kamada-Kawai layout from a Hi-C for a given region.
 
 def populate_args(parser):
     """
-    Function to give the main METALoci script the arguments needed to run the layout step
+    Function to give the main METALoci script the arguments needed to run the layout step.
 
     Parameters
     ----------
     parser : ArgumentParser
-        ArgumentParser to populate the arguments through the normal METALoci caller
+        ArgumentParser to populate the arguments through the normal METALoci caller.
     """
 
     # TODO We do not have the silent argument in this parser, don't know if we have to add it...
@@ -169,8 +169,7 @@ def populate_args(parser):
         help=SUPPRESS)
 
 
-def get_region_layout(row: pd.Series, args: pd.Series,
-                      progress=None, counter: int = None, silent: bool = True):
+def get_region_layout(row: pd.Series, args: pd.Series, progress=None, counter: int = None, silent: bool = True):
     """
     Function to get the Kamada-Kawai layout for a given region
 
@@ -178,14 +177,14 @@ def get_region_layout(row: pd.Series, args: pd.Series,
     ----------
     row : pd.Series
         Data of the region
-    args_2_use : pd.Series
+    args : pd.Series
         pd.Series with all the needed argument info to run the function
     progress : optional
         Information about if this region has been completed, by default None
     counter : int, optional
         Counter used for when multiprocessing is not active, by default None
     silent : bool, optional
-        Verbosity of the function, by default True
+        Flag to enable or disable the print statements. Useful for multiprocessing.
     """
 
     region_chrom, _, _, _ = re.split(r":|-|_", row.coords)
@@ -394,12 +393,12 @@ def get_region_layout(row: pd.Series, args: pd.Series,
 
 def run(opts: list):
     """
-    Funtion to run this section of METALoci with the needed arguments
+    Funtion to run this section of METALoci with the needed arguments.
 
     Parameters
     ----------
     opts : list
-        List of arguments
+        List of arguments.
     """
 
     if not opts.work_dir.endswith("/"):

@@ -1,6 +1,6 @@
 """
-Processes signal .bed files or .bedGraph files, binnarizing them at a given resolution,
-merging all signals in the same dataframe and subsetting by chromosomes.
+Processes signal .bed files or .bedGraph files, binnarizing them at a given resolution, merging all signals in the 
+same dataframe and subsetting by chromosomes.
 """
 
 import os
@@ -17,8 +17,7 @@ import h5py
 import hicstraw
 import pandas as pd
 from metaloci.misc import misc
-from numba.core.errors import (NumbaDeprecationWarning,
-                               NumbaPendingDeprecationWarning)
+from numba.core.errors import NumbaDeprecationWarning, NumbaPendingDeprecationWarning
 from pybedtools import BedTool
 from tqdm import tqdm
 
@@ -26,23 +25,22 @@ warnings.simplefilter('ignore', category=NumbaDeprecationWarning)
 warnings.simplefilter('ignore', category=NumbaPendingDeprecationWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
 
-
 HELP = "Processes signal .bed files to METALoci format."
 
 DESCRIPTION = """
-Processes signal .bed files or .bedGraph files, binnarizing them at a given resolution,
-merging all signals in the same dataframe and subsetting by chromosomes.
+Processes signal .bed files or .bedGraph files, binnarizing them at a given resolution, merging all signals in the 
+same dataframe and subsetting by chromosomes.
 """
 
 
 def populate_args(parser):
     """
-    Function to give the main METALoci script the arguments needed to run the prep step
+    Function to give the main METALoci script the arguments needed to run the prep step.
 
     Parameters
     ----------
     parser : ArgumentParser
-        ArgumentParser to populate the arguments through the normal METALoci caller
+        ArgumentParser to populate the arguments through the normal METALoci caller.
     """
 
     parser.formatter_class = lambda prog: HelpFormatter(prog, width=120, max_help_position=60)
@@ -133,12 +131,12 @@ def populate_args(parser):
 
 def run(opts: list):
     """
-    Funtion to run this section of METALoci with the needed arguments
+    Funtion to run this section of METALoci with the needed arguments.
 
     Parameters
     ----------
     opts : list
-        List of arguments
+        List of arguments.
     """
 
     work_dir = opts.work_dir

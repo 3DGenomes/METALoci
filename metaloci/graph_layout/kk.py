@@ -1,5 +1,6 @@
 """
-Script that contains the functions needed to create the Kamada-Kawai layout
+Functions to calculate the top interactions matrix subset, plot matrix and get restraints for the Kamada-Kawai layout
+processing.
 """
 import numpy as np
 from metaloci import mlo
@@ -65,7 +66,7 @@ def get_subset_matrix(mlobject: mlo.MetalociObject, optimise: bool = False, sile
 
     Notes
     -----
-    This function is called from::
+    This function is called from:
 
     get_restraints_matrix()
 

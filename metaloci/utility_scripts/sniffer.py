@@ -2,19 +2,18 @@
 Takes a .gft file or a .bed file and parses it into a region list, with a
 specific resolution and extension. The point of interest of the regions is the middle bin.
 """
-import sys
-import pathlib
 import os
+import pathlib
 import subprocess as sp
+import sys
 from argparse import SUPPRESS, HelpFormatter
 from datetime import timedelta
 from time import time
 
 import pandas as pd
+from metaloci.misc import misc
 from pybedtools import BedTool
 from tqdm import tqdm
-
-from metaloci.misc import misc
 
 HELP = "Converts a .gtf file to a list of regions for METALoci."
 
@@ -24,16 +23,15 @@ specific resolution and extension. The point of interest of the regions is the m
 
 def populate_args(parser):
     """
-    Function to give the main METALoci script the arguments needed to run the layout step
+    Function to give the main METALoci script the arguments needed to run the layout step.
 
     Parameters
     ----------
     parser : ArgumentParser
-        ArgumentParser to populate the arguments through the normal METALoci caller
+        ArgumentParser to populate the arguments through the normal METALoci caller.
     """
 
-    parser.formatter_class = lambda prog: HelpFormatter(prog, width=120,
-                                                        max_help_position=60)
+    parser.formatter_class = lambda prog: HelpFormatter(prog, width=120, max_help_position=60)
 
     input_arg = parser.add_argument_group(title="Input arguments")
 
@@ -115,12 +113,12 @@ def populate_args(parser):
 
 def run(opts: list):
     """
-    Funtion to run this section of METALoci with the needed arguments
+    Funtion to run this section of METALoci with the needed arguments.
 
     Parameters
     ----------
     opts : list
-        List of arguments
+        List of arguments.
     """
 
     work_dir = opts.work_dir
@@ -192,7 +190,6 @@ def run(opts: list):
     data = misc.binsearcher(ID_TSS, ID_CHROM, ID_NAME, bin_genome)
 
     print("Parsing the gene annotation file... Done.")
-
     print("Gathering information about bin index where the gene is located...")
     print(f"A total of {data.shape[0]} entries will be written to {os.path.join(work_dir, FN)}")
 
@@ -212,21 +209,25 @@ def run(opts: list):
         coords = f"{row.chrom}:{region_bin.iloc[0].start}-{region_bin.iloc[-1].end}"
 
         try:
+
             POI = region_bin[region_bin["index"] == row.bin_index].index.tolist()[0]
+
         except IndexError:
+
             print(row, region_bin.tail(), f"bin_start: {bin_start}", f"bin_end: {bin_end}",
                   f"bin_start pos from gene: {(row.bin_index - n_of_bins)}",
                   f"bin_end pos from gene: {(row.bin_index + n_of_bins)}",
                   f"{chrom_bin.index.max()}", sep="\n")
+            
             continue
 
         lines.append(f"{coords}_{POI}\t{row.gene_name}\t{row.gene_id}")
 
     with open(os.path.join(work_dir, FN), mode="w", encoding="utf-8") as handler:
+
         handler.write("\n".join(lines))
 
-    print("Cleaning temporary files...")
+    print("Cleaning tmp files...")
     sp.check_call(f"rm -rf {tmp_dir}/{resolution}bp_bin.bed {tmp_dir}/{resolution}bp_bin_unsorted.bed", shell=True)
-
     print(f"\nTotal time spent: {timedelta(seconds=round(time() - start_timer))}.")
     print("All done.")

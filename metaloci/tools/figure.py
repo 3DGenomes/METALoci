@@ -1,25 +1,33 @@
 """
-This script generates METALoci plots.
+This script generates METALoci plots from METALoci objects. The object needs to have a Kamakawa-Kawai layout and a 
+Local Moran's I already calculated. It will generate the following plots:
+    
+    * HiC matrix
+    * Signal plot
+    * Kamada-Kawai layout
+    * Local Moran's I scatterplot
+    * Gaudí plot for signal
+    * Gaudí plot for LMI quadrant
+    
+and a composite image with all of the above.
 """
+import glob
+import multiprocessing as mp
 import os
-import sys
 import pathlib
 import pickle
 import re
-import glob
 import subprocess as sp
-from argparse import HelpFormatter, SUPPRESS, RawTextHelpFormatter
-
+import sys
+from argparse import SUPPRESS, HelpFormatter
 from datetime import timedelta
 from time import time
 
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import pandas as pd
-from PIL import Image
-import multiprocessing as mp
-
 from metaloci.plot import plot
+from PIL import Image
 
 HELP = "Plots METALoci output."
 
@@ -36,12 +44,12 @@ and a composite image with all the above."""
 
 def populate_args(parser):
     """
-    Function to give the main METALoci script the arguments needed to run the layout step
+    Function to give the main METALoci script the arguments needed to run the layout step.
 
     Parameters
     ----------
     parser : ArgumentParser
-        ArgumentParser to populate the arguments through the normal METALoci caller
+        ArgumentParser to populate the arguments through the normal METALoci caller.
     """
 
     parser.formatter_class = lambda prog: HelpFormatter(prog, width=120, max_help_position=60)
@@ -173,6 +181,22 @@ def populate_args(parser):
 
 
 def get_figures(row: pd.Series, args: pd.Series, progress=None, counter: int = None, silent: bool = True):
+    """
+    Function to generate the figures for a given region, given that there is a .mlo file associated with it.
+
+    Parameters
+    ----------
+    row : pd.Series
+        Row from the DataFrame containing the regions of interest.
+    args : pd.Series
+        Arguments parsed from the user input.
+    progress : mp.Manager().dict
+        Dictionary to keep track of the progress in multiprocessing.
+    counter : int
+        Counter for the region being processed.
+    silent : bool
+        Flag to enable or disable the print statements. Useful for multiprocessing.
+    """
 
     if not silent:
         

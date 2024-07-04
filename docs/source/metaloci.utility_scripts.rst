@@ -1,6 +1,11 @@
 metaloci.utility\_scripts package
 =================================
 
+.. automodule:: metaloci.utility_scripts
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Submodules
 ----------
 
@@ -24,14 +29,6 @@ metaloci.utility\_scripts.sniffer module
 ----------------------------------------
 
 .. automodule:: metaloci.utility_scripts.sniffer
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Module contents
----------------
-
-.. automodule:: metaloci.utility_scripts
    :members:
    :undoc-members:
    :show-inheritance:

@@ -16,6 +16,7 @@ METALoci relies on spatial autocorrelation analysis, classically employed in geo
 METALoci is compatible with .cool, .mcool and .hic Hi-C formats; and with .bed signal files. The signal used in METALoci
 may be any numerical signal (as long as it is in a .bed file, with the location of such signal).
 
+#### Have a look at the [documentation](https://metaloci.readthedocs.io)!
 
 ## Installation
 
@@ -45,6 +46,6 @@ sudo apt install mawk
 
 ## Contributors
 
-METALoci is currently being developed at the `MarciusLab <http://www.marciuslab.org>` by Iago Maceda, 
+METALoci is currently being developed at the [MarciusLab](http://www.marciuslab.org) by Iago Maceda, 
 Marc A. Marti-Renom and Leo Zuber, with the contribution of other members of the lab.
 

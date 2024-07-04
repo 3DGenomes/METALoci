@@ -1,5 +1,5 @@
 """
-Script that contains helper functions of the METALoci package
+Miscellaneous functions for METALoci
 """
 import gzip
 import os
@@ -21,7 +21,7 @@ from metaloci.spatial_stats import lmi
 
 def signal_binnarize(data: pd.DataFrame, sum_type: str) -> pd.DataFrame:
     """
-    Parsing the signal data frame with the appropiate binnarizing method
+    Parsing the signal data frame with the appropiate summarising method.
 
     Parameters
     ----------
@@ -129,7 +129,7 @@ def check_diagonal(diagonal: np.ndarray) -> tuple[int, float, float, list]:
 
 def clean_matrix(mlobject: mlo.MetalociObject) -> mlo.MetalociObject:
     """
-    Clean a given HiC matrix. It checks if the matrix has too many zeroes at
+    Clean a given Hi-C matrix. It checks if the matrix has too many zeroes at
     he diagonal, removes values that are zero at the diagonal but are not in
     the rest of the matrix, adds pseudocounts to zeroes depending on the min
     value, scales all values depending on the min value and computes the log10
@@ -189,7 +189,7 @@ def clean_matrix(mlobject: mlo.MetalociObject) -> mlo.MetalociObject:
 
 def signal_normalization(region_signal: pd.DataFrame, pseudocounts: float = None, norm: str = None) -> np.ndarray:
     """
-    Normalize signal values
+    Normalize signal values.
 
     Parameters
     ----------
@@ -322,12 +322,12 @@ def natural_sort(element_list: list) -> list:
     Parameters
     ----------
     element_list : list
-        List to be sorted
+        List to be sorted.
 
     Returns
     -------
     sorted_element_list : list
-        Sorted list
+        Sorted list.
     """
 
     def convert(text): return int(text) if text.isdigit() else text.lower()
@@ -340,29 +340,28 @@ def natural_sort(element_list: list) -> list:
 
 def gtfparser(gene_file: Path, name: str, extend: int, resolution: int) -> tuple[dict, dict, dict, str]:
     """
-    Parses a gtf file and returns the information of the genes, excluding
-    artifacts
+    Parses a gtf file and returns the information of the genes, excluding artifacts
 
     Parameters
     ----------
     gene_file : str
-        Path to the file that contains the genes
+        Path to the file that contains the genes.
     name : str
-        Name of the project
+        Name of the project.
     extend : int
-        Extend of the region to be analyzed
+        Extent of the region to be analyzed.
     resolution : int
-        Resolution at which to split the genome
+        Resolution at which to split the genome.
 
     Returns
     -------
-    id_tss_f : dict
-        Dictionary linking the gene id to the tss
-    id_chrom_f : dict 
-        Dictionary linking the gene id to the chromosome
-    id_name_f : dict
-        Dictionary linking the gene id to the name
-    fn_f : str
+    id_chrom : dict 
+        Dictionary linking the gene id to the chromosome.
+    id_tss : dict
+        Dictionary linking the gene id to the tss.
+    id_name : dict
+        Dictionary linking the gene id to the name.
+    filename : str
         Name of the end file
     """
 
@@ -465,30 +464,29 @@ def gtfparser(gene_file: Path, name: str, extend: int, resolution: int) -> tuple
 
 def bedparser(gene_file_f: Path, name: str, extend: int, resolution: int) -> tuple[dict, dict, dict, str]:
     """
-    Parses a bed file and returns the information of the genes, excluding
-    artifacts.
+    Parses a bed file and returns the information of the genes, excluding artifacts.
 
     Parameters
     ----------
     gene_file : path
-        Path to the file that contains the genes
+        Path to the file that contains the genes.
     name : str
         Name of the project
     extend : int
-        Extend of the region to be analyzed
+        Extent of the region to be analyzed.
     resolution : int
-        Resolution at which to split the genome
+        Resolution at which to split the genome.
 
     Returns
     -------
-    id_tss_f : dict
-        Dictionary linking the gene id to the tss
-    id_chrom_f : dict
-        Dictionary linking the gene id to the chromosome
-    id_name_f : dict
-        Dictionary linking the gene id to the name
-    fn_f : str
-        Name of the end file
+    id_chrom : dict
+        Dictionary linking the gene id to the chromosome.
+    id_tss : dict
+        Dictionary linking the gene id to the tss.
+    id_name : dict
+        Dictionary linking the gene id to the name.
+    filename : str
+        Name of the end file.
     """
 
     id_tss = defaultdict(int)
@@ -511,37 +509,37 @@ def bedparser(gene_file_f: Path, name: str, extend: int, resolution: int) -> tup
     return id_chrom, id_tss, id_name, filename
 
 
-def binsearcher(id_tss_f: dict, id_chrom_f: dict, id_name_f: dict, bin_genome_f: pd.DataFrame) -> pd.DataFrame:
+def binsearcher(id_tss: dict, id_chrom: dict, id_name: dict, bin_genome: pd.DataFrame) -> pd.DataFrame:
     """
-    Searches the bin index where the gene is located    
+    Searches the bin index where the gene is located.
 
     Parameters
     ----------
-    id_tss_f : dict
-        Dictionary linking the gene id to the tss
-    id_chrom_f : dict
-        Dictionary linking the gene id to the chromosome
-    id_name_f : dict
-        Dictionary linking the gene id to the name
-    bin_genome_f : pd.DataFrame
-        DataFrame containing the bins of the genome
+    id_tss : dict
+        Dictionary linking the gene id to the tss.
+    id_chrom : dict
+        Dictionary linking the gene id to the chromosome.
+    id_name : dict
+        Dictionary linking the gene id to the name.
+    bin_genome : pd.DataFrame
+        DataFrame containing the bins of the genome.
 
     Returns
     -------
-    data_f : pd.DataFrame
+    data: pd.DataFrame
         DataFrame containing the information of the genes and the bin index
     """
 
     data = defaultdict(list)
 
-    for g_id, tss_pos in id_tss_f.items():
+    for g_id, tss_pos in id_tss.items():
 
-        chrom_bin = bin_genome_f[(bin_genome_f["chrom"] == id_chrom_f[g_id])]
+        chrom_bin = bin_genome[(bin_genome["chrom"] == id_chrom[g_id])]
         sub_bin_index = chrom_bin.loc[(chrom_bin["start"] <= tss_pos) & (chrom_bin["end"] >= tss_pos)].index[0]
 
-        data["chrom"].append(id_chrom_f[g_id])
+        data["chrom"].append(id_chrom[g_id])
         data["bin_index"].append(sub_bin_index)
-        data["gene_name"].append(id_name_f[g_id])
+        data["gene_name"].append(id_name[g_id])
         data["gene_id"].append(g_id)
 
     print("Aggregating genes that are located in the same bin...")
@@ -584,8 +582,7 @@ def write_bed(mlobject: mlo.MetalociObject, signal_type: str, neighbourhood: int
         on=["bin_index", "moran_index"],
         how="inner",
     )
-    bed = lmi.get_bed(mlobject, merged_lmi_geometry, neighbourhood, BFACT, args.quadrants, args.signipval,
-                      silent=silent)
+    bed = lmi.get_bed(mlobject, merged_lmi_geometry, neighbourhood, args.quadrants, args.signipval, silent=silent)
 
     if bed is not None and len(bed) > 0:
 
@@ -634,76 +631,24 @@ def write_moran_data(mlobject: mlo.MetalociObject, args, silent=False) -> None:
                   f"'{moran_data_path}/{re.sub(':|-', '_', mlobject.region)}_{signal}.tsv'")
 
 
-def meta_param_search(work_dir: str, hic: str, resolution: int, reso_file: str, pl: list, cutoff: float,
-                      sample_num: int, seed: int):
-    """
-    Test MetaLoci parameters to optimise Kamada-Kawai layout.
-
-    Parameters
-    ----------
-    work_dir_f : str
-        Path to working directory.
-    hic_f : str
-        Complete path to the cool/mcool/hic file.
-    reso_f : int
-        Hi-C resolution to be tested (in bp).
-    reso_file : str
-        Path to region file to be tested.
-    pl_f : _type_
-        Persistent length; amount of possible rotation of points in layout.
-    cutoff_f : float
-        Percent of top interactions to use from HiC.
-    sample_num_f : int
-        Number of regions to sample from the region file.
-    seed_f : int
-        Random seed for region sampling.
-    """
-
-    save_path = os.path.join(work_dir, f"reso_{resolution}_cutoff_{cutoff*100:.0f}_pl_{pl}")
-    Path(save_path).mkdir(parents=True, exist_ok=True)
-
-    ml_comm = f"metaloci layout -w {save_path} -c {hic}" + " -r {} -g {} --cutoff {} --pl {} --plot > /dev/null 2>&1"
-
-    regions = pd.read_table(reso_file)
-    sample = regions.sample(sample_num, random_state=seed)
-
-    for region_coords in sample['coords']:
-
-        sp.check_call(ml_comm.format(resolution, region_coords, cutoff, pl), shell=True)
-
-
 def get_poi_data(info_tuple: tuple):
-    # line_f: pd.Series, signals: list, work_dir_f: str,
-    # bad_file_filename: str, output_file: str,
-    # pval: float, quadrant_list: str,
-    # region_file: bool = False, rf_h=None):
     """
     Function to extract data from the METALoci objects and parse it into a table.
 
     Parameters
     ----------
-    line_f : pd.Series
-        Row of the gene file to parse.
-    signals_f : list
-        List of signals to parse.
-    work_dir_f : str
-        Path to working directory.
-    bf_f : str
-        Bad file name.
-    of : str
-        Output file name.
-    pval : float
-        P-value threshold.
-    quadrant_list : list
-        List of quadrants to consider.
-    region_file_f : bool, optional
-        Select whether or not to store a metaloci region file with the significant regions.
-    rf_h : str, optional
-        Region file name.
-
-    Returns
-    -------
-    None
+    info_tuple : tuple
+        Tuple containing the parameters to extract the data.
+        This tuple should contain the following elements:
+        - line: Line object
+        - signals: List of signals to extract the data from
+        - work_dir: Path to the working directory
+        - bad_file_filename: Path to the bad file
+        - output_file: Path to the output file
+        - pval: P-value to filter the data
+        - quadrant_list: List of quadrants to filter the data
+        - region_file: Boolean to indicate if a region file should be created
+        - rf: Path to the region file
     """
 
     if len(info_tuple) == 9:
@@ -724,7 +669,7 @@ def get_poi_data(info_tuple: tuple):
 
             bad_file_handler.write(f"{line.coords}\t{line.symbol}\t{line.id}\tno_file\n")
 
-        return None
+        return
 
     table_line = f"{line.coords}\t{line.symbol}\t{line.id}"
     region_line = f"{line.coords}\t{line.symbol}\t{line.id}"
@@ -739,7 +684,7 @@ def get_poi_data(info_tuple: tuple):
 
             bad_file_handler.write(f"{line.coords}\t{line.symbol}\t{line.id}\tcorrupt_file\n")
 
-        return None
+        return
 
     if mlo_data.bad_region:
 
@@ -747,7 +692,7 @@ def get_poi_data(info_tuple: tuple):
 
             bad_file_handler.write(f"{line.coords}\t{line.symbol}\t{line.id}\t{mlo_data.bad_region}\n")
 
-        return None
+        return
 
     bad_lines = []
 
@@ -787,10 +732,18 @@ def get_poi_data(info_tuple: tuple):
 
             regionfile_h.write(f"{region_line}\n")
 
-    return None
-
 
 def write_bad_region(mlobject, work_dir):
+    """
+    Writes the bad regions, after quality checking, to a file.
+
+    Parameters
+    ----------
+    mlobject : mlo.MetalociObject
+        METALoci object.
+    work_dir : str
+        Path to the working directory.
+    """
 
     with open(f"{work_dir}bad_regions.txt", "a+", encoding="utf-8") as handler:
 
@@ -801,3 +754,32 @@ def write_bad_region(mlobject, work_dir):
         if not any(mlobject.region in line.split('\t', 1)[0] for line in handler) and mlobject.bad_region is not None:
 
             handler.write(log)
+
+
+def has_exactly_one_line(file_path: str) -> bool:
+    """
+    Function to check if a file has exactly one line.
+
+    Parameters
+    ----------
+    file_path : str
+        Path to the file to check.
+
+    Returns
+    -------
+    bool
+        True if the file has exactly one line, False otherwise.
+    """
+    with open(file_path, mode="r", encoding="utf-8") as f:
+
+        line = f.readline()
+
+        if not line:
+
+            return False
+        
+        if f.readline():
+
+            return False
+        
+    return True

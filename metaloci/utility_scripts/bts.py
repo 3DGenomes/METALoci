@@ -168,7 +168,7 @@ def populate_args(parser):
                               help=SUPPRESS)
 
 
-def bts_ratio(hic_path, resolution, region, cutoff, pl):
+def bts_ratio(hic_path: str, resolution: int, region: str, cutoff: float, pl: float) -> float:
 
     """
     Calculate the ratio of the correlation between the linear and spherical layouts against the layout we actually
@@ -245,7 +245,7 @@ def bts_ratio(hic_path, resolution, region, cutoff, pl):
     
 def param_search(row: pd.Series, args: pd.Series, progress = None):
     """
-    Test MetaLoci parameters to optimise Kamada-Kawai layout.
+    Test METALoci parameters to optimise Kamada-Kawai layout.
 
     Parameters
     ----------
@@ -278,7 +278,7 @@ def param_search(row: pd.Series, args: pd.Series, progress = None):
         print(f"\t{progress['value']}/{sample_num} done.", end='\r')
 
 
-def sum_hic_columns(hic_path, resolution, region, cutoff,):
+def sum_hic_columns(hic_path: str, resolution: int, region: str, cutoff: float) -> float:
     """
     Function to count the number of interacctions in a subseted Hi-C matrix.
 
@@ -334,7 +334,7 @@ def sum_hic_columns(hic_path, resolution, region, cutoff,):
         return median_sum
 
 
-def pl_estimation(row: pd.Series, args: pd.Series, progress = None):
+def pl_estimation(row: pd.Series, args: pd.Series, progress = None) -> float:
     """
     Wrapper function to count the number of interacctions in a subseted Hi-C matrix.
 
@@ -346,6 +346,11 @@ def pl_estimation(row: pd.Series, args: pd.Series, progress = None):
         Arguments to test.
     progress : mp.Manager().dict
         Progress bar.
+
+    Returns
+    -------
+    sum_dict : dict
+        Dictionary with the sum of interactions for each set of parameters
     """
 
     sum_dict = {}
@@ -367,7 +372,7 @@ def pl_estimation(row: pd.Series, args: pd.Series, progress = None):
 
 def run(opts: list):
     """
-    Main function to run parameter search.
+    Main function to run bts.
 
     Parameters
     ----------

@@ -62,7 +62,7 @@ def populate_args(parser):
         metavar="PATH",
         type=str,
         required=True,
-        help="Path to the gene annotation file. Uncompressed GTF or bed files.",
+        help="Path to the gene annotation file. GTF or bed files.",
     )
 
     input_arg.add_argument(
@@ -104,6 +104,14 @@ def populate_args(parser):
     )
 
     optional_arg.add_argument(
+        "--ucsc",
+        dest="ucsc_bool",
+        required=False,
+        action="store_true",
+        help="The gene file is in UCSC format.",
+    )
+
+    optional_arg.add_argument(
         "-u",
         "--debug",
         dest="debug",
@@ -127,6 +135,7 @@ def run(opts: list):
     resolution = opts.resolution
     extension = opts.extension
     name = opts.name
+    ucsc_bool = opts.ucsc_bool
     debug = opts.debug
 
     if not work_dir.endswith("/"):
@@ -175,7 +184,11 @@ def run(opts: list):
 
     print("Parsing the gene annotation file...")
 
-    if "gtf" in gene_file:
+    if ucsc_bool:
+
+        ID_CHROM, ID_TSS, ID_NAME, FN = misc.ucscparser(gene_file, name, extension, resolution)
+
+    elif "gtf" in gene_file:
 
         ID_CHROM, ID_TSS, ID_NAME, FN = misc.gtfparser(gene_file, name, extension, resolution)
 

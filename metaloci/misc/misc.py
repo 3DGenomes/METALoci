@@ -337,6 +337,85 @@ def natural_sort(element_list: list) -> list:
 
     return sorted_element_list
 
+def ucscparser(gene_file: Path, name: str, extend: int, resolution: int) -> tuple[dict, dict, dict, str]:
+    """
+    Parses a UCSC file and returns the information of the genes, excluding artifacts.
+
+    Parameters
+    ----------
+    gene_file : str
+        Path to the file that contains the genes.
+    name : str
+        Name of the project.
+    extend : int
+        Extent of the region to be analyzed.
+    resolution : int
+        Resolution at which to split the genome.
+
+    Returns
+    -------
+    id_chrom : dict
+        Dictionary linking the gene id to the chromosome.
+    id_tss : dict
+        Dictionary linking the gene id to the tss.
+    id_name : dict
+        Dictionary linking the gene id to the name.
+    filename : str
+        Name of the end file.
+    """
+
+    myopen = gzip.open if gene_file.endswith("gz") else open
+
+    # Compile regular expressions
+    re_comment = re.compile("##")
+    re_chr = re.compile(r"chr\w+")
+    re_gene_id = re.compile(r'gene_id "(\S+)";')
+    re_gene_name = re.compile(r'gene_name "(\S+)";')
+
+    id_tss = defaultdict(int)
+    id_name = defaultdict(str)
+    id_chrom = defaultdict(str)
+
+    print("Using a UCSC annotation file. Considering anotated trasncripts as genes.")
+    print("Gathering information from the annotation file...")
+
+    with myopen(gene_file, mode="rt", encoding="utf-8") as ucsc_reader:
+
+        for line in ucsc_reader:
+
+            if re_comment.search(line) or not re_chr.search(line):
+
+                continue
+
+            line_s = line.split("\t")
+
+            # if line_s[0] contains "_" skip the line
+            if "_" in line_s[0]:
+                continue
+
+            if line_s[2] == "transcript" and line_s[0] != "chrM":
+
+                try:
+                    gene_id = re_gene_id.search(line).group(1)
+                except AttributeError:
+                    print(line)
+
+                # if gene_id has a version number, remove it
+                if "." in gene_id:
+                    gene_id = gene_id.split(".")[0]
+
+                if re_gene_name.search(line):
+                    gene_name = re_gene_name.search(line).group(1)
+                else:
+                    gene_name = gene_id
+
+                id_chrom[gene_id] = line_s[0]
+                id_name[gene_id] = gene_name
+                id_tss[gene_id] = int(line_s[3]) if line_s[6] == "+" else int(line_s[4])
+
+    filename = f"{name}_all_{extend}_{resolution}_agg.txt"
+
+    return id_chrom, id_tss, id_name, filename
 
 def gtfparser(gene_file: Path, name: str, extend: int, resolution: int) -> tuple[dict, dict, dict, str]:
     """

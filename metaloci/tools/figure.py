@@ -85,7 +85,6 @@ def populate_args(parser):
         dest="regions",
         metavar="PATH",
         type=str,
-        required=True,
         help="Region to apply LMI in format chrN:start-end_midpoint or file with the regions of interest. \
         If a file is provided, it must contain as a header 'coords', 'symbol' and 'id', and one region per line, \
         tab separated."
@@ -465,6 +464,9 @@ def run(opts: list):
     opts : list
         List of arguments
     """
+    if not opts.work_dir.endswith("/"):
+
+        opts.work_dir += "/"
 
     if opts.regions is None:
 
@@ -488,10 +490,6 @@ def run(opts: list):
     else:
 
         df_regions = pd.DataFrame({"coords": [opts.regions], "symbol": ["symbol"], "id": ["id"]})
-
-    if not opts.work_dir.endswith("/"):
-
-        opts.work_dir += "/"
 
     INFLUENCE = 1.5
     BFACT = 2

@@ -126,7 +126,7 @@ def populate_args(parser):
                               metavar='int',
                               type=int,
                               default=100,
-                              help="Numer of regions to sample from .txt file. (default: %(default)s)",
+                              help="Number of regions to sample from .txt file. (default: %(default)s)",
                               )
 
     optional_arg.add_argument('-o',
@@ -137,7 +137,7 @@ def populate_args(parser):
                               nargs='+',
                               default=[0.15, 0.175, 0.2, 0.225, 0.25],
                               help="""Percent of top interactions to use from HiC.
-                              METALoci Default = 0.2 (Normally 0.15 - 0.30)""")
+                              METALoci Default %(default)s""")
 
     optional_arg.add_argument('-l',
                               '--pls',
@@ -145,11 +145,9 @@ def populate_args(parser):
                               metavar='FLOAT',
                               type=float,
                               nargs='+',
-                            #   default=[9, 10, 11],
-                                default=None,
-                              help='Persistence length; usual values are between 9 and 12. Default is 9, 10, 11. '
-                              'You may want to add 8 and 12 to this list if your Hi-C matrix is of low quality or your'
-                              ' resolution is too high.')
+                              default=None,
+                              help='Persistence length; usual values are between 9 and 12, although this can vary a '
+                                'lot depending on the absolute values of your Hi-C matrix.')
 
     optional_arg.add_argument("-t"
                               "--threads",

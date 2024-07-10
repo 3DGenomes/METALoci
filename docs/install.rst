@@ -1,3 +1,5 @@
+.. _install:
+
 Installation
 ============
 
@@ -17,13 +19,14 @@ Install metaloci from PyPI:
     conda activate metaloci
     pip install metaloci
 
-If you are experiencing any unexpected results with METALoci, we suggest to update the version of awk you are using. The recommended version is 1.3.4 or newer.
+If you are experiencing any unexpected results with METALoci (e.g. your signal after binning is 0 for every bin), we 
+suggest to update the version of **awk** you are using. The recommended version is 5.1.0 or newer.
 
 In Ubuntu, you can do this with:
 
 .. code-block:: bash
 
-    sudo apt install mawk
+    sudo apt install gawk
 
 
 

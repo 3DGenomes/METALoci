@@ -1,5 +1,7 @@
-Crawler Python API
-==================
+.. _api:
+
+METALoci Python API
+===================
 
 * :ref:`modindex`
 

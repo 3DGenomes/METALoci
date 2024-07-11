@@ -3,8 +3,6 @@
 Tutorial
 ========
 
-Working on it.
-
 * :ref:`tutorial_intro`
 * :ref:`tutorial_beginning`
     * :ref:`downloading_example_data`

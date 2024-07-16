@@ -5,17 +5,12 @@ Installation
 
 *METALoci has only been tested in Ubuntu and Manjaro Linux distributions. MacOS support is not guaranteed.*
 
-METALoci requires bedtools to be installed and accesible from the conda environment you will use. You can install it with:
-
-.. code-block:: bash
-
-   conda install bedtools
-
 Install metaloci from PyPI:
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: bash
 
-    conda create -n metaloci python==3.9
+    conda create -n metaloci -c bioconda python==3.9 bedtools==2.31.1
     conda activate metaloci
     pip install metaloci
 

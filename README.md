@@ -18,19 +18,10 @@ may be any numerical signal (as long as it is in a .bed file, with the location 
 
 #### Have a look at the [documentation](https://metaloci.readthedocs.io)!
 
-## Installation
-
-METALoci requires bedtools to be installed and accesible from the conda environment you will use. You can install it
-with
+## Install metaloci from PyPI:
 
 ```bash
-conda install bedtools
-```
-
-#### Install metaloci from PyPI:
-
-```bash
-conda create -n metaloci python==3.9
+conda create -n metaloci -c bioconda python==3.9 bedtools==2.31.1
 conda activate metaloci
 pip install metaloci
 ```

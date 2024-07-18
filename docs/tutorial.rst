@@ -79,7 +79,7 @@ process. The structure of the file is as follows:
 .. code-block:: bash
 
     coords  symbol    id
-    chr:start-end_poi   symbol    id
+    chr19:41370000-45380000_200 Crtac1  ENSMUST00000238290.2
     ...
 
 Where:
@@ -106,15 +106,18 @@ only contains the regions of chromosome 19. You can generate the region file wit
 
     metaloci sniffer -w example_working_directory -s data/mm39_chrom_sizes.txt -g data/gencode.vM35.annotation_chr19.gtf.gz -r 10000 -e 2000000
 
-When prompted, select 'protein coding', with ``6 + ENTER``. This should create a new working directory and create a ``metaloci region file`` inside it.
+When prompted, select 'protein coding', with ``6 + ENTER``. This should create a new working directory and create a 
+``metaloci region file`` inside it.
+
+The ``-r`` flag is the resolution of the Hi-C matrix. It is recommended to use the highest resolution your Hi-C
+matrix can provide. The ``-e`` flag is the amount of bp --upstream and downstream-- to extend the region around the
+point of interest. These two parameters will determine the number of bins the Kamada-Kawai layout will have (in this 
+case, 4000000 / 10000 = 400 bins)
 
 .. note::
 
-    The ``-r`` flag is the resolution of the Hi-C matrix. It is recommended to use the highest resolution your Hi-C
-    matrix can provide. The ``-e`` flag is the amount of bp --upstream and downstream-- to extend the region around the
-    point of interest. These two parameters will determine the number of bins the Kamada-Kawai layout will have. The 
-    recommended amount of bins is around 400. In this case, 2Mb upstream and downstream would be 
-    4000000 / 10000 = 400 bins. A number of bins higher than 900 **is not recommended**.
+    The recommended amount of bins is around 400. In this case, 2Mb upstream and downstream would be 4000000 / 10000 = 
+    400 bins. **A number of bins higher than 900 is not recommended**.
 
 *You can read more about this script in the* :ref:`cli_usage` *section.*
 
@@ -182,16 +185,10 @@ for your Hi-C you will not need to run this sript ever again. You can skip runni
 Running 'metaloci layout'
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Now that we have all the necessary files, we can run the layout script. This script will generate the Kamada-Kawai layout
-for the Hi-C matrix. To run the layout script, use:
-
-.. code-block:: bash
-
-    metaloci layout -w example_working_directory -c data/hic/ICE_DM_5kb_eef0283c05_chr19.mcool -r 10000 -o 0.2 -l 7.044 
-
-This code will process all the regions in chromosome 19, because the ``metaloci region file`` is already present in 
-the working directory, as it was calculated with ``metaloci sniffer``. The command may take a while to run, so for the 
-sake of speed, we will only process the first 16 regions. To subset the file, run:
+Now that we have all the necessary files, we can run the ``metaloci layout`` script. This script will generate the 
+Kamada-Kawai layout for the Hi-C matrix. The script would use the ``metaloci region file`` that has been computed by
+``metaloci sniffer``, that contains all the regions in chromosome 19. fot he sake of speed, we will make a subset to 
+only process the first 16 regions. To subset the file, run:
 
 .. code-block:: bash
 
@@ -234,13 +231,16 @@ signal using Local Moran's Index. To do this, we will use the ``metaloci lm`` sc
 
 With the argument ``-s`` we can specify which signal we want to process. You can also specify a file with the names of 
 multiple signals, one per line. If you do not know the exact name of the signal, you can find it in the ``signal`` 
-folder.
+folder. The ``-b`` flag will output ``metaloci bed files``, with the location of the bins with significant 
+autocorrelation of the quadrants we specify.
 
-The script will process all the regions in the region file. The ``-m`` flag will set the use of multiprocessing, to 
-make things quicker. If you want more information printed on the screen, omit this flag (things will get slower). 
-The ``-b`` flag will output ``metaloci bed files``, with the location of the bins with significant autocorrelation of 
-the quadrants we specify (``-q`` argument, default is quadrant 1 and 3). The flag ``-i`` will 'unpickle' all the 
-information about the run in a ``.txt`` file.
+.. note::
+
+    The script will process all the regions in the region file, but you can specify another region file with the 
+    flag ``-g``. The ``-m`` flag will set the use of multiprocessing, to make things quicker. If you want more 
+    information printed on the screen, omit this flag (things will get slower). The ``-q`` argument, allows you to 
+    specify the quadrants that you will consider important in your run (default is quadrants 1 and 3). The flag ``-i`` 
+    will 'unpickle' all the information about the run in a ``.txt`` file.
 
 *You can read more about this script in the* :ref:`cli_usage` *section.*
 
@@ -286,7 +286,10 @@ Interpreting the results
     
     Example output for region chr19:41370000-45380000_200 in mm39 myeloid cells with ATAC-Seq.
 
-* The ``composite figure`` shows the results of the pipeline for a single region. The first plot is the ``Hi-C matrix``, with the region of interest highlighted. The second plot is the ``signal plot``, showing the distribution of the signal along the region. The signal plot has been highlighted according to significant ``metalocis`` --regions with a spatial  correlation of the signal-- found in the run. 
+The ``composite figure`` shows the results of the pipeline for a single region. The following plots have been generated:
+
+* The first plot is the ``Hi-C matrix``, with the region of interest highlighted. 
+* The second plot is the ``signal plot``, showing the distribution of the signal along the region. The signal plot has been highlighted according to significant ``metalocis`` --regions with a spatial  correlation of the signal-- found in the run. 
 
 * The ``scatter plot`` represents a linear correlation between the signal of a bin (x axis) and the signal of its neighbours (y axis), where only the significant bins have a solid colour. The plot is divided into four different quadrants, according to the spatial autocorrelation of the signal:
 

@@ -22,6 +22,7 @@ setuptools==59.8.0
 shapely==2.0.1
 tqdm==4.65.0
 adjustText==1.1.1
+docutils<0.21
 sphinx
 sphinx-rtd-theme
 sphinx-argparse

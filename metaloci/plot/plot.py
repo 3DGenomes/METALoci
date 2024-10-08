@@ -641,7 +641,8 @@ def get_lmi_scatterplot(mlobject: mlo.MetalociObject, merged_lmi_geometry: pd.Da
     plt.scatter(x=x, y=y, s=100, ec="white", fc=colors_sp, alpha=alpha_sp)
 
     sns.scatterplot(
-        x=[x[mlobject.poi]], y=[y[mlobject.poi]], s=150, ec="lime", fc="none", zorder=len(merged_lmi_geometry)
+        x=[x[mlobject.poi]], y=[y[mlobject.poi]], s=150, ec="lime", fc=colors_sp[mlobject.poi],
+        zorder=len(merged_lmi_geometry)
     )
     sns.regplot(x=x, y=y, scatter=False, color="k")
     sns.despine(top=True, right=True, left=False, bottom=False, offset=10, trim=False)

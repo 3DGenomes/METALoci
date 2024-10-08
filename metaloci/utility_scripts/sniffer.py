@@ -15,10 +15,14 @@ from metaloci.misc import misc
 from pybedtools import BedTool
 from tqdm import tqdm
 
-HELP = "Converts a .gtf file to a list of regions for METALoci."
+HELP = "Converts a .gtf/.bed file to a list of regions for METALoci."
 
 DESCRIPTION = """Takes a .gft file or a .bed file and parses it into a region list, with a
-specific resolution and extension. The point of interest of the regions is the middle bin."""
+specific resolution and extension. The point of interest of the regions is the middle bin.
+Human/mouse gtf files can be downloaded from the GENCODE website. For other species, please
+refer to the UCSC website. BED files can be used to create a custom region list, using the following format:
+chromosome, start, end, gene_symbol, gene_id. Strandness can be added to the bed file by adding a 6th column; if not,
+the script will consider the gene to be on the positive strand."""
 
 
 def populate_args(parser):
@@ -112,6 +116,14 @@ def populate_args(parser):
     )
 
     optional_arg.add_argument(
+        "--strand",
+        dest="strand",
+        required=False,
+        action="store_true",
+        help="The file has strand information. ONLY FOR BED FILES.",
+    )
+
+    optional_arg.add_argument(
         "-u",
         "--debug",
         dest="debug",
@@ -136,6 +148,7 @@ def run(opts: list):
     extension = opts.extension
     name = opts.name
     ucsc_bool = opts.ucsc_bool
+    strand = opts.strand
     debug = opts.debug
 
     if not work_dir.endswith("/"):
@@ -157,6 +170,8 @@ def run(opts: list):
         resolution: {resolution}
         extension: {extension}
         name: {name}
+        ucsc_bool: {ucsc_bool}
+        strand: {strand}
         """
         print(debug_info)
 
@@ -194,11 +209,24 @@ def run(opts: list):
 
     elif "bed" in gene_file:
 
-        ID_CHROM, ID_TSS, ID_NAME, FN = misc.bedparser(gene_file, name, extension, resolution)
+        # get the first line of gene_file and check if it has 5 or 6 columns
+        with open(gene_file, mode="r", encoding="utf-8") as handler:
+            first_line = handler.readline().strip().split("\t")
+
+        if strand and len(first_line) == 5:
+            sys.exit("ERROR: The bed file must have 6 columns to include strand information.")
+        elif not strand and len(first_line) == 6:
+            sys.exit("ERROR: The bed file must have 5 columns to exclude strand information.")
+
+        ID_CHROM, ID_TSS, ID_NAME, FN = misc.bedparser(gene_file, name, extension, resolution, strand)
 
     else:
 
         sys.exit("ERROR: The annotation file must be either a .gtf(.gz) or a .bed(.gz) file.")
+
+    # print(ID_CHROM)
+    # print(ID_TSS)
+    # print(ID_NAME)
 
     data = misc.binsearcher(ID_TSS, ID_CHROM, ID_NAME, bin_genome)
 
@@ -231,7 +259,7 @@ def run(opts: list):
                   f"bin_start pos from gene: {(row.bin_index - n_of_bins)}",
                   f"bin_end pos from gene: {(row.bin_index + n_of_bins)}",
                   f"{chrom_bin.index.max()}", sep="\n")
-            
+
             continue
 
         lines.append(f"{coords}_{POI}\t{row.gene_name}\t{row.gene_id}")

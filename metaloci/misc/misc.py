@@ -541,7 +541,8 @@ def gtfparser(gene_file: Path, name: str, extend: int, resolution: int) -> tuple
     return id_chrom, id_tss, id_name, filename
 
 
-def bedparser(gene_file_f: Path, name: str, extend: int, resolution: int) -> tuple[dict, dict, dict, str]:
+def bedparser(gene_file_f: Path, name: str, extend: int,
+              resolution: int, strand: bool = False) -> tuple[dict, dict, dict, str]:
     """
     Parses a bed file and returns the information of the genes, excluding artifacts.
 
@@ -555,6 +556,8 @@ def bedparser(gene_file_f: Path, name: str, extend: int, resolution: int) -> tup
         Extent of the region to be analyzed.
     resolution : int
         Resolution at which to split the genome.
+    strand : bool, optional
+        If the bed file contains the strand information, by default False.
 
     Returns
     -------
@@ -575,14 +578,21 @@ def bedparser(gene_file_f: Path, name: str, extend: int, resolution: int) -> tup
     print("Gathering information from the annotation file...")
 
     filename = f"{name}_all_{extend}_{resolution}_agg.txt"
-    bed_file = pd.read_table(gene_file_f, names=["coords", "symbol", "id"])
+
+    colnames = ["chrom", "start", "end", "symbol", "id"]
+
+    if strand:
+            colnames.append("strand")
+
+    bed_file = pd.read_table(gene_file_f, names=colnames)
 
     for _, row in bed_file.iterrows():
 
-        coords = row.coords.split(":")
-
-        id_chrom[row.id] = coords[0]
-        id_tss[row.id] = int(coords[1])
+        id_chrom[row.id] = row.chrom
+        if strand:
+            id_tss[row.id] = row.start if row.strand == "+" else row.end
+        else:
+            id_tss[row.id] = row.start
         id_name[row.id] = row.symbol
 
     return id_chrom, id_tss, id_name, filename

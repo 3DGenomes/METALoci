@@ -59,6 +59,8 @@ def populate_args(parser):
         metavar="FILE",
         type=str,
         required=True,
+        nargs="*",
+        action="extend",
         help="Path to the file with the samples/signals to use."
     )
 
@@ -402,15 +404,33 @@ def run(opts):
     elif os.path.isfile(opts.region_file):
 
         df_regions = pd.read_table(opts.region_file)
-
+        
     else:
 
         df_regions = pd.DataFrame({"coords": [opts.region_file], "symbol": ["symbol"], "id": ["id"]})
 
+    if len(opts.signals) == 1:
+        if os.path.isfile(opts.signals[0]) and os.access(opts.signals[0], os.R_OK):
+
+            with open(opts.signals[0], "r", encoding="utf-8") as handler:
+
+                signals = [line.strip() for line in handler]
+        
+        else:
+                
+                signals = [opts.signals[0]]
+        
+    else:
+        if os.path.isfile(opts.signals[0]) and os.path.isfile(opts.signals[1]):
+
+            sys.exit("Please provide only one file with signals to plot.")
+                
+        signals = opts.signals
+
     if opts.debug:
 
         print(f"work_dir ->\n\t{opts.work_dir}")
-        print(f"signals ->\n\t{opts.signals}")
+        print(f"signals ->\n\t{signals}")
         print(f"regions ->\n\t{opts.region_file}")
         print(f"n_permutations ->\n\t{opts.perms}")
         print(f"signipval ->\n\t{opts.signipval}")
@@ -432,7 +452,7 @@ def run(opts):
             agg_dict[row[1]].append(row[0])
 
     args = pd.Series({"work_dir": opts.work_dir,
-                      "signals": opts.signals,
+                      "signals": signals,
                       "n_permutations": opts.perms,
                       "signipval": opts.signipval,
                       "aggregate": opts.agg,

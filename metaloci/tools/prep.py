@@ -8,6 +8,7 @@ import pathlib
 import subprocess as sp
 import sys
 import warnings
+import re
 from argparse import SUPPRESS, HelpFormatter
 from datetime import timedelta
 from time import time
@@ -161,6 +162,12 @@ def run(opts: list):
         print(f"sum_type ->\n\t{sum_type}")
 
         sys.exit()
+
+    awk_ver = re.search(r'GNU Awk (\d+\.\d+\.?\d?)', sp.getoutput("awk -V | head -1")).group(1)
+    
+    if awk_ver < "5.1.0":
+        
+        sys.exit("Please, install GNU Awk version 5.1.0 or greater.")
 
     start_timer = time()
     tmp_dir = os.path.join(work_dir, "tmp")

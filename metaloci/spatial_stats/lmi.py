@@ -128,7 +128,7 @@ def coord_to_id(mlobject: mlo.MetalociObject, poly_from_lines: list) -> dict:
     return coord_id_dict
 
 
-def load_region_signals(mlobject: mlo.MetalociObject, signal_data: dict, signal_file: Path) -> dict:
+def load_region_signals(mlobject: mlo.MetalociObject, signal_data: dict, signal_types: list) -> dict:
     """
     Does a subset of the signal file to contain only the signal corresponding to the region being processed.
 
@@ -149,17 +149,6 @@ def load_region_signals(mlobject: mlo.MetalociObject, signal_data: dict, signal_
     signal_types : list(str)
         List containing the signal types to compute for this region.
     """
-
-    # Read signal file. Will only process the signals present in this list.
-    if os.path.isfile(signal_file):
-
-        with open(signal_file, "r", encoding="utf-8") as signals_handler:
-
-            signal_types = [line.rstrip() for line in signals_handler]
-
-    else:
-
-        signal_types = [signal_file]
 
     if not all(signal in signal_data.columns for signal in signal_types):
 

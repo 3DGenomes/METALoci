@@ -60,9 +60,9 @@ def populate_args(parser):
         "-w",
         "--work-dir",
         dest="work_dir",
-        required=True,
         metavar="PATH",
         type=str,
+        required=True,
         help="Path to working directory."
     )
 
@@ -105,6 +105,15 @@ def populate_args(parser):
         action="store_false",
         default=True,
         help="Preserve temporal .png image files that are used for making the composed figure (default: %(default)s)."
+    )
+
+    optional_arg.add_argument(
+        "-C",
+        "--clean-matrix",
+        dest="clean_matrix",
+        action="store_true",
+        help="Flag to plot the 'clean' Hi-C matrix (the one METALoci uses to calculate the Kamada-Kawai layout) \
+            instead of the 'original' Hi-C matrix (default: %(default)s)."
     )
 
     optional_arg.add_argument(
@@ -259,7 +268,7 @@ def get_figures(row: pd.Series, args: pd.Series, progress=None, counter: int = N
             
             print("\t\tHi-C plot", end="\r")
 
-        hic_plt = plot.get_hic_plot(mlobject)
+        hic_plt = plot.get_hic_plot(mlobject, clean_mat=args.clean_matrix)
 
         hic_plt.savefig(f"{plot_filename}_hic.pdf", **plot_opt)
         hic_plt.savefig(f"{plot_filename}_hic.png", **plot_opt)
@@ -497,12 +506,26 @@ def run(opts: list):
     # Functions assume this schema of colors if the user says nothing.
     # colors = {1: "firebrick", 2: "lightskyblue", 3: "steelblue", 4: "orange"}
 
-    # Parse list of signals to plot. If it is a file, strip it, if there are
-    if os.path.isfile(opts.signals[0]) and os.access(opts.signals[0], os.R_OK):
+    # Parse list of signals to plot. Check if there is only one. Then check if it is a file, if so read it and store
+    # the signals in a list. If not, store the signal in a list. If there are more than one signal, check if they are
+    # files, if so exit. If not, store the signals in a list.
+    if len(opts.signals) == 1:
+        if os.path.isfile(opts.signals[0]) and os.access(opts.signals[0], os.R_OK):
 
-        with open(opts.signals[0], "r", encoding="utf-8") as handler:
+            with open(opts.signals[0], "r", encoding="utf-8") as handler:
 
-            signals = [line.strip() for line in handler]
+                signals = [line.strip() for line in handler]
+        
+        else:
+                
+                signals = [opts.signals[0]]
+        
+    else:
+        if os.path.isfile(opts.signals[0]) and os.path.isfile(opts.signals[1]):
+
+            sys.exit("Please provide only one file with signals to plot.")
+                
+        signals = opts.signals
 
     if opts.mark_regions is not None:
 
@@ -517,10 +540,10 @@ def run(opts: list):
         print(f"work_dir ->\n\t{opts.work_dir}")
         print(f"regions ->\n\t{opts.regions}")
         print(f"signals ->\n\t{signals}")
-        print(f"metaloci_only ->\n\t{opts.metaloci_only}")
-        print(f"quadrants ->\n\t{opts.quadrants}")
+        print(f"metaloci_only ->\n\t{opts.metalocis}")
+        print(f"quadrants ->\n\t{opts.quart}")
         print(f"signipval ->\n\t{opts.signipval}")
-        print(f"rmtypes ->\n\t{opts.rmtypes}")
+        print(f"rmtypes ->\n\t{opts.rm_types}")
         print(f"mark_regions ->\n\t{mark_regions}")
         print(f"influence ->\n\t{INFLUENCE}")
         print(f"bfact ->\n\t{BFACT}")
@@ -529,7 +552,7 @@ def run(opts: list):
 
 
     parsed_args = pd.Series({"work_dir": opts.work_dir,
-                             "signals": opts.signals,
+                             "signals": signals,
                              "metaloci_only": opts.metalocis,
                              "quadrants":  [int(x) for x in opts.quart],
                              "signipval": opts.signipval,

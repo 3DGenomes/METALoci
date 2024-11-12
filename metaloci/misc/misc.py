@@ -582,7 +582,7 @@ def bedparser(gene_file_f: Path, name: str, extend: int,
     colnames = ["chrom", "start", "end", "symbol", "id"]
 
     if strand:
-            colnames.append("strand")
+        colnames.append("strand")
 
     bed_file = pd.read_table(gene_file_f, names=colnames)
 

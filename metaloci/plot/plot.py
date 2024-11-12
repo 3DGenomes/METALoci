@@ -211,7 +211,7 @@ def get_kk_plot(mlobject: mlo.MetalociObject, restraints: bool = True, neighbour
     return kk_plt
 
 
-def get_hic_plot(mlobject: mlo.MetalociObject, cmap_user: str = "YlOrRd"):
+def get_hic_plot(mlobject: mlo.MetalociObject, cmap_user: str = "YlOrRd", clean_mat: bool = False):
     """
     Create a plot of the HiC matrix for the region. Only the upper triangle of the array is represented, rotated
     45ª counter-clock wise.
@@ -222,6 +222,8 @@ def get_hic_plot(mlobject: mlo.MetalociObject, cmap_user: str = "YlOrRd"):
         METALoci object with a matrix (MetalociObject.matrix) in it.
     cmap_user : str
         Color map used on the plotting of the HiC data, by default YlOrRd.
+    clean_mat : bool
+        If True, the function will use the subset matrix, otherwise it will use the original matrix, by default False.
 
     Returns
     -------
@@ -230,7 +232,15 @@ def get_hic_plot(mlobject: mlo.MetalociObject, cmap_user: str = "YlOrRd"):
     """
 
     poi_factor = mlobject.poi / mlobject.lmi_geometry["bin_index"].shape[0]
-    array = mlobject.matrix
+
+    if clean_mat:
+
+        array = mlobject.subset_matrix
+
+    else:
+
+        array = mlobject.matrix
+
     matrix_min_value = np.nanmin(array)
     matrix_max_value = np.nanmax(array)
     array = rotate(np.triu(np.nan_to_num(array, nan=0), -1), angle=45)  # Rotate get crazy when rotating with nans.

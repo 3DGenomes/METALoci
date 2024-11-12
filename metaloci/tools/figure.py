@@ -523,28 +523,11 @@ def run(opts: list):
     # the signals in a list. If not, store the signal in a list. If there are more than one signal, check if they are
     # files, if so exit. If not, store the signals in a list.
     if len(opts.signals) == 1:
-
-        if os.path.isfile(opts.signals[0]) and os.access(opts.signals[0], os.R_OK):
-    # Parse list of signals to plot. Check if there is only one. Then check if it is a file, if so read it and store
-    # the signals in a list. If not, store the signal in a list. If there are more than one signal, check if they are
-    # files, if so exit. If not, store the signals in a list.
-    if len(opts.signals) == 1:
         if os.path.isfile(opts.signals[0]) and os.access(opts.signals[0], os.R_OK):
 
                 with open(opts.signals[0], "r", encoding="utf-8") as handler:
 
                     signals = [line.strip() for line in handler]
-        
-        else:
-                
-                signals = [opts.signals[0]]
-        
-    else:
-        if os.path.isfile(opts.signals[0]) and os.path.isfile(opts.signals[1]):
-
-            sys.exit("Please provide only one file with signals to plot.")
-                
-        signals = opts.signals
         
         else:
                 

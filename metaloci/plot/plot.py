@@ -16,14 +16,15 @@ from adjustText import adjust_text
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.lines import Line2D
 from matplotlib.ticker import FormatStrFormatter, MaxNLocator
-from metaloci import mlo
-from metaloci.graph_layout import kk
-from metaloci.misc import misc
 from PIL import Image
 from pybedtools import BedTool
 from scipy.ndimage import rotate
 from scipy.stats import linregress
 from shapely.geometry import Point
+
+from metaloci import mlo
+from metaloci.graph_layout import kk
+from metaloci.misc import misc
 
 
 def mixed_matrices_plot(mlobject: mlo.MetalociObject):
@@ -147,6 +148,7 @@ def kk_plot_to_subplot(ax, mlobject: mlo.MetalociObject, restraints: bool = True
     poi_x, poi_y = xs[mlobject.poi], ys[mlobject.poi]
 
     if neighbourhood:
+
         circle = plt.Circle((poi_x, poi_y), neighbourhood, color="red",
                             fill=False, linestyle=":", alpha=0.5, lw=1, zorder=3)
         ax.add_patch(circle)
@@ -356,7 +358,7 @@ def get_gaudi_signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFra
 
 
 def get_gaudi_type_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame,
-                        signipval: float = 0.05, colors_lmi: dict = None, mark_regions=None
+                        signipval: float = 0.05, colors_lmi: dict = None, mark_regions=None, neighbourhood=False
                         ):
     """
     Get a Gaudí type plot.
@@ -445,6 +447,22 @@ def get_gaudi_type_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame
         fc="lime",
         zorder=len(lmi_geometry),
     )
+
+    xs = [lmi_geometry.X[n] for n in lmi_geometry.index]
+    ys = [lmi_geometry.Y[n] for n in lmi_geometry.index]
+
+    poi_x, poi_y = xs[mlobject.poi], ys[mlobject.poi]
+
+    if neighbourhood:
+
+        INFLUENCE = 1.5
+        BFACT = 2
+
+        neighbourhood_value = mlobject.kk_distances.diagonal(1).mean() * INFLUENCE * BFACT
+
+        circle = plt.Circle((poi_x, poi_y), neighbourhood_value, color="black",
+                            fill=False, linestyle=":", alpha=0.5, lw=1.5, zorder=3)
+        ax.add_patch(circle)
 
     ax.legend(handles=legend_elements, frameon=False, fontsize=20, loc="center left", bbox_to_anchor=(1, 0.5))
 

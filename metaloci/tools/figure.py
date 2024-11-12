@@ -26,8 +26,9 @@ from time import time
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import pandas as pd
-from metaloci.plot import plot
 from PIL import Image
+
+from metaloci.plot import plot
 
 HELP = "Plots METALoci output."
 
@@ -117,17 +118,6 @@ def populate_args(parser):
     )
 
     optional_arg.add_argument(
-        "-M",
-        "--metalocis",
-        dest="metalocis",
-        action="store_true",
-        help="Flag to select highlightning of the signal plots. If True, only the neighbouring bins from the point of \
-        interest will be highlighted (independently of the quadrant and significance of those bins, but only if the \
-        point of interest is significant). If False, all significant regions that correspond to the quadrant selected \
-        with -q will be highlighted (default: False)."
-    )
-
-    optional_arg.add_argument(
         "-q",
         "--quarts",
         dest="quart",
@@ -149,16 +139,6 @@ def populate_args(parser):
         metavar="FLOAT",
         type=float,
         help="P-value significance threshold (default: %(default)s).",
-    )
-
-    optional_arg.add_argument(
-        "-k",
-        "--mark_regions",
-        dest="mark_regions",
-        metavar="PATH",
-        type=str,
-        help="Path to a file to mark certain regions on the gaudí plots. The file must have the following columns "
-        "(tab-separated): region_metaloci chr start end label. The label will be used to mark the region on the plot."
     )
 
     optional_arg.add_argument(
@@ -186,6 +166,38 @@ def populate_args(parser):
         dest="debug",
         action="store_true",
         help=SUPPRESS)
+    
+    style_arg = parser.add_argument_group(title="Style arguments")
+
+    style_arg.add_argument(
+        "-M",
+        "--metalocis",
+        dest="metalocis",
+        action="store_true",
+        help="Flag to select highlightning of the signal plots. If True, only the neighbouring bins from the point of \
+        interest will be highlighted (independently of the quadrant and significance of those bins, but only if the \
+        point of interest is significant). If False, all significant regions that correspond to the quadrant selected \
+        with -q will be highlighted (default: False)."
+    )
+
+    style_arg.add_argument(
+        "-k",
+        "--mark_regions",
+        dest="mark_regions",
+        metavar="PATH",
+        type=str,
+        help="Path to a file to mark certain regions on the gaudí plots. The file must have the following columns "
+        "(tab-separated): region_metaloci chr start end label. The label will be used to mark the region on the plot."
+    )
+
+    style_arg.add_argument(
+        "-n",
+        "--neighbourhood",
+        dest="neighbourhood_circle",
+        action="store_true",
+        help="Flag to plot the neighbourhood on the Gaudí plot. This is the influence radious around the point of "
+        "interest that will be considered part of the metaloci. (default: False)."
+    )
 
 
 def get_figures(row: pd.Series, args: pd.Series, progress=None, counter: int = None, silent: bool = True):
@@ -308,7 +320,8 @@ def get_figures(row: pd.Series, args: pd.Series, progress=None, counter: int = N
             print("\t\tGaudi Signal plot -> done.")
             print("\t\tGaudi Type plot", end="\r")
 
-        gt_plt = plot.get_gaudi_type_plot(mlobject, merged_lmi_geometry, args.signipval, mark_regions=args.mark_regions)
+        gt_plt = plot.get_gaudi_type_plot(mlobject, merged_lmi_geometry, args.signipval, mark_regions=args.mark_regions,
+                                          neighbourhood=args.neighbourhood_circle)
         gt_plt.savefig(f"{plot_filename}_gtp.pdf", **plot_opt)
         gt_plt.savefig(f"{plot_filename}_gtp.png", **plot_opt)
         plt.close()
@@ -510,17 +523,35 @@ def run(opts: list):
     # the signals in a list. If not, store the signal in a list. If there are more than one signal, check if they are
     # files, if so exit. If not, store the signals in a list.
     if len(opts.signals) == 1:
+
+        if os.path.isfile(opts.signals[0]) and os.access(opts.signals[0], os.R_OK):
+    # Parse list of signals to plot. Check if there is only one. Then check if it is a file, if so read it and store
+    # the signals in a list. If not, store the signal in a list. If there are more than one signal, check if they are
+    # files, if so exit. If not, store the signals in a list.
+    if len(opts.signals) == 1:
         if os.path.isfile(opts.signals[0]) and os.access(opts.signals[0], os.R_OK):
 
-            with open(opts.signals[0], "r", encoding="utf-8") as handler:
+                with open(opts.signals[0], "r", encoding="utf-8") as handler:
 
-                signals = [line.strip() for line in handler]
+                    signals = [line.strip() for line in handler]
         
         else:
                 
                 signals = [opts.signals[0]]
         
     else:
+        if os.path.isfile(opts.signals[0]) and os.path.isfile(opts.signals[1]):
+
+            sys.exit("Please provide only one file with signals to plot.")
+                
+        signals = opts.signals
+        
+        else:
+                
+                signals = [opts.signals[0]]
+        
+    else:
+
         if os.path.isfile(opts.signals[0]) and os.path.isfile(opts.signals[1]):
 
             sys.exit("Please provide only one file with signals to plot.")
@@ -543,7 +574,7 @@ def run(opts: list):
         print(f"metaloci_only ->\n\t{opts.metalocis}")
         print(f"quadrants ->\n\t{opts.quart}")
         print(f"signipval ->\n\t{opts.signipval}")
-        print(f"rmtypes ->\n\t{opts.rm_types}")
+        print(f"rmtypes ->\n\t{opts.rm__types}")
         print(f"mark_regions ->\n\t{mark_regions}")
         print(f"influence ->\n\t{INFLUENCE}")
         print(f"bfact ->\n\t{BFACT}")
@@ -561,7 +592,9 @@ def run(opts: list):
                              "debug": opts.debug,
                              "total_num": len(df_regions),
                              "INFLUENCE": INFLUENCE,
-                             "BFACT": BFACT
+                             "BFACT": BFACT,
+                             "clean_matrix": opts.clean_matrix,
+                             "neighbourhood_circle": opts.neighbourhood_circle
                              })
 
     start_timer = time()

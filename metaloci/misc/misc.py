@@ -720,41 +720,23 @@ def write_moran_data(mlobject: mlo.MetalociObject, args, silent=False) -> None:
                   f"'{moran_data_path}/{re.sub(':|-', '_', mlobject.region)}_{signal}.tsv'")
 
 
-def get_poi_data(info_tuple: tuple):
+def get_poi_data(line: pd.Series, args: pd.Series):
     """
     Function to extract data from the METALoci objects and parse it into a table.
 
     Parameters
     ----------
-    info_tuple : tuple
-        Tuple containing the parameters to extract the data.
-        This tuple should contain the following elements:
-        - line: Line object
-        - signals: List of signals to extract the data from
-        - work_dir: Path to the working directory
-        - bad_file_filename: Path to the bad file
-        - output_file: Path to the output file
-        - pval: P-value to filter the data
-        - quadrant_list: List of quadrants to filter the data
-        - region_file: Boolean to indicate if a region file should be created
-        - rf: Path to the region file
+    line : pd.Series
+        Row of the DataFrame.
+    args : pd.Series
+        Arguments from the command line.
     """
-
-    if len(info_tuple) == 9:
-
-        line, signals, work_dir, bad_file_filename, output_file, pval, quadrant_list, region_file, rf = info_tuple
-
-    else:
-        
-        line, signals, work_dir, bad_file_filename, output_file, pval, quadrant_list = info_tuple
-        region_file = False
-        rf = None
 
     mlo_filename = f"{line.coords.replace(':', '_').replace('-', '_')}.mlo"
 
-    if not os.path.exists(os.path.join(work_dir, mlo_filename.split("_")[0], 'objects', mlo_filename)):
+    if not os.path.exists(os.path.join(args.work_dir, mlo_filename.split("_")[0], 'objects', mlo_filename)):
 
-        with open(bad_file_filename, mode="a", encoding="utf-8") as bad_file_handler:
+        with open(args.bad_file_name, mode="a", encoding="utf-8") as bad_file_handler:
 
             bad_file_handler.write(f"{line.coords}\t{line.symbol}\t{line.id}\tno_file\n")
 
@@ -765,11 +747,11 @@ def get_poi_data(info_tuple: tuple):
 
     try:
 
-        mlo_data = pd.read_pickle(os.path.join(work_dir, mlo_filename.split("_")[0],'objects', mlo_filename))
+        mlo_data = pd.read_pickle(os.path.join(args.work_dir, mlo_filename.split("_")[0],'objects', mlo_filename))
 
     except UnpicklingError:
 
-        with open(bad_file_filename, mode="a", encoding="utf-8") as bad_file_handler:
+        with open(args.bad_file_name, mode="a", encoding="utf-8") as bad_file_handler:
 
             bad_file_handler.write(f"{line.coords}\t{line.symbol}\t{line.id}\tcorrupt_file\n")
 
@@ -777,7 +759,7 @@ def get_poi_data(info_tuple: tuple):
 
     if mlo_data.bad_region:
 
-        with open(bad_file_filename, mode="a", encoding="utf-8") as bad_file_handler:
+        with open(args.bad_file_name, mode="a", encoding="utf-8") as bad_file_handler:
 
             bad_file_handler.write(f"{line.coords}\t{line.symbol}\t{line.id}\t{mlo_data.bad_region}\n")
 
@@ -785,7 +767,7 @@ def get_poi_data(info_tuple: tuple):
 
     bad_lines = []
 
-    for signal in signals:
+    for signal in args.signal_list:
 
         try:
 
@@ -793,9 +775,9 @@ def get_poi_data(info_tuple: tuple):
 
             table_line += f"\t{poi_data['moran_quadrant']}\t{poi_data['LMI_score']}\t{poi_data['LMI_pvalue']}\t{poi_data['ZSig']}\t{poi_data['ZLag']}"
 
-            if region_file:
+            if args.region_file:
 
-                if poi_data['moran_quadrant'] in quadrant_list and poi_data['LMI_pvalue'] <= pval:
+                if poi_data['moran_quadrant'] in args.quadrant_list and poi_data['LMI_pvalue'] <= args.pval:
 
                     region_line += table_line
 
@@ -807,17 +789,17 @@ def get_poi_data(info_tuple: tuple):
 
             bad_lines.append(f"{line.coords}\t{line.symbol}\t{line.id}\tno_signal_{signal}")
 
-    with open(bad_file_filename, mode="a", encoding="utf-8") as bad_file_handler:
+    with open(args.bad_file_name, mode="a", encoding="utf-8") as bad_file_handler:
 
         bad_file_handler.write('\n'.join(bad_lines))
 
-    with open(output_file, mode="a", encoding="utf-8") as output_file_handler:
+    with open(args.out_file_name, mode="a", encoding="utf-8") as output_file_handler:
 
         output_file_handler.write(f"{table_line}\n")
 
-    if region_file:
+    if args.region_file:
 
-        with open(rf, mode="a", encoding="utf-8") as regionfile_h:
+        with open(args.region_file_name, mode="a", encoding="utf-8") as regionfile_h:
 
             regionfile_h.write(f"{region_line}\n")
 

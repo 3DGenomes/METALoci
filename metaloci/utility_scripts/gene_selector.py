@@ -215,6 +215,7 @@ def run(opts: list):
         print("Region file will not be computed because more than one signal was selected.")
 
         region_file = False
+        region_file_name = None
 
     try:
         
@@ -251,37 +252,20 @@ def run(opts: list):
         with open(region_file_name, mode="w", encoding="utf-8") as region_file_handler:
 
             region_file_handler.write(f"{HEADER}\n")
-
-        args = [(line, signal_list, work_dir, bad_file_name, out_file_name, pval,
-                    quadrant_list, region_file, region_file_name) for line in genes.itertuples(index=False)]
-
-    else:
-
-        args = [(line, signal_list, work_dir, bad_file_name, out_file_name, pval,
-                    quadrant_list) for _, line in genes.iterrows()]
-
-    try:
         
-        # This piece of code works, but not progress bar
-        # with mp.Pool(processes=ncpus) as pool:
-        #     pool.starmap(misc.get_poi_data, args2do)
-        # pool.close()
-        # pool.join()
-
-        # This piece of code works, has a progress bar, but the way it "counts" is weird (it counts the start of
-        # the process, not the end of it)
-        pbar = tqdm(total=len(args))
-
-        def update(*a):
-
-            pbar.update()
+    parsed_args = pd.Series({"signal_list": signal_list,
+                             "work_dir": work_dir,
+                             "bad_file_name": bad_file_name,
+                             "out_file_name": out_file_name,
+                             "pval": pval,
+                             "quadrant_list": quadrant_list,
+                             "region_file": region_file,
+                             "region_file_name": region_file_name})
+    
+    try:
 
         with mp.Pool(processes=threads) as pool:
-
-            for i in range(pbar.total):
-
-                pool.apply_async(misc.get_poi_data, args=(args[i]), callback=update)
-
+            pool.starmap(misc.get_poi_data, [(row, parsed_args) for _, row in genes.iterrows()])
         pool.close()
         pool.join()
 

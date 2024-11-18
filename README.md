@@ -37,6 +37,6 @@ sudo apt install gawk
 
 ## Contributors
 
-METALoci is currently being developed at the [MarciusLab](http://www.marciuslab.org) by Iago Maceda, 
-Marc A. Marti-Renom and Leo Zuber, with the contribution of other members of the lab.
+METALoci is currently being developed at the [MarciusLab](http://www.marciuslab.org) by Leo Zuber, Iago Maceda and
+Marc A. Marti-Renom, with the original contribution of Juan Antonio Rodríguez as well as other members of the lab.
 

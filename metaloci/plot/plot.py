@@ -59,7 +59,7 @@ def mixed_matrices_plot(mlobject: mlo.MetalociObject):
     mlobject.mixed_matrices = upper_triangle + lower_triangle
 
     if mlobject.flat_matrix is None:
-        
+
         print("Flat matrix not found in metaloci object. Run get_subset_matrix() first.")
         return None
 
@@ -118,6 +118,7 @@ def kk_plot_to_subplot(ax, mlobject: mlo.MetalociObject, restraints: bool = True
     -------
     None
     """
+
     xs = [mlobject.kk_nodes[n][0] for n in mlobject.kk_nodes]
     ys = [mlobject.kk_nodes[n][1] for n in mlobject.kk_nodes]
 
@@ -662,17 +663,17 @@ def get_lmi_scatterplot(mlobject: mlo.MetalociObject, merged_lmi_geometry: pd.Da
     y = mlobject.lmi_info[merged_lmi_geometry["ID"][0]]["ZLag"]
 
     _, _, r_value_scat, p_value_scat, _ = linregress(x, y)
-    scatter_fig, ax = plt.subplots(figsize=(5, 5)) 
+    scatter_fig, ax = plt.subplots(figsize=(5, 5))
     alpha_sp = [1.0 if val < signipval else 0.1 for val in merged_lmi_geometry.LMI_pvalue]
     colors_sp = [colors_lmi[val] for val in merged_lmi_geometry.moran_quadrant]
 
     plt.scatter(x=x, y=y, s=100, ec="white", fc=colors_sp, alpha=alpha_sp)
 
     sns.scatterplot(
-        x=[x[mlobject.poi]], y=[y[mlobject.poi]], s=150, ec="lime", fc=colors_sp[mlobject.poi],
-        zorder=len(merged_lmi_geometry)
-    )
-    sns.regplot(x=x, y=y, scatter=False, color="k")
+        x=[x[mlobject.poi]], y=[y[mlobject.poi]], s=150, ec="lime", fc="none",
+        zorder=len(merged_lmi_geometry), marker = "o"
+        )
+    sns.regplot(x=x, y=y, scatter=False, color="k", truncate = True)
     sns.despine(top=True, right=True, left=False, bottom=False, offset=10, trim=False)
 
     plt.title(f"Moran Local Scatterplot\n[r: {r_value_scat:4.2f} | p-value: {p_value_scat:.1e}]", fontsize=11)
@@ -683,7 +684,7 @@ def get_lmi_scatterplot(mlobject: mlo.MetalociObject, merged_lmi_geometry: pd.Da
     ax.set_ylabel(f"Z-score ({merged_lmi_geometry.ID[0]} Spatial Lag)")
 
     r_value_scat = float(r_value_scat)
-    p_value_scat = float(r_value_scat)
+    p_value_scat = float(p_value_scat)
 
     return scatter_fig, r_value_scat, p_value_scat
 

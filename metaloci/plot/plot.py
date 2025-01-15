@@ -157,7 +157,8 @@ def kk_plot_to_subplot(ax, mlobject: mlo.MetalociObject, restraints: bool = True
     sns.scatterplot(x=[poi_x], y=[poi_y], s=50 * 1.5, ec="lime", fc="none", zorder=4, ax=ax)
 
 
-def get_kk_plot(mlobject: mlo.MetalociObject, restraints: bool = True, neighbourhood: float = None):
+def get_kk_plot(mlobject: mlo.MetalociObject, restraints: bool = True, 
+                neighbourhood: bool =  False):
     """
     Generate Kamada-Kawai plot from pre-calculated restraints.
 
@@ -184,6 +185,7 @@ def get_kk_plot(mlobject: mlo.MetalociObject, restraints: bool = True, neighbour
     plt.axis("off")
 
     if restraints:
+
         nx.draw(
             mlobject.kk_graph,
             mlobject.kk_nodes,
@@ -191,7 +193,9 @@ def get_kk_plot(mlobject: mlo.MetalociObject, restraints: bool = True, neighbour
             cmap=plt.cm.coolwarm,
             **options,
         )
+
     else:
+        
         sns.scatterplot(x=xs, y=ys, hue=range(len(xs)), palette="coolwarm", legend=False, s=50, zorder=2)
 
     g = sns.lineplot(x=xs, y=ys, sort=False, lw=2, color="black", legend=False, zorder=1)
@@ -205,8 +209,14 @@ def get_kk_plot(mlobject: mlo.MetalociObject, restraints: bool = True, neighbour
     poi_x, poi_y = xs[mlobject.poi], ys[mlobject.poi]
 
     if neighbourhood:
-        circle = plt.Circle((poi_x, poi_y), neighbourhood, color="red",
-                            fill=False, linestyle=":", alpha=0.5, lw=1, zorder=3)
+
+        INFLUENCE = 1.5
+        BFACT = 2
+
+        neighbourhood_value = mlobject.kk_distances.diagonal(1).mean() * INFLUENCE * BFACT
+
+        circle = plt.Circle((poi_x, poi_y), neighbourhood_value, color="black",
+                            fill=False, linestyle="--", alpha=0.6, lw=1.8, zorder=3)
         plt.gca().add_patch(circle)
 
     sns.scatterplot(x=[poi_x], y=[poi_y], s=50 * 1.5, ec="lime", fc="none", zorder=4)
@@ -271,7 +281,7 @@ def get_hic_plot(mlobject: mlo.MetalociObject, cmap_user: str = "YlOrRd", clean_
 
 
 def get_gaudi_signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame,
-                          cmap_user: str = "PuOr_r", mark_regions=None):
+                          cmap_user: str = "PuOr_r", mark_regions: pd.DataFrame = None, neighbourhood: bool = False):
     """
     Get a Gaudí signal plot.
 
@@ -338,7 +348,7 @@ def get_gaudi_signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFra
     sns.scatterplot(
         x=[lmi_geometry.X[mlobject.poi]],
         y=[lmi_geometry.Y[mlobject.poi]],
-        s=50, ec="none", fc="lime", zorder=len(lmi_geometry))
+        s=120, ec="none", fc="lime", zorder=len(lmi_geometry))
 
     sm = plt.cm.ScalarMappable(cmap=cmap_user, norm=plt.Normalize(vmin=min_value, vmax=max_value))
     sm.set_array([1, 2, 3, 4])
@@ -353,14 +363,30 @@ def get_gaudi_signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFra
         ax=ax,
     )
     cbar.set_label(f"{lmi_geometry.ID[0]}", rotation=270, size=20, labelpad=35)
+
+    if neighbourhood:
+
+        xs = [lmi_geometry.X[n] for n in lmi_geometry.index]
+        ys = [lmi_geometry.Y[n] for n in lmi_geometry.index]
+
+        poi_x, poi_y = xs[mlobject.poi], ys[mlobject.poi]
+
+        INFLUENCE = 1.5
+        BFACT = 2
+
+        neighbourhood_value = mlobject.kk_distances.diagonal(1).mean() * INFLUENCE * BFACT
+
+        circle = plt.Circle((poi_x, poi_y), neighbourhood_value, color="black",
+                            fill=False, linestyle="--", alpha=0.6, lw=1.8, zorder=3)
+        ax.add_patch(circle)
+        
     plt.axis("off")
 
     return gaudi_signal_fig
 
 
 def get_gaudi_type_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame,
-                        signipval: float = 0.05, colors_lmi: dict = None, mark_regions=None, neighbourhood=False
-                        ):
+                        signipval: float = 0.05, colors_lmi: dict = None, mark_regions=None, neighbourhood=False):
     """
     Get a Gaudí type plot.
 
@@ -443,18 +469,18 @@ def get_gaudi_type_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame
     sns.scatterplot(
         x=[lmi_geometry.X[mlobject.poi]],
         y=[lmi_geometry.Y[mlobject.poi]],
-        s=50,
+        s=120,
         ec="none",
         fc="lime",
         zorder=len(lmi_geometry),
     )
 
-    xs = [lmi_geometry.X[n] for n in lmi_geometry.index]
-    ys = [lmi_geometry.Y[n] for n in lmi_geometry.index]
-
-    poi_x, poi_y = xs[mlobject.poi], ys[mlobject.poi]
-
     if neighbourhood:
+        
+        xs = [lmi_geometry.X[n] for n in lmi_geometry.index]
+        ys = [lmi_geometry.Y[n] for n in lmi_geometry.index]
+
+        poi_x, poi_y = xs[mlobject.poi], ys[mlobject.poi]
 
         INFLUENCE = 1.5
         BFACT = 2
@@ -462,7 +488,7 @@ def get_gaudi_type_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame
         neighbourhood_value = mlobject.kk_distances.diagonal(1).mean() * INFLUENCE * BFACT
 
         circle = plt.Circle((poi_x, poi_y), neighbourhood_value, color="black",
-                            fill=False, linestyle=":", alpha=0.5, lw=1.5, zorder=3)
+                            fill=False, linestyle="--", alpha=0.6, lw=1.8, zorder=3)
         ax.add_patch(circle)
 
     ax.legend(handles=legend_elements, frameon=False, fontsize=20, loc="center left", bbox_to_anchor=(1, 0.5))

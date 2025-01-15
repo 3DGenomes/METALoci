@@ -9,7 +9,7 @@ from importlib.metadata import version
 
 from metaloci.tests import test_tools
 from metaloci.tools import figure, layout, ml, prep
-from metaloci.utility_scripts import bts, gene_selector, sniffer
+from metaloci.utility_scripts import bts, compressor, gene_selector, sniffer
 
 
 def create_parser():
@@ -84,6 +84,15 @@ def create_parser():
                                                     )
     args_pp["gene_selector"].set_defaults(func=gene_selector.run)
     gene_selector.populate_args(args_pp["gene_selector"])
+
+    args_pp["compressor"] = subparser.add_parser("compressor", 
+                                                    description=compressor.DESCRIPTION, 
+                                                    help=compressor.HELP, 
+                                                    add_help=False, 
+                                                    formatter_class=RawDescriptionHelpFormatter
+                                                    )
+    args_pp["compressor"].set_defaults(func=compressor.run)
+    compressor.populate_args(args_pp["compressor"])
 
     return parser
 

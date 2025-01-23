@@ -267,7 +267,7 @@ def compute_lmi(mlobject: mlo.MetalociObject, signal_type: str, neighbourhood: f
 
         df_lmi["ID"].append(signal_type)
         df_lmi["bin_index"].append(row.bin_index)
-        df_lmi["bin_chr"].append(mlobject.chrom[3:])
+        df_lmi["bin_chr"].append(mlobject.chrom)
         df_lmi["bin_start"].append(bin_start)
         df_lmi["bin_end"].append(bin_end)
         df_lmi["signal"].append(signal_values[row.bin_index])

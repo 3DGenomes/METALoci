@@ -204,43 +204,41 @@ def bts_ratio(hic_path: str, resolution: int, region: str, cutoff: float, pl: fl
             mlobject.start, mlobject.end, mlobject.start, mlobject.end)
 
     mlobject = misc.clean_matrix(mlobject)
-    
+
     if mlobject.matrix is None and mlobject.bad_regions is not None:
 
         return np.nan
 
-    else:
+    mlobject_test = kk.get_restraints_matrix(mlobject, optimise = True, silent=True)
+    mlobject_test.kk_graph = nx.from_scipy_sparse_array(csr_matrix(mlobject_test.kk_restraints_matrix))
+    mlobject_test.kk_nodes = nx.kamada_kawai_layout(mlobject_test.kk_graph)
 
-        mlobject_test = kk.get_restraints_matrix(mlobject, optimise = True, silent=True)
-        mlobject_test.kk_graph = nx.from_scipy_sparse_array(csr_matrix(mlobject_test.kk_restraints_matrix))
-        mlobject_test.kk_nodes = nx.kamada_kawai_layout(mlobject_test.kk_graph)
+    xy = np.array([mlobject_test.kk_nodes[n] for n in mlobject_test.kk_nodes])
 
-        xy = np.array([mlobject_test.kk_nodes[n] for n in mlobject_test.kk_nodes])
+    mlobject_linear = mlobject
+    mlobject_linear.kk_cutoff["values"] = 0.01
 
-        mlobject_linear = mlobject
-        mlobject_linear.kk_cutoff["values"] = 0.01
+    mlobject_linear = kk.get_restraints_matrix(mlobject_linear, optimise = True, silent=True)
+    mlobject_linear.kk_graph = nx.from_scipy_sparse_array(csr_matrix(mlobject_linear.kk_restraints_matrix))
+    mlobject_linear.kk_nodes = nx.kamada_kawai_layout(mlobject_linear.kk_graph)
 
-        mlobject_linear = kk.get_restraints_matrix(mlobject_linear, optimise = True, silent=True)
-        mlobject_linear.kk_graph = nx.from_scipy_sparse_array(csr_matrix(mlobject_linear.kk_restraints_matrix))
-        mlobject_linear.kk_nodes = nx.kamada_kawai_layout(mlobject_linear.kk_graph)
+    xy_linear = np.array([mlobject_linear.kk_nodes[n] for n in mlobject_linear.kk_nodes])
 
-        xy_linear = np.array([mlobject_linear.kk_nodes[n] for n in mlobject_linear.kk_nodes])
+    mlobject_spherical = mlobject
+    mlobject_spherical.kk_cutoff["values"] = 0.6
 
-        mlobject_spherical = mlobject
-        mlobject_spherical.kk_cutoff["values"] = 0.6
+    mlobject_spherical = kk.get_restraints_matrix(mlobject_spherical, optimise = True, silent=True)
+    mlobject_spherical.kk_graph = nx.from_scipy_sparse_array(csr_matrix(mlobject_spherical.kk_restraints_matrix))
+    mlobject_spherical.kk_nodes = nx.kamada_kawai_layout(mlobject_spherical.kk_graph)
 
-        mlobject_spherical = kk.get_restraints_matrix(mlobject_spherical, optimise = True, silent=True)
-        mlobject_spherical.kk_graph = nx.from_scipy_sparse_array(csr_matrix(mlobject_spherical.kk_restraints_matrix))
-        mlobject_spherical.kk_nodes = nx.kamada_kawai_layout(mlobject_spherical.kk_graph)
+    xy_spherical = np.array([mlobject_spherical.kk_nodes[n] for n in mlobject_spherical.kk_nodes])
 
-        xy_spherical = np.array([mlobject_spherical.kk_nodes[n] for n in mlobject_spherical.kk_nodes])
-
-        linear_correlation = pearsonr(xy.flatten(), xy_linear.flatten())[0]
-        spherical_correlation = pearsonr(xy.flatten(), xy_spherical.flatten())[0]
+    linear_correlation = pearsonr(xy.flatten(), xy_linear.flatten())[0]
+    spherical_correlation = pearsonr(xy.flatten(), xy_spherical.flatten())[0]
 
     return linear_correlation / spherical_correlation
 
-    
+
 def param_search(row: pd.Series, args: pd.Series, progress = None):
     """
     Test METALoci parameters to optimise Kamada-Kawai layout.
@@ -258,13 +256,13 @@ def param_search(row: pd.Series, args: pd.Series, progress = None):
     for arg_set in args:
 
         work_dir, hic, resolution, pl, cutoff, sample_num = arg_set
-        
+
         pathlib.Path(os.path.join(work_dir, "bts")).mkdir(parents=True, exist_ok=True)
 
         arg_set_string = f"{int(int(resolution) / 1000)}_kb_cutoff_{cutoff:.3f}_pl_{pl}"
         ratio = bts_ratio(hic, resolution, row.coords, cutoff, pl)
 
-        with open(f"{work_dir}bts/{arg_set_string}.txt", "a") as handler:
+        with open(f"{work_dir}bts/{arg_set_string}.txt", mode="a", encoding="utf-8") as handler:
 
             handler.write(f"{row.coords}_{arg_set_string}\t{ratio}\n")
             handler.flush()
@@ -326,7 +324,7 @@ def sum_hic_columns(hic_path: str, resolution: int, region: str, cutoff: float) 
 
     # for every value in the diagonal, sum all the values in that column that are below the diagonal
     if not mlobject.subset_matrix is None:
-        
+
         median_sum = np.nanmean([np.nansum(mlobject.subset_matrix[i, i+1:]) for i in range(len(mlobject.subset_matrix))])
 
         return median_sum
@@ -405,6 +403,10 @@ def run(opts: list):
 
         df_regions = pd.DataFrame({"coords": [opts.regions], "symbol": ["symbol"], "id": ["id"]})
 
+    if not os.path.isfile(opts.hic):
+
+        sys.exit(f"Hi-C file {opts.hic} not found.")
+
     if opts.cutoffs is None:
 
         opts.cutoffs = [0.2]
@@ -422,17 +424,16 @@ def run(opts: list):
         print(f"threads is:\n\t{opts.threads}\n")
         # print(f"resolution_region_dict is:\n\t{resolution_region_dict}")
         sys.exit(0)
-    
+
     if os.path.exists(f"{opts.work_dir}bts"):
 
         sp.check_call(f"rm -r {opts.work_dir}bts", shell=True)
-        
+
     if not opts.pls is None:
-        
-        
-        parsed_args = pd.Series([(opts.work_dir, opts.hic, opts.resolution[0], pl, cutoff, opts.sample_num) 
-                                 for pl, cutoff in product(opts.pls, opts.cutoffs)]) 
-        
+
+        parsed_args = pd.Series([(opts.work_dir, opts.hic, opts.resolution[0], pl, cutoff, opts.sample_num)
+                                 for pl, cutoff in product(opts.pls, opts.cutoffs)])
+
     else:
 
         if len(df_regions) >= 4000:
@@ -450,9 +451,9 @@ def run(opts: list):
     try:
 
         with mp.Pool(processes=opts.threads) as pool:
-            
+
             if opts.pls is None:
-                
+
                 start_timer = time()
                 progress = mp.Manager().dict(value=0, timer=start_timer)
 
@@ -472,15 +473,15 @@ def run(opts: list):
 
                 print(f"\n\nThese persistence lengths will be tested: {pls}\n")
 
-                parsed_args = pd.Series([(opts.work_dir, opts.hic, opts.resolution[0], pl, cutoff, opts.sample_num) 
+                parsed_args = pd.Series([(opts.work_dir, opts.hic, opts.resolution[0], pl, cutoff, opts.sample_num)
                                          for pl, cutoff in product(pls, opts.cutoffs)])
-                
+
             print(f"------> {opts.sample_num} regions will be tested for optimisation.")
             print("This may take a while.")
 
             start_timer = time()
             progress = mp.Manager().dict(value=0, timer=start_timer)
-            
+
             print(f"\033[A{'  '*int(sp.Popen(['tput','cols'], stdout=sp.PIPE).communicate()[0].strip())}\033[A")
             print(f"\t{progress['value']}/{opts.sample_num} done.", end='\r')
 
@@ -490,9 +491,9 @@ def run(opts: list):
 
     except KeyboardInterrupt:
 
-            pool.terminate()
-            sp.check_call(f"rm -r {opts.work_dir}bts", shell=True)
-            exit()
+        pool.terminate()
+        sp.check_call(f"rm -r {opts.work_dir}bts", shell=True)
+        sys.exit()
 
     print("\n")
 
@@ -502,7 +503,7 @@ def run(opts: list):
 
         if file.endswith(".txt"):
 
-            with open(f"{opts.work_dir}bts/{file}", "r") as handler:
+            with open(f"{opts.work_dir}bts/{file}", mode="r", encoding="utf-8") as handler:
 
                 ratios = [float(line.split("\t")[1]) for line in handler.readlines()]
                 mean_ratio_diff = abs(1 - np.nanmean(ratios))
@@ -531,13 +532,13 @@ def run(opts: list):
     if len(best_params_list) > 1:
 
         print("You can use any of the below set of parameters to run 'metaloci layout' as they are similarly good.\n")
-    
+
     else:
 
-        print(f"\nBest parameters are:")
+        print("\nBest parameters are:")
 
     for best in best_params_list:
-            
+
         print(f"Cut-off (-o): {float(best.split('_')[3]):.3f}; Persistence length (-l): "
               f"{float(best.split('_')[5].rsplit('.', 1)[0]):.3f}; "
               f"BTS score: {float(ratios_dict[best]):.5f}")

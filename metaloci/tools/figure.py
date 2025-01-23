@@ -195,8 +195,8 @@ def populate_args(parser):
         "--neighbourhood",
         dest="neighbourhood_circle",
         action="store_true",
-        help="Flag to plot the neighbourhood on the Gaudí plot. This is the influence radious around the point of "
-        "interest that will be considered part of the metaloci. (default: False)."
+        help="Flag to plot the neighbourhood on the Kamada-Kawai and Gaudí plots. This is the influence radious around "
+        "the point of interest that will be considered part of the metaloci. (default: False)."
     )
 
 
@@ -291,16 +291,7 @@ def get_figures(row: pd.Series, args: pd.Series, progress=None, counter: int = N
             print("\t\tHi-C plot -> done.")
             print("\t\tKamada-Kawai plot", end="\r")
 
-        mlg_poi = merged_lmi_geometry.loc[merged_lmi_geometry["bin_index"] == mlobject.poi].squeeze()
-
-        if (args.metaloci_only and mlg_poi.LMI_pvalue <= args.signipval and mlg_poi.moran_quadrant in args.quadrants):
-
-            kk_plt = plot.get_kk_plot(mlobject, neighbourhood=neighbourhood)
-
-        else:
-
-            kk_plt = plot.get_kk_plot(mlobject)
-
+        kk_plt = plot.get_kk_plot(mlobject, neighbourhood=args.neighbourhood_circle)
         kk_plt.savefig(f"{plot_filename}_kk.pdf", **plot_opt)
         kk_plt.savefig(f"{plot_filename}_kk.png", **plot_opt)
         plt.close()
@@ -310,7 +301,8 @@ def get_figures(row: pd.Series, args: pd.Series, progress=None, counter: int = N
             print("\t\tKamada-Kawai plot -> done.")
             print("\t\tGaudi Signal plot", end="\r")
 
-        gs_plt = plot.get_gaudi_signal_plot(mlobject, merged_lmi_geometry, mark_regions=args.mark_regions)
+        gs_plt = plot.get_gaudi_signal_plot(mlobject, merged_lmi_geometry, mark_regions=args.mark_regions,
+                                            neighbourhood=args.neighbourhood_circle)
         gs_plt.savefig(f"{plot_filename}_gsp.pdf", **plot_opt)
         gs_plt.savefig(f"{plot_filename}_gsp.png", **plot_opt)
         plt.close()

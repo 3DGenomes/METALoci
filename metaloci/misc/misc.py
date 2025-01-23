@@ -304,7 +304,7 @@ def check_names(hic_file: Path, data: Path, coords: Path, resolution: int = None
     if not signal_chr_nom == cooler_chr_nom == coords_chr_nom:
 
         sys.exit(
-            "\nThe signal, cooler and chromosome sizes files do not have the same nomenclature for chromosomes:\n\
+            f"\nThe signal, cooler and chromosome sizes files do not have the same nomenclature for chromosomes:\n\
             \n\tSignal chromosomes nomenclature is '{signal_chr_nom}'.\
             \n\tHi-C chromosomes nomenclature is '{cooler_chr_nom}'.\
             \n\tChromosome sizes nomenclature is '{coords_chr_nom}'.\

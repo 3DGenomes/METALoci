@@ -16,6 +16,8 @@ from datetime import timedelta
 from time import time
 
 import pandas as pd
+
+from metaloci import mlo
 from metaloci.misc import misc
 from metaloci.spatial_stats import lmi
 
@@ -227,7 +229,9 @@ def get_lmi(row: pd.Series, args: pd.Series,
 
         with open(save_path, "rb",) as mlobject_handler:
 
-            mlobject = pickle.load(mlobject_handler)
+            state = pickle.load(mlobject_handler)
+            mlobject = mlo.reconstruct(state)            
+            
             # This ensures the path is still right even if the user changes the working directory.
             mlobject.save_path = save_path
             
@@ -382,6 +386,7 @@ def run(opts):
     opts : list
         List of arguments.
     """
+
     if not opts.work_dir.endswith("/"):
 
         opts.work_dir += "/"
@@ -410,6 +415,7 @@ def run(opts):
         df_regions = pd.DataFrame({"coords": [opts.region_file], "symbol": ["symbol"], "id": ["id"]})
 
     if len(opts.signals) == 1:
+
         if os.path.isfile(opts.signals[0]) and os.access(opts.signals[0], os.R_OK):
 
             with open(opts.signals[0], "r", encoding="utf-8") as handler:
@@ -421,6 +427,7 @@ def run(opts):
                 signals = [opts.signals[0]]
         
     else:
+
         if os.path.isfile(opts.signals[0]) and os.path.isfile(opts.signals[1]):
 
             sys.exit("Please provide only one file with signals to plot.")

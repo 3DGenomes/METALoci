@@ -22,6 +22,15 @@ def create_parser():
     args_pp = {}
 
     # Populate subcommands
+    args_pp["sniffer"] = subparser.add_parser("sniffer", 
+                                              description=sniffer.DESCRIPTION, 
+                                              help=sniffer.HELP, 
+                                              add_help=False, 
+                                              formatter_class=RawDescriptionHelpFormatter
+                                              )
+    args_pp["sniffer"].set_defaults(func=sniffer.run)
+    sniffer.populate_args(args_pp["sniffer"])
+
     args_pp["prep"] = subparser.add_parser("prep", 
                                            description=prep.DESCRIPTION, 
                                            help=prep.HELP, 
@@ -30,6 +39,15 @@ def create_parser():
                                            )
     args_pp["prep"].set_defaults(func=prep.run)
     prep.populate_args(args_pp["prep"])
+
+    args_pp["bts"] = subparser.add_parser("bts", 
+                                          description=bts.DESCRIPTION, 
+                                          help=bts.HELP, 
+                                          add_help=False, 
+                                          formatter_class=RawDescriptionHelpFormatter
+                                          )
+    args_pp["bts"].set_defaults(func=bts.run)
+    bts.populate_args(args_pp["bts"])
 
     args_pp["layout"] = subparser.add_parser("layout", 
                                              description=layout.DESCRIPTION, 
@@ -49,33 +67,6 @@ def create_parser():
     args_pp["lm"].set_defaults(func=ml.run)
     ml.populate_args(args_pp["lm"])
 
-    args_pp["figure"] = subparser.add_parser("figure", 
-                                             description=figure.DESCRIPTION, 
-                                             help=figure.HELP, 
-                                             add_help=False, 
-                                             formatter_class=RawTextHelpFormatter
-                                             )
-    args_pp["figure"].set_defaults(func=figure.run)
-    figure.populate_args(args_pp["figure"])
-
-    args_pp["sniffer"] = subparser.add_parser("sniffer", 
-                                              description=sniffer.DESCRIPTION, 
-                                              help=sniffer.HELP, 
-                                              add_help=False, 
-                                              formatter_class=RawDescriptionHelpFormatter
-                                              )
-    args_pp["sniffer"].set_defaults(func=sniffer.run)
-    sniffer.populate_args(args_pp["sniffer"])
-
-    args_pp["bts"] = subparser.add_parser("bts", 
-                                          description=bts.DESCRIPTION, 
-                                          help=bts.HELP, 
-                                          add_help=False, 
-                                          formatter_class=RawDescriptionHelpFormatter
-                                          )
-    args_pp["bts"].set_defaults(func=bts.run)
-    bts.populate_args(args_pp["bts"])
-
     args_pp["gene_selector"] = subparser.add_parser("gene_selector", 
                                                     description=gene_selector.DESCRIPTION, 
                                                     help=gene_selector.HELP, 
@@ -85,14 +76,28 @@ def create_parser():
     args_pp["gene_selector"].set_defaults(func=gene_selector.run)
     gene_selector.populate_args(args_pp["gene_selector"])
 
+    args_pp["figure"] = subparser.add_parser("figure", 
+                                             description=figure.DESCRIPTION, 
+                                             help=figure.HELP, 
+                                             add_help=False, 
+                                             formatter_class=RawTextHelpFormatter
+                                             )
+    args_pp["figure"].set_defaults(func=figure.run)
+    figure.populate_args(args_pp["figure"])
+
     args_pp["compressor"] = subparser.add_parser("compressor", 
-                                                    description=compressor.DESCRIPTION, 
-                                                    help=compressor.HELP, 
-                                                    add_help=False, 
-                                                    formatter_class=RawDescriptionHelpFormatter
-                                                    )
+                                                description=compressor.DESCRIPTION, 
+                                                help=compressor.HELP, 
+                                                add_help=False, 
+                                                formatter_class=RawDescriptionHelpFormatter
+                                                )
     args_pp["compressor"].set_defaults(func=compressor.run)
     compressor.populate_args(args_pp["compressor"])
+
+    args_pp["test"] = subparser.add_parser("test",
+                                          add_help=False,
+                                          formatter_class=RawDescriptionHelpFormatter)
+    args_pp["test"].set_defaults(func=test_tools.run)
 
     return parser
 
@@ -101,6 +106,7 @@ def main(arguments=None):
     Main function to run METALoci CLI.
     """
     if arguments is None:
+
         arguments = sys.argv
 
     # Check if running under Sphinx

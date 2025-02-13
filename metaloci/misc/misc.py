@@ -4,6 +4,7 @@ Miscellaneous functions for METALoci
 import gzip
 import os
 import pathlib
+import pickle
 import re
 import subprocess as sp
 import sys
@@ -15,6 +16,7 @@ import cooler
 import hicstraw
 import numpy as np
 import pandas as pd
+
 from metaloci import mlo
 from metaloci.spatial_stats import lmi
 
@@ -757,7 +759,7 @@ def get_poi_data(line: pd.Series, args: pd.Series):
 
         return
 
-    if mlo_data.bad_region:
+    if mlo_data["bad_region"]:
 
         with open(args.bad_file_name, mode="a", encoding="utf-8") as bad_file_handler:
 
@@ -771,7 +773,7 @@ def get_poi_data(line: pd.Series, args: pd.Series):
 
         try:
 
-            poi_data = mlo_data.lmi_info[signal].loc[mlo_data.poi].to_dict()
+            poi_data = mlo_data["lmi_info"][signal].loc[mlo_data["poi"]].to_dict()
 
             table_line += f"\t{poi_data['moran_quadrant']}\t{poi_data['LMI_score']}\t{poi_data['LMI_pvalue']}\t{poi_data['ZSig']}\t{poi_data['ZLag']}"
 

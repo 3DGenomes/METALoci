@@ -5,10 +5,10 @@ same dataframe and subsetting by chromosomes.
 
 import os
 import pathlib
+import re
 import subprocess as sp
 import sys
 import warnings
-import re
 from argparse import SUPPRESS, HelpFormatter
 from datetime import timedelta
 from time import time
@@ -17,10 +17,11 @@ import cooler
 import h5py
 import hicstraw
 import pandas as pd
-from metaloci.misc import misc
 from numba.core.errors import NumbaDeprecationWarning, NumbaPendingDeprecationWarning
 from pybedtools import BedTool
 from tqdm import tqdm
+
+from metaloci.misc import misc
 
 warnings.simplefilter('ignore', category=NumbaDeprecationWarning)
 warnings.simplefilter('ignore', category=NumbaPendingDeprecationWarning)

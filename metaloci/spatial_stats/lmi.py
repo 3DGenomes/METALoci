@@ -14,13 +14,14 @@ import numpy as np
 import pandas as pd
 from esda.moran import Moran_Local
 from libpysal.weights.spatial_lag import lag_spatial
-from metaloci import mlo
-from metaloci.misc import misc
 from scipy.spatial import Voronoi
 from scipy.stats import zscore
 from shapely.errors import ShapelyDeprecationWarning
 from shapely.geometry import LineString, Point
 from shapely.ops import polygonize
+
+from metaloci import mlo
+from metaloci.misc import misc
 
 warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
 

@@ -265,7 +265,9 @@ def run(opts: list):
     try:
 
         with mp.Pool(processes=threads) as pool:
+
             pool.starmap(misc.get_poi_data, [(row, parsed_args) for _, row in genes.iterrows()])
+            
         pool.close()
         pool.join()
 

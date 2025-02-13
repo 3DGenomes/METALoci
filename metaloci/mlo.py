@@ -140,14 +140,39 @@ class MetalociObject:
         self.lmi_geometry = None
         self.lmi_info = {}
 
+
+    def __getstate__(self):
+        """
+        Function to get the state of the object.
+        """
+
+        return self.__dict__
+    
+
+    def __setstate__(self, state):
+        """
+        Function to set the state of the object.
+        """
+        self.__dict__ = state
+
+
     def save(self, file_handler: str):
         """
         Function to save the mlobject.
-
         Parameters
         ----------
         file_handler : str
             Path to the file name where to save the mlo
         """
+        pickle.dump(self.__getstate__(), file_handler)
 
-        pickle.dump(self, file_handler)
+
+def reconstruct(state):
+    """
+    Function to reconstruct the object from the state dictionary.
+    """
+    mlobject = MetalociObject.__new__(MetalociObject)
+    mlobject.__setstate__(state)
+
+    return mlobject
+

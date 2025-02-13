@@ -55,6 +55,13 @@ def populate_args(parser):
                                    action="store_true",
                                    help='Flag to uncompress the Hi-C file.'
                                    )
+    
+    optional_arg = parser.add_argument_group(title="Optional arguments")
+
+    optional_arg.add_argument("-h",
+                              "--help",
+                              action="help",
+                              help="Show this help message and exit.")
 
 
 def compress(work_dir: str):

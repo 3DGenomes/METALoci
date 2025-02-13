@@ -28,6 +28,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from PIL import Image
 
+from metaloci import mlo
 from metaloci.plot import plot
 
 HELP = "Plots METALoci output."
@@ -69,7 +70,7 @@ def populate_args(parser):
 
     input_arg.add_argument(
         "-s",
-        "--types",
+        "--signals",
         dest="signals",
         required=True,
         metavar="STR",
@@ -229,7 +230,8 @@ def get_figures(row: pd.Series, args: pd.Series, progress=None, counter: int = N
 
         with open(save_path, "rb") as mlobject_handler:
 
-            mlobject = pickle.load(mlobject_handler)
+            state = pickle.load(mlobject_handler)
+            mlobject = mlo.reconstruct(state)
             mlobject.save_path = save_path
 
     except FileNotFoundError:
@@ -601,28 +603,7 @@ def run(opts: list):
 
         for counter, row in df_regions.iterrows():
 
-            get_figures(row, parsed_args, counter=counter, silent=False)
-
-
-
-            # bed = plot.get_bed(mlobject, merged_lmi_geometry, neighbourhood, BFACT, quadrants, signipval, plotit=True)
-
-            # if bed is not None and len(bed) > 0:
-
-            #     metaloci_bed_path = os.path.join(work_dir, mlobject.chrom, "metalocis_log", signal)
-
-            #     bed_file_name = os.path.join(
-            #         metaloci_bed_path,
-            #         f"{mlobject.chrom}_{mlobject.start}_{mlobject.end}_{mlobject.poi}_{signal}_\
-            #         q-{'_'.join([str(q) for q in quadrants])}_metalocis.bed")
-
-            #     pathlib.Path(metaloci_bed_path).mkdir(parents=True, exist_ok=True)
-            #     bed.to_csv(bed_file_name, sep="\t", index=False)
-
-            #     print(f"\t\tBed file with metalocis location saved to: {bed_file_name}")
-
-            
-            
+            get_figures(row, parsed_args, counter=counter, silent=False)            
 
     print(f"\nInformation saved to: '{os.path.join(opts.work_dir, 'moran_info.txt')}'")
     print(f"\nTotal time spent: {timedelta(seconds=round(time() - start_timer))}.")

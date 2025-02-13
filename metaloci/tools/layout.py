@@ -19,12 +19,13 @@ import h5py
 import hicstraw
 import networkx as nx
 import pandas as pd
+from scipy.sparse import csr_matrix
+from scipy.spatial import distance
+
 from metaloci import mlo
 from metaloci.graph_layout import kk
 from metaloci.misc import misc
 from metaloci.plot import plot
-from scipy.sparse import csr_matrix
-from scipy.spatial import distance
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
@@ -214,8 +215,9 @@ def get_region_layout(row: pd.Series, args: pd.Series, progress=None, counter: i
 
             with open(save_path, "rb") as mlobject_handler:
 
-                mlobject = pickle.load(mlobject_handler)
-
+                state = pickle.load(mlobject_handler)
+                mlobject = mlo.reconstruct(state)
+            
             if args.save_plots:
 
                 if not silent:

@@ -9,9 +9,10 @@ import shutil
 from subprocess import call
 from unittest import TestCase, TestSuite, TextTestRunner
 
-import metaloci
 import numpy as np
 import pandas as pd
+
+import metaloci
 
 
 class TestProcess(TestCase):
@@ -33,7 +34,7 @@ class TestProcess(TestCase):
         call(
             f"metaloci prep -w test_wd -c {metaloci.__file__.rsplit('/', 1)[0]}/tests/data/hic/ICE_DM_5kb_eef0283c05_"
             f"chr19.mcool -d {metaloci.__file__.rsplit('/', 1)[0]}/tests/data/signal/DM_27me3-merged-sub137930236_"
-            f"chr19.bed -r 10000 -s {metaloci.__file__.rsplit('/', 1)[0]}/tests/data/mm10_chrom_sizes.txt "
+            f"chr19.bed -r 10000 -s {metaloci.__file__.rsplit('/', 1)[0]}/tests/data/mm39_chrom_sizes.txt "
             "> /dev/null 2>&1",
             shell=True,
         )
@@ -55,7 +56,7 @@ class TestProcess(TestCase):
         call(
             f"metaloci prep -w test_wd -c {metaloci.__file__.rsplit('/', 1)[0]}/tests/data/hic/ICE_DM_5kb_eef0283c05_"
             f"chr19.mcool -d {metaloci.__file__.rsplit('/', 1)[0]}/tests/data/signal/DM_27me3-merged-sub137930236_"
-            f"chr19_header.bed -r 10000 -s {metaloci.__file__.rsplit('/', 1)[0]}/tests/data/mm10_chrom_sizes.txt "
+            f"chr19_header.bed -r 10000 -s {metaloci.__file__.rsplit('/', 1)[0]}/tests/data/mm39_chrom_sizes.txt "
             "> /dev/null 2>&1",
             shell=True,
         )
@@ -78,7 +79,7 @@ class TestProcess(TestCase):
             f"metaloci prep -w test_wd -c {metaloci.__file__.rsplit('/', 1)[0]}/tests/data/hic/ICE_DM_5kb_eef0283c05_"
             f"chr19.mcool -d {metaloci.__file__.rsplit('/', 1)[0]}/tests/data/signal/DM_27me3-merged-sub137930236_"
             f"chr19.bed {metaloci.__file__.rsplit('/', 1)[0]}/tests/data/signal/DM_Arid1a-sub17717303_15052021_"
-            f"chr19.bed  -r 10000 -s {metaloci.__file__.rsplit('/', 1)[0]}/tests/data/mm10_chrom_sizes.txt "
+            f"chr19.bed  -r 10000 -s {metaloci.__file__.rsplit('/', 1)[0]}/tests/data/mm39_chrom_sizes.txt "
             "> /dev/null 2>&1",
             shell=True,
         )
@@ -103,7 +104,7 @@ class TestProcess(TestCase):
             f"chr19.mcool -d {metaloci.__file__.rsplit('/', 1)[0]}/tests/data/signal/DM_27me3-merged-sub137930236"
             f"_chr19_header.bed {metaloci.__file__.rsplit('/', 1)[0]}/tests/data/signal/DM_Arid1a-sub17717303_"
             f"15052021_chr19_header.bed  -r 10000 -s {metaloci.__file__.rsplit('/', 1)[0]}/tests/data/"
-            "mm10_chrom_sizes.txt > /dev/null 2>&1",
+            "mm39_chrom_sizes.txt > /dev/null 2>&1",
             shell=True,
         )
 
@@ -125,7 +126,7 @@ class TestProcess(TestCase):
         call(
             f"metaloci prep -w test_wd -c {metaloci.__file__.rsplit('/', 1)[0]}/tests/data/hic/ICE_DM_5kb_eef0283c05_"
             f"chr19.mcool -d {metaloci.__file__.rsplit('/', 1)[0]}/tests/data/signal/multi_chr19.bed  -r 10000 -s "
-            f"{metaloci.__file__.rsplit('/', 1)[0]}/tests/data/mm10_chrom_sizes.txt > /dev/null 2>&1",
+            f"{metaloci.__file__.rsplit('/', 1)[0]}/tests/data/mm39_chrom_sizes.txt > /dev/null 2>&1",
             shell=True,
         )
 
@@ -146,8 +147,9 @@ class TestProcess(TestCase):
 
         print("\nTesting metaloci layout:")
 
-        if os.path.exists("test_wd/chr19/chr19_27320000_31340000_200.mlo"):
-            os.remove("test_wd/chr19/chr19_27320000_31340000_200.mlo")
+        if os.path.exists("test_wd/chr19/objects/chr19_27320000_31340000_200.mlo"):
+
+            os.remove("test_wd/chr19/objects/chr19_27320000_31340000_200.mlo")
 
         call(
             f"metaloci layout -w test_wd -c {metaloci.__file__.rsplit('/', 1)[0]}/tests/data/hic/ICE_DM_5kb_eef0283c05"
@@ -156,7 +158,7 @@ class TestProcess(TestCase):
         )
 
         with open(
-            "test_wd/chr19/chr19_27320000_31340000_200.mlo", "rb"
+            "test_wd/chr19/objects/chr19_27320000_31340000_200.mlo", "rb"
         ) as mlobject_handler:
             mlobject = pickle.load(mlobject_handler)
 
@@ -179,7 +181,7 @@ class TestProcess(TestCase):
         )
 
         with open(
-            "test_wd/chr19/chr19_27320000_31340000_200.mlo", "rb"
+            "test_wd/chr19/objects/chr19_27320000_31340000_200.mlo", "rb"
         ) as mlobject_handler:
             mlobject = pickle.load(mlobject_handler)
 
@@ -201,7 +203,7 @@ class TestProcess(TestCase):
         )
 
         path = pathlib.Path(
-            "test_wd/chr19/plots/KK/chr19_27320000_31340000_200_percentage_0.1500_KK.pdf"
+            "test_wd/chr19/plots/KK/chr19_27320000_31340000_200_percentage_0.15_pl-5.26_KK.pdf"
         )
         self.assertEqual((str(path), path.is_file()), (str(path), True))
 
@@ -221,7 +223,7 @@ class TestProcess(TestCase):
         )
 
         path = pathlib.Path(
-            "test_wd/chr19/plots/KK/chr19_27320000_31340000_200_percentage_0.2000_KK.pdf"
+            "test_wd/chr19/plots/KK/chr19_27320000_31340000_200_percentage_0.20_pl-9.00_KK.pdf"
         )
         self.assertEqual((str(path), path.is_file()), (str(path), True))
 
@@ -241,7 +243,7 @@ class TestProcess(TestCase):
         )
 
         path = pathlib.Path(
-            "test_wd/chr19/plots/KK/chr19_27320000_31340000_200_absolute_1.2000_KK.pdf"
+            "test_wd/chr19/plots/KK/chr19_27320000_31340000_200_absolute_1.20_pl-5.55_KK.pdf"
         )
         self.assertEqual((str(path), path.is_file()), (str(path), True))
 
@@ -258,7 +260,7 @@ class TestProcess(TestCase):
         )
 
         with open(
-            "test_wd/chr19/chr19_27320000_31340000_200.mlo",
+            "test_wd/chr19/objects/chr19_27320000_31340000_200.mlo",
             "rb",
         ) as mlobject_handler:
             mlobject = pickle.load(mlobject_handler)
@@ -271,12 +273,12 @@ class TestProcess(TestCase):
 
         call(
             "metaloci lm -w test_wd -g chr19:27320000-31340000_200 -s DM_27me3-merged-sub137930236.IgScaled -f "
-            "-v 0.06> /dev/null 2>&1",
+            "-v 0.06 > /dev/null 2>&1",
             shell=True,
         )
 
         with open(
-            "test_wd/chr19/chr19_27320000_31340000_200.mlo",
+            "test_wd/chr19/objects/chr19_27320000_31340000_200.mlo",
             "rb",
         ) as mlobject_handler:
             mlobject = pickle.load(mlobject_handler)
@@ -289,12 +291,12 @@ class TestProcess(TestCase):
 
         call(
             f"metaloci lm -w test_wd -g chr19:27320000-31340000_200 -s DM_27me3-merged-sub137930236.IgScaled -f "
-            f"-a {metaloci.__file__.rsplit('/', 1)[0]}/tests/data/aggregate.txt> /dev/null 2>&1",
+            f"-a {metaloci.__file__.rsplit('/', 1)[0]}/tests/data/aggregate.txt > /dev/null 2>&1",
             shell=True,
         )
 
         with open(
-            "test_wd/chr19/chr19_27320000_31340000_200.mlo",
+            "test_wd/chr19/objects/chr19_27320000_31340000_200.mlo",
             "rb",
         ) as mlobject_handler:
             mlobject = pickle.load(mlobject_handler)
@@ -312,7 +314,7 @@ class TestProcess(TestCase):
         )
 
         with open(
-            "test_wd/chr19/chr19_27320000_31340000_200.mlo",
+            "test_wd/chr19/objects/chr19_27320000_31340000_200.mlo",
             "rb",
         ) as mlobject_handler:
             mlobject = pickle.load(mlobject_handler)
@@ -329,7 +331,7 @@ class TestProcess(TestCase):
         )
 
         with open(
-            "test_wd/chr19/chr19_27320000_31340000_200.mlo",
+            "test_wd/chr19/objects/chr19_27320000_31340000_200.mlo",
             "rb",
         ) as mlobject_handler:
             mlobject = pickle.load(mlobject_handler)
@@ -348,14 +350,14 @@ class TestProcess(TestCase):
         )
 
         path = pathlib.Path(
-            "test_wd/chr19/plots/DM_27me3-merged-sub137930236.IgScaled/27320000_31340000_200/"
+            "test_wd/chr19/plots/DM_27me3-merged-sub137930236.IgScaled/chr19_27320000_31340000_200/"
             "chr19_27320000_31340000_200_10000_DM_27me3-merged-sub137930236.IgScaled.pdf"
         )
         self.assertEqual((str(path), path.is_file()), (str(path), True))
 
     def test_figure_metalocis_only_highlight(self):
         """
-        Test the metaloci figure command with the metalocis_only flah for the highlight of the signal plot.
+        Test the metaloci figure command with the metalocis_only flag for the highlight of the signal plot.
         """
 
         call(
@@ -365,7 +367,7 @@ class TestProcess(TestCase):
         )
 
         path = pathlib.Path(
-            "test_wd/chr19/plots/DM_27me3-merged-sub137930236.IgScaled/27320000_31340000_200/"
+            "test_wd/chr19/plots/DM_27me3-merged-sub137930236.IgScaled/chr19_27320000_31340000_200/"
             "chr19_27320000_31340000_200_10000_DM_27me3-merged-sub137930236.IgScaled.pdf"
         )
         self.assertEqual((str(path), path.is_file()), (str(path), True))
@@ -382,7 +384,7 @@ class TestProcess(TestCase):
         )
 
         path = pathlib.Path(
-            "test_wd/chr19/plots/DM_27me3-merged-sub137930236.IgScaled/27320000_31340000_200/"
+            "test_wd/chr19/plots/DM_27me3-merged-sub137930236.IgScaled/chr19_27320000_31340000_200/"
             "chr19_27320000_31340000_200_10000_DM_27me3-merged-sub137930236.IgScaled.pdf"
         )
         self.assertEqual((str(path), path.is_file()), (str(path), True))
@@ -400,7 +402,7 @@ class TestProcess(TestCase):
         )
 
         path = pathlib.Path(
-            "test_wd/chr19/plots/DM_27me3-merged-sub137930236.IgScaled/27320000_31340000_200/"
+            "test_wd/chr19/plots/DM_27me3-merged-sub137930236.IgScaled/chr19_27320000_31340000_200/"
             "chr19_27320000_31340000_200_10000_DM_27me3-merged-sub137930236.IgScaled.pdf"
         )
         self.assertEqual((str(path), path.is_file()), (str(path), True))
@@ -417,7 +419,7 @@ class TestProcess(TestCase):
         )
 
         path = pathlib.Path(
-            "test_wd/chr19/plots/DM_27me3-merged-sub137930236.IgScaled/27320000_31340000_200/"
+            "test_wd/chr19/plots/DM_27me3-merged-sub137930236.IgScaled/chr19_27320000_31340000_200/"
             "chr19_27320000_31340000_200_10000_DM_27me3-merged-sub137930236.IgScaled.pdf"
         )
         self.assertEqual((str(path), path.is_file()), (str(path), True))
@@ -434,7 +436,7 @@ class TestProcess(TestCase):
         )
 
         path = pathlib.Path(
-            "test_wd/chr19/plots/DM_27me3-merged-sub137930236.IgScaled/27320000_31340000_200/"
+            "test_wd/chr19/plots/DM_27me3-merged-sub137930236.IgScaled/chr19_27320000_31340000_200/"
             "chr19_27320000_31340000_200_10000_DM_27me3-merged-sub137930236.IgScaled.pdf"
         )
         self.assertEqual((str(path), path.is_file()), (str(path), True))

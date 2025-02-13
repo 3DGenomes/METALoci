@@ -28,11 +28,12 @@ import hicstraw
 import networkx as nx
 import numpy as np
 import pandas as pd
+from scipy.sparse import csr_matrix
+from scipy.stats import pearsonr
+
 from metaloci import mlo
 from metaloci.graph_layout import kk
 from metaloci.misc import misc
-from scipy.sparse import csr_matrix
-from scipy.stats import pearsonr
 
 HELP = """
 Finds the best combination of parameters for your Hi-C.
@@ -94,22 +95,18 @@ def populate_args(parser):
                            help="List of Hi-C resolutions to be tested (in bp)."
                            )
 
-    input_arg.add_argument(
+    optional_arg = parser.add_argument_group(title="Optional arguments")
+
+    optional_arg.add_argument(
                             "-g",
                             "--region",
                             dest="regions",
                             metavar="PATH",
                             type=str,
-                            help="Region to apply LMI in format chrN:start-end_midpoint or file with the regions of interest. If a file \
-                            is provided, it must contain as a header 'coords', 'symbol' and 'id', and one region per line, tab separated.",
+                            help="Path to METALoci region file. This is a file with coords in chrN:start-end_midpoint "
+                            "format, the 'symbol' and 'id', one region per line, tab separated. This file can be "
+                            "generated from a gtf file using 'metaloci bts'",
                         )
-
-    optional_arg = parser.add_argument_group(title="Optional arguments")
-
-    optional_arg.add_argument("-h",
-                              "--help",
-                              action="help",
-                              help="Show this help message and exit.")
 
     optional_arg.add_argument('-s',
                               '--seed',

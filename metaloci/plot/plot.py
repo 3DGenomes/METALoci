@@ -249,6 +249,9 @@ def get_hic_plot(mlobject: mlo.MetalociObject, cmap_user: str = "YlOrRd", clean_
     if clean_mat:
 
         array = mlobject.subset_matrix
+        array[np.diag_indices_from(array)] = 0
+        np.fill_diagonal(array[:-1, 1:], 0)
+        np.fill_diagonal(array[1:, :-1], 0)
 
     else:
 

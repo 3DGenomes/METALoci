@@ -256,14 +256,14 @@ def compute_lmi(mlobject: mlo.MetalociObject, signal_type: str, neighbourhood: f
 
     df_lmi = defaultdict(list)
 
-    for i, row in mlobject.lmi_geometry.iterrows():
+    for _, row in mlobject.lmi_geometry.iterrows():
 
         # if poi_only is True, only the points of interest will be saved
         if poi_only and mlobject.poi != row.bin_index:
 
             continue
 
-        bin_start = int(mlobject.start) + (mlobject.resolution * row.bin_index) + row.bin_index
+        bin_start = int(mlobject.start) + (mlobject.resolution * row.bin_index)
         bin_end = bin_start + mlobject.resolution
 
         df_lmi["ID"].append(signal_type)

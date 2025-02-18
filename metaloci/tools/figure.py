@@ -87,7 +87,7 @@ def populate_args(parser):
         dest="regions",
         metavar="PATH",
         type=str,
-        help="Region to apply LMI in format chrN:start-end_midpoint or file with the regions of interest. \
+        help="Region to apply LMI in format chrN:start-end_poi or file with the regions of interest. \
         If a file is provided, it must contain as a header 'coords', 'symbol' and 'id', and one region per line, \
         tab separated."
     )

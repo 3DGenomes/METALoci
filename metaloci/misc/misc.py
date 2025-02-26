@@ -763,7 +763,7 @@ def get_poi_data(line: pd.Series, args: pd.Series):
 
         with open(args.bad_file_name, mode="a", encoding="utf-8") as bad_file_handler:
 
-            bad_file_handler.write(f"{line.coords}\t{line.symbol}\t{line.id}\t{mlo_data.bad_region}\n")
+            bad_file_handler.write(f"{line.coords}\t{line.symbol}\t{line.id}\t{mlo_data['bad_region']}\n")
 
         return
 

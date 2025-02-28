@@ -789,7 +789,7 @@ def get_poi_data(line: pd.Series, args: pd.Series):
 
         except KeyError:
 
-            bad_lines.append(f"{line.coords}\t{line.symbol}\t{line.id}\tno_signal_{signal}")
+            bad_lines.append(f"{line.coords}\t{line.symbol}\t{line.id}\tno_signal_{signal}\n")
 
     with open(args.bad_file_name, mode="a", encoding="utf-8") as bad_file_handler:
 

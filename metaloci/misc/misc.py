@@ -793,7 +793,7 @@ def get_poi_data(line: pd.Series, args: pd.Series):
 
     with open(args.bad_file_name, mode="a", encoding="utf-8") as bad_file_handler:
 
-        bad_file_handler.write('\n'.join(bad_lines))
+        bad_file_handler.write(''.join(bad_lines))
 
     with open(args.out_file_name, mode="a", encoding="utf-8") as output_file_handler:
 

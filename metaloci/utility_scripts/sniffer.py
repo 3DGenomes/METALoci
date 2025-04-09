@@ -11,9 +11,10 @@ from datetime import timedelta
 from time import time
 
 import pandas as pd
-from metaloci.misc import misc
 from pybedtools import BedTool
 from tqdm import tqdm
+
+from metaloci.misc import misc
 
 HELP = "Converts a .gtf/.bed file to a list of regions for METALoci."
 
@@ -269,6 +270,6 @@ def run(opts: list):
         handler.write("\n".join(lines))
 
     print("Cleaning tmp files...")
-    sp.check_call(f"rm -rf {tmp_dir}/{resolution}bp_bin.bed {tmp_dir}/{resolution}bp_bin_unsorted.bed", shell=True)
+    sp.check_call(f"rm -rf {tmp_dir}", shell=True)
     print(f"\nTotal time spent: {timedelta(seconds=round(time() - start_timer))}.")
     print("All done.")

@@ -173,10 +173,10 @@ def populate_args(parser):
         nargs="+",
         default=[1, 3],
         help="Space-separated list with the LMI quadrants to highlight (default: %(default)s). \
-        1: High-high (signal in bin is high, signal on neighbours is high). \
-        2: High-Low (signal in bin is high, signal on neighbours is low). \
-        3: Low-Low (signal in bin is low, signal on neighbours is low). \
-        4: Low-High (signal in bin is low, signal on neighbours is high).",
+        1: High-high, top right (signal in bin is high, signal on neighbours is high). \
+        2: Low-High, top left(signal in bin is low, signal on neighbours is high). \
+        3: Low-Low, bottom left(signal in bin is low, signal on neighbours is low). \
+        4: High-Low, bottom right (signal in bin is high, signal on neighbours is low).",
     )
 
     optional_arg.add_argument(

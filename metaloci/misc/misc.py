@@ -378,7 +378,7 @@ def ucscparser(gene_file: Path, name: str, extend: int, resolution: int) -> tupl
     id_name = defaultdict(str)
     id_chrom = defaultdict(str)
 
-    print("Using a UCSC annotation file. Considering anotated trasncripts as genes.")
+    print("Using a UCSC annotation file. Considering anotated transcripts as genes.")
     print("Gathering information from the annotation file...")
 
     with myopen(gene_file, mode="rt", encoding="utf-8") as ucsc_reader:
@@ -415,7 +415,7 @@ def ucscparser(gene_file: Path, name: str, extend: int, resolution: int) -> tupl
                 id_name[gene_id] = gene_name
                 id_tss[gene_id] = int(line_s[3]) if line_s[6] == "+" else int(line_s[4])
 
-    filename = f"{name}_all_{extend}_{resolution}_agg.txt"
+    filename = f"{name}_all_{extend}_{resolution}_agg_coords.txt"
 
     return id_chrom, id_tss, id_name, filename
 
@@ -506,7 +506,7 @@ def gtfparser(gene_file: Path, name: str, extend: int, resolution: int) -> tuple
     if chrom_index == 0:
 
         chrom_type_patttern = re.compile(r'gene_type "\w+";')
-        filename = f"{name}_all_{extend}_{resolution}_agg.txt"
+        filename = f"{name}_all_{extend}_{resolution}_agg_coords.txt"
         print("Parsing all genes...")
 
     else:

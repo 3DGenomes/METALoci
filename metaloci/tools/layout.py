@@ -128,12 +128,19 @@ def populate_args(parser):
     )
 
     optional_arg.add_argument(
+        "-i",
+        "--optimise",
+        dest="optimise",
+        action="store_true",
+        help="Optimise the cutoff and/or the persistence length for the Kamada-Kawai layout.",
+    )
+
+    optional_arg.add_argument(
         "-p",
         "--plot",
         dest="save_plots",
         action="store_true",
-        help="Plot the matrix, density and Kamada-Kawai plots, even when a single cutoff "
-        "is selected.",
+        help="Plot the matrix, density and Kamada-Kawai plots, even when a single cutoff is selected.",
     )
 
     optional_arg.add_argument(
@@ -217,7 +224,7 @@ def get_region_layout(row: pd.Series, args: pd.Series, progress=None, counter: i
 
                 state = pickle.load(mlobject_handler)
                 mlobject = mlo.reconstruct(state)
-            
+
             if args.save_plots:
 
                 if not silent:
@@ -247,11 +254,9 @@ def get_region_layout(row: pd.Series, args: pd.Series, progress=None, counter: i
         mlobject = mlo.MetalociObject(
             region=row.coords,
             resolution=args.resolution,
-            persistence_length=args.persistence_length,
+            # persistence_length=args.persistence_length,
             save_path=save_path,
         )
-
-        mlobject.kk_cutoff["cutoff_type"] = args.cutoffs["cutoff_type"]
 
         if args.hic_path.endswith(".cool"):
 
@@ -275,14 +280,27 @@ def get_region_layout(row: pd.Series, args: pd.Series, progress=None, counter: i
         if mlobject.matrix is None:
 
             return
+        
+        mlobject.persistence_length = args.persistence_length
+        mlobject.kk_cutoff["cutoff_type"] = args.cutoffs["cutoff_type"]
+        mlobject.kk_cutoff["values"] = args.cutoffs["values"]
+
+        if mlobject.kk_cutoff["values"] == "optimise":
+
+            mlobject.kk_cutoff["values"] = kk.estimate_cutoff(mlobject, args.optimise)
+
+        if mlobject.persistence_length == "optimise":
+
+            mlobject.persistence_length = kk.estimate_persistence_length(mlobject, args.optimise)
 
         time_per_region = time()
+        cutoffs = mlobject.kk_cutoff["values"]  # Create a list of cutoffs to iterate over
 
-        for i, cutoff in enumerate(args.cutoffs["values"]):
+        for i, cutoff in enumerate(cutoffs):
 
             time_per_cutoff = time()
 
-            mlobject.kk_cutoff["values"] = args.cutoffs["values"][i]  # Select cut-off for this iteration
+            mlobject.kk_cutoff["values"] = cutoffs[i]  # Select cut-off for this iteration
             mlobject = kk.get_restraints_matrix(mlobject, False, silent)  # Get submatrix of restraints
 
             if mlobject.kk_restraints_matrix is None:
@@ -317,7 +335,7 @@ def get_region_layout(row: pd.Series, args: pd.Series, progress=None, counter: i
             mlobject.kk_coords = list(mlobject.kk_nodes.values())
             mlobject.kk_distances = distance.cdist(mlobject.kk_coords, mlobject.kk_coords, "euclidean")
 
-            if len(args.cutoffs["values"]) > 1:
+            if len(cutoffs) > 1:
 
                 if not silent:
                     
@@ -329,18 +347,18 @@ def get_region_layout(row: pd.Series, args: pd.Series, progress=None, counter: i
 
                     progress["plots"] = True
 
-            elif len(args.cutoffs["values"]) == 1:
+            elif len(cutoffs) == 1:
 
                 if not silent:
 
-                    if args.cutoffs["cutoff_type"] == "percentage":
+                    if mlobject.kk_cutoff["cutoff_type"] == "percentage":
 
                         print(
                             f"\tKamada-Kawai layout of region '{mlobject.region}' at {int(cutoff * 100)} % cutoff "
                             f"saved to file: '{mlobject.save_path}'"
                         )
 
-                    elif args.cutoffs["cutoff_type"] == "absolute":
+                    elif mlobject.kk_cutoff["cutoff_type"] == "absolute":
 
                         print(
                             f"\tKamada-Kawai layout of region '{mlobject.region}' at {cutoff} cutoff saved "
@@ -418,9 +436,16 @@ def run(opts: list):
         sys.exit("Please provide a cutoff (-o) value when using the absolute flag (-a).")
 
     elif opts.cutoff is None or len(opts.cutoff) == 0:
+        
+        if opts.optimise:
 
-        cutoffs["cutoff_type"] = "percentage"
-        cutoffs["values"] = [0.2]
+            cutoffs["cutoff_type"] = "percentage"
+            cutoffs["values"] = "optimise"
+
+        else:
+
+            cutoffs["cutoff_type"] = "percentage"
+            cutoffs["values"] = [0.2]
 
     elif opts.absolute:
 
@@ -432,11 +457,29 @@ def run(opts: list):
         cutoffs["cutoff_type"] = "percentage"
         cutoffs["values"] = [float(i) for i in opts.cutoff]
 
-    if cutoffs["cutoff_type"] == "percentage" and not 0 < cutoffs["values"][0] <= 1:
+    if cutoffs["cutoff_type"] == "percentage" and cutoffs["values"] != "optimise" and not 0 < cutoffs["values"][0] <= 1:
 
         sys.exit("Select a cut-off between 0 and 1.")
 
-    cutoffs["values"].sort(key=float, reverse=True)
+    if not cutoffs["values"] == "optimise":
+
+        cutoffs["values"].sort(key=float, reverse=True)
+
+    if opts.persistence_length is not None:
+
+        persistence_length = opts.persistence_length
+
+    else:
+
+        persistence_length = None
+
+    if persistence_length is not None and persistence_length < 0:
+
+        sys.exit("Persistence length must be a positive number.")
+
+    if opts.optimise:
+
+        persistence_length = "optimise"
 
     if opts.regions is None:
 
@@ -520,7 +563,8 @@ def run(opts: list):
                              "hic_path": opts.hic_file,
                              "resolution": opts.resolution,
                              "cutoffs": cutoffs,
-                             "persistence_length": opts.persistence_length,
+                             "persistence_length": persistence_length,
+                             "optimise": opts.optimise,
                              "force": opts.force,
                              "save_plots": opts.save_plots,
                              "total_num": len(df_regions)})

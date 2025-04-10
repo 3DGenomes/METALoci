@@ -354,7 +354,7 @@ def get_region_layout(row: pd.Series, args: pd.Series, progress=None, counter: i
                     if mlobject.kk_cutoff["cutoff_type"] == "percentage":
 
                         print(
-                            f"\tKamada-Kawai layout of region '{mlobject.region}' at {int(cutoff * 100)} % cutoff "
+                            f"\tKamada-Kawai layout of region '{mlobject.region}' at {int(cutoff * 100)}% cutoff "
                             f"saved to file: '{mlobject.save_path}'"
                         )
 
@@ -398,7 +398,9 @@ def get_region_layout(row: pd.Series, args: pd.Series, progress=None, counter: i
 
         if not silent:
 
-            print(f"\tdone in {timedelta(seconds=round(time() - time_per_region))}.\n")
+            if len(cutoffs) > 1:
+
+                print(f"\tdone in {timedelta(seconds=round(time() - time_per_region))}.\n")
 
     if progress is not None:
 
@@ -473,13 +475,13 @@ def run(opts: list):
 
         persistence_length = None
 
+        if opts.optimise:
+
+            persistence_length = "optimise"
+
     if persistence_length is not None and persistence_length < 0:
 
         sys.exit("Persistence length must be a positive number.")
-
-    if opts.optimise:
-
-        persistence_length = "optimise"
 
     if opts.regions is None:
 
@@ -607,4 +609,5 @@ def run(opts: list):
             get_region_layout(row, parsed_args, counter=counter, silent=False)
 
     print(f"\n\nTotal time spent: {timedelta(seconds=round(time() - start_timer))}.")
+    misc.create_version_log("layout", opts.work_dir)
     print("\nAll done.")

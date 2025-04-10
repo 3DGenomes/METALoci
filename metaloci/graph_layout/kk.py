@@ -101,7 +101,6 @@ def get_subset_matrix(mlobject: mlo.MetalociObject, optimise: bool = False, sile
 
             print(
                 f"\tCut-off = {sorted(mlobject.flat_matrix, reverse = True)[top]:.4f} | Using top: {round(mlobject.kk_cutoff['values'] * 100, ndigits=2)}% highest interactions")
-            print(f"\tPersistence length = {mlobject.persistence_length:.4f}")
 
     elif mlobject.kk_cutoff["cutoff_type"] == "absolute":
 
@@ -114,7 +113,6 @@ def get_subset_matrix(mlobject: mlo.MetalociObject, optimise: bool = False, sile
 
             print(
                 f"\tCut-off = {mlobject.kk_cutoff['values']:.4f} | Using top: {round(perc_temp * 100, ndigits=2)}% highest interactions")
-            print(f"\tPersistence length = {mlobject.persistence_length:.4f}")
 
     if top < len(np.diag(mlobject.matrix)):
 
@@ -156,6 +154,10 @@ def get_subset_matrix(mlobject: mlo.MetalociObject, optimise: bool = False, sile
     else: # -l argument used, use the given persistence length to calculate the subset matrix
 
         subset_matrix[rng, rng + 1] = mlobject.persistence_length
+    
+    if not silent and mlobject.persistence_length != "optimise":
+        
+        print(f"\tPersistence length = {mlobject.persistence_length:.4f}")
 
     subset_matrix[0, 0] = 0
     subset_matrix[rng + 1, rng + 1] = 0  # Remove diagonal

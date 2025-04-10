@@ -272,4 +272,5 @@ def run(opts: list):
     print("Cleaning tmp files...")
     sp.check_call(f"rm -rf {tmp_dir}", shell=True)
     print(f"\nTotal time spent: {timedelta(seconds=round(time() - start_timer))}.")
+    misc.create_version_log("sniffer", opts.work_dir)
     print("All done.")

@@ -249,6 +249,9 @@ def get_hic_plot(mlobject: mlo.MetalociObject, cmap_user: str = "YlOrRd", clean_
     if clean_mat:
 
         array = mlobject.subset_matrix
+        array[np.diag_indices_from(array)] = 0
+        np.fill_diagonal(array[:-1, 1:], 0)
+        np.fill_diagonal(array[1:, :-1], 0)
 
     else:
 
@@ -699,7 +702,7 @@ def get_lmi_scatterplot(mlobject: mlo.MetalociObject, merged_lmi_geometry: pd.Da
         x=[x[mlobject.poi]], y=[y[mlobject.poi]], s=150, ec="lime", fc="none",
         zorder=len(merged_lmi_geometry), marker = "o"
         )
-    sns.regplot(x=x, y=y, scatter=False, color="k", truncate = True)
+    sns.regplot(x=x, y=y, scatter=False, color="k", truncate = True, n_boot=10000)
     sns.despine(top=True, right=True, left=False, bottom=False, offset=10, trim=False)
 
     plt.title(f"Moran Local Scatterplot\n[r: {r_value_scat:4.2f} | p-value: {p_value_scat:.1e}]", fontsize=11)

@@ -168,7 +168,7 @@ def run(opts: list):
     
     if awk_ver < "5.1.0":
         
-        sys.exit("Please, install GNU Awk version 5.1.0 or greater.")
+        sys.exit("Please, install GNU Awk version 5.1.0 or greater.\nExiting...")
 
     start_timer = time()
     tmp_dir = os.path.join(work_dir, "tmp")
@@ -430,4 +430,5 @@ def run(opts: list):
     print(f"\nSignal bed files saved to {work_dir}signal/")
     misc.remove_folder(pathlib.Path(tmp_dir))
     print(f"\nTotal time spent: {timedelta(seconds=round(time() - start_timer))}.")
+    misc.create_version_log("prep", work_dir)
     print("\nAll done.")

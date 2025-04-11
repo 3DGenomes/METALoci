@@ -28,7 +28,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from PIL import Image
 
-from metaloci import mlo
+from metaloci import misc, mlo
+from metaloci.misc import misc
 from metaloci.plot import plot
 
 HELP = "Plots METALoci output."
@@ -126,10 +127,10 @@ def populate_args(parser):
         metavar="INT",
         nargs="*",
         help="Space-separated list with the LMI quadrants to highlight (default: %(default)s). \
-        1: High-high (signal in bin is high, signal on neighbours is high). \
-        2: High-Low (signal in bin is high, signal on neighbours is low). \
-        3: Low-Low (signal in bin is low, signal on neighbours is low). \
-        4: Low-High (signal in bin is low, signal on neighbours is high).",
+        1: High-high, top right (signal in bin is high, signal on neighbours is high). \
+        2: Low-High, top left(signal in bin is low, signal on neighbours is high). \
+        3: Low-Low, bottom left(signal in bin is low, signal on neighbours is low). \
+        4: High-Low, bottom right (signal in bin is high, signal on neighbours is low).",
     )
 
     optional_arg.add_argument(
@@ -260,7 +261,7 @@ def get_figures(row: pd.Series, args: pd.Series, progress=None, counter: int = N
         
         if not silent:
             
-            print(f"\n\tPlotting signal: {signal}")
+            print(f"\tPlotting signal: {signal}")
 
         plot_filename = os.path.join(args.work_dir, mlobject.chrom, "plots",
                                         signal, f"{mlobject.chrom}_{mlobject.start}_{mlobject.end}_{mlobject.poi}")
@@ -599,6 +600,8 @@ def run(opts: list):
 
             pool.terminate()
 
+        print("\n")
+
     else:
 
         for counter, row in df_regions.iterrows():
@@ -607,4 +610,5 @@ def run(opts: list):
 
     print(f"\nInformation saved to: '{os.path.join(opts.work_dir, 'moran_info.txt')}'")
     print(f"\nTotal time spent: {timedelta(seconds=round(time() - start_timer))}.")
+    misc.create_version_log("figure", opts.work_dir)
     print("\nall done.")

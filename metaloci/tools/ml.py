@@ -173,10 +173,10 @@ def populate_args(parser):
         nargs="+",
         default=[1, 3],
         help="Space-separated list with the LMI quadrants to highlight (default: %(default)s). \
-        1: High-high (signal in bin is high, signal on neighbours is high). \
-        2: High-Low (signal in bin is high, signal on neighbours is low). \
-        3: Low-Low (signal in bin is low, signal on neighbours is low). \
-        4: Low-High (signal in bin is low, signal on neighbours is high).",
+        1: High-high, top right (signal in bin is high, signal on neighbours is high). \
+        2: Low-High, top left(signal in bin is low, signal on neighbours is high). \
+        3: Low-Low, bottom left(signal in bin is low, signal on neighbours is low). \
+        4: High-Low, bottom right (signal in bin is high, signal on neighbours is low).",
     )
 
     optional_arg.add_argument(
@@ -241,6 +241,17 @@ def get_lmi(row: pd.Series, args: pd.Series,
 
             print("\t.mlo file not found for this region.\n\tSkipping to next region...")
 
+        if progress is not None:
+
+            progress["mlo_not_found"] = True
+
+            time_spent = time() - progress['timer']
+            time_remaining = int(time_spent / progress['value'] * (args.total_num - progress['value']))
+
+            print(f"\033[A{'  '*int(sp.Popen(['tput','cols'], stdout=sp.PIPE).communicate()[0].strip())}\033[A")
+            print(f"\t[{progress['value']}/{args.total_num}] | Time spent: {timedelta(seconds=round(time_spent))} | "
+                  f"ETR: {timedelta(seconds=round(time_remaining))}", end='\r')
+
         return
 
     if mlobject.kk_nodes is None:
@@ -274,10 +285,8 @@ def get_lmi(row: pd.Series, args: pd.Series,
 
         return
 
-    # Load signals if it has not already been done
-    if mlobject.signals_dict is None:
-
-        mlobject.signals_dict = lmi.load_region_signals(mlobject, signal_data, args.signals)
+    # Load signals 
+    mlobject.signals_dict = lmi.load_region_signals(mlobject, signal_data, args.signals)
 
     # Agreggate signals if needed
     if args.aggregate is not None:
@@ -330,8 +339,10 @@ def get_lmi(row: pd.Series, args: pd.Series,
                 print("\tLMI already computed for this region.\n\tSkipping to next region...")
 
             return
-
-    if mlobject.lmi_geometry is None:
+        
+    # If 'metaloci lm' has already been used on this region, the geometry is already
+    # computed and saved in the .mlo file. If not, it will be computed here.
+    if mlobject.lmi_geometry is None: 
 
         mlobject.lmi_geometry = lmi.construct_voronoi(mlobject, mlobject.kk_distances.diagonal(1).mean() * INFLUENCE)
 
@@ -479,7 +490,11 @@ def run(opts):
 
         try:
 
-            progress = mp.Manager().dict(value=0, timer=start_timer, done=False, missing_signal=None)
+            progress = mp.Manager().dict(value=0,
+                                        timer=start_timer,
+                                        done=False,
+                                        missing_signal=None, 
+                                        mlo_not_found=None)
 
             with mp.Pool(processes=opts.threads) as pool:
 
@@ -503,6 +518,11 @@ def run(opts):
                                 "processed with prep."
                                 "\n\tProcess that signal or remove it from the signal list."
                                 "\n\tExiting...")
+                        
+                    if progress["mlo_not_found"] is not None:
+
+                        print(f"\t.mlo file not found for one or more regions. Make sure to run 'metaloci layout first'"
+                                "\n\tExiting...")
 
                     pool.close()
                     pool.join()
@@ -521,4 +541,5 @@ def run(opts):
             get_lmi(row, args, counter=counter, silent=False)
 
     print(f"\n\nTotal time spent: {timedelta(seconds=round(time() - start_timer))}.")
+    misc.create_version_log("lm", opts.work_dir)
     print("\nAll done.")

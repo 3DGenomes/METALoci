@@ -77,7 +77,7 @@ class MetalociObject:
         Information of the the Local Moran's I output for this region.
     """
 
-    def __init__(self, region: str, resolution: int, persistence_length: float, save_path: str,
+    def __init__(self, region: str, resolution: int, save_path: str,
                  chrom: str = None, start: int = None, end: int = None, poi: int = None):
         """
         
@@ -121,8 +121,8 @@ class MetalociObject:
             self.poi = poi
 
         self.resolution = resolution
-        self.persistence_length = persistence_length
         self.save_path = save_path
+        self.persistence_length = None
         self.subset_matrix = None
         self.matrix = None
         self.bad_region = None

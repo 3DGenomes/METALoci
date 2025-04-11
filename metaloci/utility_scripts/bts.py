@@ -541,4 +541,5 @@ def run(opts: list):
               f"BTS score: {float(ratios_dict[best]):.5f}")
 
     print(f"\nTotal time spent: {timedelta(seconds=round(time() - start_timer))}.")
+    misc.create_version_log("bts", opts.work_dir)
     print("all done.")

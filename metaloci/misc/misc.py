@@ -9,6 +9,7 @@ import re
 import subprocess as sp
 import sys
 from collections import defaultdict
+from importlib.metadata import version
 from pathlib import Path
 from pickle import UnpicklingError
 
@@ -378,7 +379,7 @@ def ucscparser(gene_file: Path, name: str, extend: int, resolution: int) -> tupl
     id_name = defaultdict(str)
     id_chrom = defaultdict(str)
 
-    print("Using a UCSC annotation file. Considering anotated trasncripts as genes.")
+    print("Using a UCSC annotation file. Considering anotated transcripts as genes.")
     print("Gathering information from the annotation file...")
 
     with myopen(gene_file, mode="rt", encoding="utf-8") as ucsc_reader:
@@ -415,7 +416,7 @@ def ucscparser(gene_file: Path, name: str, extend: int, resolution: int) -> tupl
                 id_name[gene_id] = gene_name
                 id_tss[gene_id] = int(line_s[3]) if line_s[6] == "+" else int(line_s[4])
 
-    filename = f"{name}_all_{extend}_{resolution}_agg.txt"
+    filename = f"{name}_all_{extend}_{resolution}_agg_coords.txt"
 
     return id_chrom, id_tss, id_name, filename
 
@@ -506,7 +507,7 @@ def gtfparser(gene_file: Path, name: str, extend: int, resolution: int) -> tuple
     if chrom_index == 0:
 
         chrom_type_patttern = re.compile(r'gene_type "\w+";')
-        filename = f"{name}_all_{extend}_{resolution}_agg.txt"
+        filename = f"{name}_all_{extend}_{resolution}_agg_coords.txt"
         print("Parsing all genes...")
 
     else:
@@ -856,3 +857,46 @@ def has_exactly_one_line(file_path: str) -> bool:
             return False
         
     return True
+
+
+def create_version_log(subprogram: str, work_dir):
+    """
+    Function to create a log of the metaloci version used in each subprogram.
+
+    Parameters
+    ----------
+    subprogram : str
+        Subprogram to log the version.
+    work_dir : str
+        Path to the working directory.
+    """
+    metaloci_version = version("metaloci")  # Replace with actual version logic
+    version_file = os.path.join(work_dir, "version_log.txt")
+
+    if not os.path.exists(version_file):
+
+        with open(version_file, mode="w", encoding="utf-8") as handler:
+
+            handler.write("prep\tNA\n")
+            handler.write("sniffer\tNA\n")
+            handler.write("bts\tNA\n")
+            handler.write("layout\tNA\n")
+            handler.write("lm\tNA\n")
+            handler.write("figure\tNA\n")
+            handler.write("\nIf you encounter any problem, check that your current metaloci version is the same as "
+                          "the ones shown here.\n")
+
+    # Read and update the file
+    with open(version_file, mode="r", encoding="utf-8") as handler:
+
+        lines = handler.readlines()
+
+    with open(version_file, mode="w", encoding="utf-8") as handler:
+
+        for line in lines:
+
+            if line.startswith(subprogram):
+
+                line = f"{subprogram}\tversion=={metaloci_version}\n"
+                
+            handler.write(line)

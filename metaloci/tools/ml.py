@@ -25,8 +25,8 @@ HELP = "Calculates Local Moran's I for every bin in a Kamada-Kawai layout."
 
 DESCRIPTION = """
 Adds signal data to a Kamada-Kawai layout and calculates Local Moran's I for every bin in the layout. Outputs
-a .mlo file with the LMI data for each signal. It can also output a csv with info for each signal and bed files with
-the metalocis found, depending to the flags you set. 
+a .mlo file with the LMI data for each signal. It can also output a .csv with info for each signal and bed files with
+the metalocis found, depending on the flags you set. 
 """
 
 
@@ -63,8 +63,8 @@ def populate_args(parser):
         required=True,
         nargs="*",
         action="extend",
-        help="Path to the file with the samples/signals to use."
-    )
+        help="Space-separated list of signals to plot or path to the file with the list of signals to plot, "
+        "one per line."    )
 
     input_arg.add_argument(
         "-g",
@@ -72,7 +72,10 @@ def populate_args(parser):
         dest="region_file",
         metavar="PATH",
         type=str,
-        help="Region to apply LMI in format chrN:start-end_poi or file containing the regions of interest."
+        help="Region to apply LMI in format chrN:start-end_poi or file containing the regions of interest. " \
+        "If a file is provided, it must contain as a header 'coords', 'symbol' and 'id', and one region per line, \ "
+        "The metaloci region file can be generated with 'metaloci sniffer'. " \
+        "'poi' is the point of interest in the region (its bin number)."
     )
 
     optional_arg = parser.add_argument_group(title="Optional arguments")
@@ -173,10 +176,10 @@ def populate_args(parser):
         nargs="+",
         default=[1, 3],
         help="Space-separated list with the LMI quadrants to highlight (default: %(default)s). \
-        1: High-high, top right (signal in bin is high, signal on neighbours is high). \
-        2: Low-High, top left(signal in bin is low, signal on neighbours is high). \
-        3: Low-Low, bottom left(signal in bin is low, signal on neighbours is low). \
-        4: High-Low, bottom right (signal in bin is high, signal on neighbours is low).",
+        1: High-high, top right (signal in bin is high, signal for neighbours is high). \
+        2: Low-High, top left (signal in bin is low, signal for neighbours is high). \
+        3: Low-Low, bottom left (signal in bin is low, signal for neighbours is low). \
+        4: High-Low, bottom right (signal in bin is high, signal for neighbours is low).",
     )
 
     optional_arg.add_argument(
@@ -184,7 +187,8 @@ def populate_args(parser):
         "--poi_only",
         dest="poi_only",
         action="store_true",
-        help="Flag to only save the point of interest row in the LMI dataframes. Useful for large datasets."
+        help="Flag to only save the point of interest row in the LMI dataframes. Useful for large datasets. " \
+        "You will not be able to use 'metaloci figure' with this option."
     )
 
 

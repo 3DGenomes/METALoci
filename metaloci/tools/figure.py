@@ -34,15 +34,9 @@ from metaloci.plot import plot
 
 HELP = "Plots METALoci output."
 
-DESCRIPTION = """Outputs the different plots to show METALoci.
-It creates the following plots:\n
-\tHiC matrix
-\tSignal plot
-\tKamada-Kawai layout
-\tLocal Moran's I scatterplot
-\tGaudí plot for signal
-\tGaudí plot for LMI quadrant\n
-and a composite image with all the above."""
+DESCRIPTION = """Outputs METALoci output.
+It creates the following plots: Hi-C matrix, Signal plot, Kamada-Kawai layout, Local Moran's I scatterplot,
+Gaudí plot for signal, Gaudí plot for LMI quadrant, and a composite image with all the above."""
 
 
 def populate_args(parser):
@@ -107,7 +101,7 @@ def populate_args(parser):
         dest="rm_types",
         action="store_false",
         default=True,
-        help="Preserve temporal .png image files that are used for making the composed figure (default: %(default)s)."
+        help="Preserve temporary .png image files that are used for making the composite figure (default: %(default)s)."
     )
 
     optional_arg.add_argument(
@@ -116,7 +110,7 @@ def populate_args(parser):
         dest="clean_matrix",
         action="store_true",
         help="Flag to plot the 'clean' Hi-C matrix (the one METALoci uses to calculate the Kamada-Kawai layout) \
-            instead of the 'original' Hi-C matrix (default: %(default)s)."
+        instead of the 'original' Hi-C matrix (default: %(default)s)."
     )
 
     optional_arg.add_argument(
@@ -127,10 +121,10 @@ def populate_args(parser):
         metavar="INT",
         nargs="*",
         help="Space-separated list with the LMI quadrants to highlight (default: %(default)s). \
-        1: High-high, top right (signal in bin is high, signal on neighbours is high). \
-        2: Low-High, top left(signal in bin is low, signal on neighbours is high). \
-        3: Low-Low, bottom left(signal in bin is low, signal on neighbours is low). \
-        4: High-Low, bottom right (signal in bin is high, signal on neighbours is low).",
+        1: High-high, top right (signal in bin is high, signal for neighbours is high). \
+        2: Low-High, top left (signal in bin is low, signal for neighbours is high). \
+        3: Low-Low, bottom left (signal in bin is low, signal for neighbours is low). \
+        4: High-Low, bottom right (signal in bin is high, signal for neighbours is low).",
     )
 
     optional_arg.add_argument(
@@ -176,7 +170,7 @@ def populate_args(parser):
         "--metalocis",
         dest="metalocis",
         action="store_true",
-        help="Flag to select highlightning of the signal plots. If True, only the neighbouring bins from the point of \
+        help="Flag to select highlighting of the signal plots. If True, only the neighbouring bins from the point of \
         interest will be highlighted (independently of the quadrant and significance of those bins, but only if the \
         point of interest is significant). If False, all significant regions that correspond to the quadrant selected \
         with -q will be highlighted (default: False)."
@@ -188,8 +182,9 @@ def populate_args(parser):
         dest="mark_regions",
         metavar="PATH",
         type=str,
-        help="Path to a file to mark certain regions on the gaudí plots. The file must have the following columns "
-        "(tab-separated): region_metaloci chr start end label. The label will be used to mark the region on the plot."
+        help="(experimental) Path to a file to mark certain regions on the gaudí plots. The file must have the " \
+        "following columns (tab-separated): region_metaloci chr start end label. The label will be used to mark the " \
+        "region on the plot."
     )
 
     style_arg.add_argument(
@@ -197,8 +192,9 @@ def populate_args(parser):
         "--neighbourhood",
         dest="neighbourhood_circle",
         action="store_true",
-        help="Flag to plot the neighbourhood on the Kamada-Kawai and Gaudí plots. This is the influence radious around "
-        "the point of interest that will be considered part of the metaloci. (default: False)."
+        help="Flag to plot the neighbourhood extension on the Kamada-Kawai and Gaudí plots. This is the influence " \
+        "radius around the point of interest that will be considered for the local spatial autocorrelation of the " \
+        "point of interest. (default: False)."
     )
 
 

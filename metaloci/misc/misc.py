@@ -17,6 +17,7 @@ import cooler
 import hicstraw
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 
 from metaloci import mlo
 from metaloci.spatial_stats import lmi
@@ -416,7 +417,7 @@ def ucscparser(gene_file: Path, name: str, extend: int, resolution: int) -> tupl
                 id_name[gene_id] = gene_name
                 id_tss[gene_id] = int(line_s[3]) if line_s[6] == "+" else int(line_s[4])
 
-    filename = f"{name}_all_{extend}_{resolution}_agg_coords.txt"
+    filename = f"{name}_all_{int(extend * 2)}_{resolution}_agg_coords.txt"
 
     return id_chrom, id_tss, id_name, filename
 
@@ -507,13 +508,13 @@ def gtfparser(gene_file: Path, name: str, extend: int, resolution: int) -> tuple
     if chrom_index == 0:
 
         chrom_type_patttern = re.compile(r'gene_type "\w+";')
-        filename = f"{name}_all_{extend}_{resolution}_agg_coords.txt"
+        filename = f"{name}_all_{int(extend * 2)}_{resolution}_agg_coords.txt"
         print("Parsing all genes...")
 
     else:
 
         chrom_type_patttern = re.compile(f'gene_type "{gene_type_keys[chrom_index - 1]}";')
-        filename = f"{name}_{gene_type_keys[chrom_index - 1]}_{extend}_{resolution}_gene_coords.txt"
+        filename = f"{name}_{gene_type_keys[chrom_index - 1]}_{int(extend * 2)}_{resolution}_gene_coords.txt"
         print(f"Gene type chosen: {gene_type_keys[chrom_index - 1]}")
 
     id_tss = defaultdict(int)
@@ -624,7 +625,7 @@ def binsearcher(id_tss: dict, id_chrom: dict, id_name: dict, bin_genome: pd.Data
 
     data = defaultdict(list)
 
-    for g_id, tss_pos in id_tss.items():
+    for g_id, tss_pos in tqdm(id_tss.items()):
 
         chrom_bin = bin_genome[(bin_genome["chrom"] == id_chrom[g_id])]
         sub_bin_index = chrom_bin.loc[(chrom_bin["start"] <= tss_pos) & (chrom_bin["end"] >= tss_pos)].index[0]

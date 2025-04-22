@@ -19,7 +19,7 @@ from metaloci.misc import misc
 HELP = "Converts a .gtf/.bed file to a list of regions for METALoci."
 
 DESCRIPTION = """Takes a .gft file or a .bed file and parses it into a region list, with a
-specific resolution and extension. The point of interest of the regions is the middle bin.
+specific resolution and extension. Each gene will be a point of interest and the region will be centered around it. 
 Human/mouse gtf files can be downloaded from the GENCODE website. For other species, please
 refer to the UCSC website. BED files can be used to create a custom region list, using the following format:
 chromosome, start, end, gene_symbol, gene_id. Strandness can be added to the bed file by adding a 6th column; if not,
@@ -47,7 +47,7 @@ def populate_args(parser):
         metavar="PATH",
         type=str,
         required=True,
-        help="Path to the working directory where data will be stored.",
+        help="Path to working directory.",
     )
 
     input_arg.add_argument(
@@ -57,7 +57,9 @@ def populate_args(parser):
         metavar="PATH",
         type=str,
         required=True,
-        help="Path to the chrom sizes file (where the script should stop).",
+        help="Full path to a file that contains the name of the chromosomes in the first column and the ending " \
+        "coordinate of the chromosome in the second column. This can be found in UCSC Genome Browser website for your " \
+        "species."
     )
 
     input_arg.add_argument(
@@ -77,17 +79,19 @@ def populate_args(parser):
         metavar="INT",
         required=True,
         type=int,
-        help="Resolution at which to split the genome.",
+        help="Resolution at which to split the genome, in bp. This should be the resolution you have in your Hi-C data, but " \
+        "it will not be checked.",
     )
 
     input_arg.add_argument(
-        "-e",
-        "--extend",
-        dest="extension",
+        "-wi",
+        "--window",
+        dest="window",
         metavar="INT",
         required=True,
         type=int,
-        help="How many bp the script should extend the region (upstream and downstream).",
+        help="Size of the regions in bp. The region will be centered around the point of interest. Regions close " \
+        "to the telomeres will be smaller, but still centered around the point of interest." 
     )
 
     optional_arg = parser.add_argument_group(title="Optional arguments")
@@ -113,7 +117,7 @@ def populate_args(parser):
         dest="ucsc_bool",
         required=False,
         action="store_true",
-        help="The gene file is in UCSC format.",
+        help="Flag if the gene file you are using is in UCSC format.",
     )
 
     optional_arg.add_argument(
@@ -121,7 +125,7 @@ def populate_args(parser):
         dest="strand",
         required=False,
         action="store_true",
-        help="The file has strand information. ONLY FOR BED FILES.",
+        help="The file has strand information in the last column. ONLY FOR BED FILES.",
     )
 
     optional_arg.add_argument(
@@ -146,7 +150,7 @@ def run(opts: list):
     chrom_sizes = opts.chrom_sizes
     gene_file = opts.gene_file
     resolution = opts.resolution
-    extension = opts.extension
+    extension = int(opts.window / 2)
     name = opts.name
     ucsc_bool = opts.ucsc_bool
     strand = opts.strand
@@ -169,7 +173,7 @@ def run(opts: list):
         chrom_sizes: {chrom_sizes}
         gene_file: {gene_file}
         resolution: {resolution}
-        extension: {extension}
+        window: {extension}
         name: {name}
         ucsc_bool: {ucsc_bool}
         strand: {strand}
@@ -180,6 +184,7 @@ def run(opts: list):
 
     start_timer = time()
 
+    
     n_of_bins = int(extension / resolution)
     tmp_dir = os.path.join(work_dir, "tmp")
 
@@ -202,52 +207,47 @@ def run(opts: list):
 
     if ucsc_bool:
 
-        ID_CHROM, ID_TSS, ID_NAME, FN = misc.ucscparser(gene_file, name, extension, resolution)
+        ID_CHROM, ID_TSS, ID_NAME, file_name = misc.ucscparser(gene_file, name, extension, resolution)
 
     elif "gtf" in gene_file:
 
-        ID_CHROM, ID_TSS, ID_NAME, FN = misc.gtfparser(gene_file, name, extension, resolution)
+        ID_CHROM, ID_TSS, ID_NAME, file_name = misc.gtfparser(gene_file, name, extension, resolution)
 
     elif "bed" in gene_file:
 
         # get the first line of gene_file and check if it has 5 or 6 columns
         with open(gene_file, mode="r", encoding="utf-8") as handler:
+
             first_line = handler.readline().strip().split("\t")
 
         if strand and len(first_line) == 5:
+
             sys.exit("ERROR: The bed file must have 6 columns to include strand information.")
+
         elif not strand and len(first_line) == 6:
+
             sys.exit("ERROR: The bed file must have 5 columns to exclude strand information.")
 
-        ID_CHROM, ID_TSS, ID_NAME, FN = misc.bedparser(gene_file, name, extension, resolution, strand)
+        ID_CHROM, ID_TSS, ID_NAME, file_name = misc.bedparser(gene_file, name, extension, resolution, strand)
 
     else:
 
         sys.exit("ERROR: The annotation file must be either a .gtf(.gz) or a .bed(.gz) file.")
 
-    # print(ID_CHROM)
-    # print(ID_TSS)
-    # print(ID_NAME)
-
     data = misc.binsearcher(ID_TSS, ID_CHROM, ID_NAME, bin_genome)
+    bins_by_chrom = bin_genome.groupby("chrom")
+    lines = ["coords\tsymbol\tid"]
 
     print("Parsing the gene annotation file... Done.")
     print("Gathering information about bin index where the gene is located...")
-    print(f"A total of {data.shape[0]} entries will be written to {os.path.join(work_dir, FN)}")
-
-    bins_by_chrom = bin_genome.groupby("chrom")
-
-    lines = ["coords\tsymbol\tid"]
-
+    print(f"A total of {data.shape[0]} entries will be written to {os.path.join(work_dir, file_name)}")
+    
     for row in tqdm(data.itertuples(), total=len(data)):
 
         chrom_bin = bins_by_chrom.get_group(row.chrom)
-
         bin_start = max(0, (row.bin_index - n_of_bins))
         bin_end = min(chrom_bin.index.max(), (row.bin_index + n_of_bins))
-
         region_bin = chrom_bin.loc[(chrom_bin.index >= bin_start) & (chrom_bin.index <= bin_end)].reset_index()
-
         coords = f"{row.chrom}:{region_bin.iloc[0].start}-{region_bin.iloc[-1].end}"
 
         try:
@@ -265,7 +265,7 @@ def run(opts: list):
 
         lines.append(f"{coords}_{POI}\t{row.gene_name}\t{row.gene_id}")
 
-    with open(os.path.join(work_dir, FN), mode="w", encoding="utf-8") as handler:
+    with open(os.path.join(work_dir, file_name), mode="w", encoding="utf-8") as handler:
 
         handler.write("\n".join(lines))
 

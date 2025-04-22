@@ -21,7 +21,7 @@ HELP = "Extracts data about the point of interest of your regions."
 DESCRIPTION = """This script parses the LMI information files created by METALoci.
 
 The output file will contain regions that pass the quadrant and p-value threshold for a given
-signal. In case it doesn't pass this filters, the script will output NA."""
+signal. In case it doesn't pass these filters, the script will output NA."""
 
 
 def populate_args(parser):

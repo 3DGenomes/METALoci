@@ -2,3 +2,4 @@ docutils<0.21
 sphinx-rtd-theme
 sphinx==7.3.7
 sphinx-argparse
+cppy>=1.2.0

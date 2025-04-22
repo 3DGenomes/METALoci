@@ -33,7 +33,7 @@ This package has several submodules that we can invoke from the command line. Th
 * ``metaloci prep``: Processing of the ``.bed`` signal files for them to be used in METALoci.
 * ``metaloci layout``: Generation of the Kamada-Kawai layouts, given a Hi-C matrix and a list of regions to process.
 * ``metaloci lm``: Calculation of the spatial autocorrelation of the signal given the previously calculated layouts.
-* ``metaloci plot``: Plotting of the results of the pipeline.
+* ``metaloci figure``: Plotting of the results of the pipeline.
 
 Additionally, we have a few QoL scripts that can be used to generate necessary files, find the best parameters for the
 run, and some downstream analysis. These are:
@@ -104,20 +104,20 @@ only contains the regions of chromosome 19. You can generate the region file wit
 
 .. code-block:: bash
 
-    metaloci sniffer -w example_working_directory -s data/mm39_chrom_sizes.txt -g data/gencode.vM35.annotation_chr19.gtf.gz -r 10000 -e 2000000
+    metaloci sniffer -w example_working_directory -s data/mm39_chrom_sizes.txt -g data/gencode.vM35.annotation_chr19.gtf.gz -r 10000 -wi 4000000
 
 When prompted, select 'protein coding', with ``6 + ENTER``. This should create a new working directory and create a 
 ``metaloci region file`` inside it.
 
 The ``-r`` flag is the resolution of the Hi-C matrix. It is recommended to use the highest resolution your Hi-C
-matrix can provide. The ``-e`` flag is the amount of bp --upstream and downstream-- to extend the region around the
+matrix can provide. The ``-wi`` flag is the size of the region that will be processed centered around the TSS, our
 point of interest. These two parameters will determine the number of bins the Kamada-Kawai layout will have (in this 
 case, 4000000 / 10000 = 400 bins)
 
 .. note::
 
-    The recommended amount of bins is around 400. In this case, 2Mb upstream and downstream would be 4000000 / 10000 = 
-    400 bins. **A number of bins higher than 900 is not recommended**.
+    The recommended amount of bins is around 400. In this case, 4Mb 4000000 / 10000 = 400 bins.
+     **A number of bins higher than 900 is not recommended**.
 
 *You can read more about this script in the* :ref:`cli_usage` *section.*
 
@@ -127,7 +127,7 @@ Binning the signal files
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 In order to be able to use the signal files in METALoci, we need to bin them. This is done with the ``metaloci prep``
-script. This script will take the signal files and bin them according to the Hi-C matrix resolution. It will also take
+script. This script will take the signal files and bin them according to the Hi-C matrix resolution. It will then take
 care of assigning the proper 'amount of signal' to each bin if the signal is already binned to a higher resolution.
 If multiple files are provided, the script will merge them into a single file. If the bed files do not have a header,
 the name of the signal will be the name of the file. You need to provide the Hi-C matrix you will be using in further
@@ -164,10 +164,16 @@ Layouting the Hi-C matrix
 Finding the best parameters
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-We have already chosen the resolution of the Hi-C matrix and the amount of bp around the point of interest. However, we
+.. note::
+
+    **As of METALoci v1.2.0, a new way of estimating the best parameters for the layout has been implemented. 'metaloci bts'
+    will still be available, but using the flag '-i' in 'metaloci layout' is the prefered way of estimating the best parameters.**
+
+We have already chosen the resolution of the Hi-C matrix and the size of the region. However, we
 still need to find the best values for the ``cut-off`` and the ``persistence length``. The ``cut-off`` is the minimum
 value of the Hi-C matrix that will be considered in the layout. The ``persistence length`` is a value of the 'stiffness'
-of the layout. The higher the value, the more 'stiff' the layout will be. To find the best values for these parameters,
+of the layout, that corresponds to the minimum distance between two consecutive particles in the layout. 
+The higher the value, the more 'stiff' the layout will be. To find the best values for these parameters,
 we will use the ``metaloci bts`` script:
 
 .. code-block:: bash
@@ -175,7 +181,7 @@ we will use the ``metaloci bts`` script:
     metaloci bts -w example_working_directory -c data/hic/ICE_DM_5kb_eef0283c05_chr19.mcool -r 10000 -g example_working_directory/example_working_directory_protein_coding_2000000_10000_gene_coords.txt 
 
 This script may take a few hours, depending on the computing power of your PC. Once you have determined the best values
-for your Hi-C you will not need to run this sript ever again. You can skip running this script for the sake of speed.
+for your Hi-C you will not need to run this script ever again. You can skip running this script for the sake of speed.
 **The output parameters for this run would be** ``cut-off = 0.2`` **and** ``persistence length = 7.044``.
 
 *You can read more about this script in the* :ref:`cli_usage` *section.*
@@ -187,7 +193,7 @@ Running 'metaloci layout'
 
 Now that we have all the necessary files, we can run the ``metaloci layout`` script. This script will generate the 
 Kamada-Kawai layout for the Hi-C matrix. The script would use the ``metaloci region file`` that has been computed by
-``metaloci sniffer``, that contains all the regions in chromosome 19. fot he sake of speed, we will make a subset to 
+``metaloci sniffer``, that contains all the regions in chromosome 19. for the sake of speed, we will make a subset to 
 only process the first 16 regions. To subset the file, run:
 
 .. code-block:: bash
@@ -200,6 +206,17 @@ And then run the layout script, which will automatically recognise the new regio
 .. code-block:: bash
 
     metaloci layout -w example_working_directory -c data/hic/ICE_DM_5kb_eef0283c05_chr19.mcool -r 10000 -o 0.2 -l 7.044 
+
+Alternatively, you can use the flag '-i' to automatically estimate the best parameters for each region. You can omit 
+the -o, the -l or just one of them, and it will be automatically estimated:
+
+.. code-block:: bash
+
+    metaloci layout -w example_working_directory -c data/hic/ICE_DM_5kb_eef0283c05_chr19.mcool -r 10000 -i 
+
+
+Note that using '-i' several times in one region might slightly change the results, as the way the cut-off is estimated 
+is not deterministic.
 
 If you wish to use another ``metaloci region file``, you can specify it with the ``-g`` flag. You can also 
 specify a single region rather than using a whole region file (e.g. ``chr19:2310000-6320000_200``). The ``-m`` flag
@@ -262,7 +279,7 @@ To plot the results, run:
 
 .. code-block:: bash
 
-    metaloci figure -w example_working_directory -s mm39_organoid_ATAC_4000_chr19 -g data/example_working_directory_protein_coding_2000000_10000_gene_coords_subset.txt
+    metaloci figure -w example_working_directory -s mm39_organoid_ATAC_4000_chr19 
 
 You can check the plots in the ``plots`` folder inside the chromosome folder. A 'composite' image with all the plots 
 will also be generated.

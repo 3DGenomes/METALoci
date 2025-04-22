@@ -42,12 +42,12 @@ Finds the best combination of parameters for your Hi-C.
 DESCRIPTION = """
 Find the best combination persistence length and cut-off for your Hi-C, given a Hi-C resolution.\n
 
-Check first the maximum resolution yout Hi-C allows, and supply it to this script. This script will then determine, by
+Check first the maximum resolution your Hi-C allows, and supply it to this script. This script will then determine, by
 computing layouts on a sample of regions, the best combination of persistence length and cut-off for your Hi-C. You can 
 then use these parameters to run 'metaloci layout' on your regions of interest.\n
 
 This can take from minutes to a few hours, depending on the resolution, the size of the regions and the number of 
-cpu's available in your machine. Once you run it for a specific Hi-C and a specific resolution, the parameters will
+cpus available in your machine. Once you run it for a specific Hi-C and a specific resolution, the parameters will
 remain the same for other runs with other signals.\n
 """
 
@@ -97,15 +97,19 @@ def populate_args(parser):
 
     optional_arg = parser.add_argument_group(title="Optional arguments")
 
-    optional_arg.add_argument(
-                            "-g",
+    optional_arg.add_argument("-h",
+                            "--help",
+                            action="help",
+                            help="Show this help message and exit.")
+
+    optional_arg.add_argument("-g",
                             "--region",
                             dest="regions",
                             metavar="PATH",
                             type=str,
                             help="Path to METALoci region file. This is a file with coords in chrN:start-end_midpoint "
                             "format, the 'symbol' and 'id', one region per line, tab separated. This file can be "
-                            "generated from a gtf file using 'metaloci bts'",
+                            "generated from a gtf file using 'metaloci sniffer'",
                         )
 
     optional_arg.add_argument('-s',

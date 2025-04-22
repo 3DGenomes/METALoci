@@ -30,8 +30,8 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 HELP = "Processes signal .bed files to METALoci format."
 
 DESCRIPTION = """
-Processes signal .bed files or .bedGraph files, binnarizing them at a given resolution, merging all signals in the 
-same dataframe and subsetting by chromosomes.
+Processes signal .bed files or .bedGraph files. This will bin them at a given resolution, merge all signals in the 
+same dataframe and subset it by chromosomes.
 """
 
 
@@ -56,7 +56,7 @@ def populate_args(parser):
         required=True,
         metavar="PATH",
         type=str,
-        help="Path to a working directory."
+        help="Path to working directory."
     )
 
     input_arg.add_argument(
@@ -66,7 +66,7 @@ def populate_args(parser):
         required=True,
         metavar="PATH",
         type=str,
-        help="Complete path to the cool/mcool/hic file."
+        help="Path to the cool/mcool/hic file."
     )
 
     input_arg.add_argument(
@@ -79,8 +79,9 @@ def populate_args(parser):
         nargs="*",
         action="extend",
         help="Path to file to process. The file must contain titles for the columns, being the first 3 columns coded "
-        "as chrom, start, end. The following columns should contain the name of the signal. "
-        "Names of the chromosomes must be the same as the coords file described below. "
+        "as chrom, start, end. The following columns contain the name of the signal. For single signal files, if " \
+        "header is omited, the signal name will be the name of the file. "
+        "Names of the chromosomes must be the same as in the Hi-C and the chromosome sizes file. "
     )
 
     input_arg.add_argument(
@@ -90,7 +91,7 @@ def populate_args(parser):
         required=True,
         metavar="INT",
         type=int,
-        help="Resolution of the bins, to binnarize the signal (in bp)."
+        help="Resolution of the bins, to bin the signal (in bp). Hi-C file must contain this resolution."
     )
 
     input_arg.add_argument(
@@ -100,9 +101,9 @@ def populate_args(parser):
         required=True,
         metavar="PATH",
         type=str,
-        help="Full path to a file that contains the name of the chromosomes in the "
-        "first column and the ending coordinate of the chromosome in the "
-        "second column. This can be found in UCSC Genome Browser website for your species of interest."
+        help="Full path to a file that contains the name of the chromosomes in the first column and the ending " \
+        "coordinate of the chromosome in the second column. This can be found in UCSC Genome Browser website for your " \
+        "species."
     )
 
     optional_arg = parser.add_argument_group(title="Optional arguments")
@@ -121,7 +122,8 @@ def populate_args(parser):
         type=str,
         default="median",
         choices=["median", "mean", "min", "max", "count"],
-        help="Type of summarization to use. Options: %(choices)s. Default: %(default)s.")
+        help="Type of summarization to use when merging signal in a single bin. " \
+        "Options: %(choices)s. Default: %(default)s.")
 
     optional_arg.add_argument(
         "-u",

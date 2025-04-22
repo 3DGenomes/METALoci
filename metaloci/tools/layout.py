@@ -68,7 +68,7 @@ def populate_args(parser):
         metavar="PATH",
         type=str,
         required=True,
-        help="Complete path to the cool/mcool/hic file.",
+        help="Path to the cool/mcool/hic file.",
     )
 
     input_arg.add_argument(
@@ -78,7 +78,7 @@ def populate_args(parser):
         metavar="INT",
         type=int,
         required=True,
-        help="Resolution of the HI-C files to be used (in bp).",
+        help="Resolution of the Hi-C files to be used (in bp).",
     )
 
     input_arg.add_argument(
@@ -87,8 +87,10 @@ def populate_args(parser):
         dest="regions",
         metavar="PATH",
         type=str,
-        help="Region to apply LMI in format chrN:start-end_poi or file with the regions of interest. If a file \
-        is provided, it must contain as a header 'coords', 'symbol' and 'id', and one region per line, tab separated.",
+        help="Region to apply LMI in format chrN:start-end_poi or file containing the regions of interest. " \
+        "If a file is provided, it must contain as a header 'coords', 'symbol' and 'id', and one region per line, \ "
+        "The metaloci region file can be generated with 'metaloci sniffer'. " \
+        "'poi' is the point of interest in the region (its bin number)."
     )
 
     optional_arg = parser.add_argument_group(title="Optional arguments")
@@ -106,7 +108,8 @@ def populate_args(parser):
         nargs="*",
         type=float,
         action="extend",
-        help="Fraction of top interactions to keep, space separated (default: 0.2)",
+        help="Fraction of top interactions to keep as restraints for the layout. If more than one is selected, " \
+        "space separated, all of them will be computed and plotted but not saved to an object. (default: 0.2)",
     )
 
     optional_arg.add_argument(
@@ -114,7 +117,8 @@ def populate_args(parser):
         "--absolute",
         dest="absolute",
         action="store_true",
-        help="Treat the cutoff as an absolute value instead of a fraction of top interactions to keep.",
+        help="Treat the cut-off as an absolute value instead of a fraction of top interactions to keep. If this flag "
+        "is set, the cut-off value must be provided in the -o flag. The cut-off value must be a positive number.",
     )
 
     optional_arg.add_argument(
@@ -124,7 +128,8 @@ def populate_args(parser):
         metavar="FLOAT",
         action="store",
         type=float,
-        help="Set a persistence length for the Kamada-Kawai layout.",
+        help="Set a persistence length for the Kamada-Kawai layout. This represents the distance between two "
+        "consecutive points in the layout. The lower the value, the more distance between consecutive points. ",
     )
 
     optional_arg.add_argument(
@@ -132,7 +137,7 @@ def populate_args(parser):
         "--optimise",
         dest="optimise",
         action="store_true",
-        help="Optimise the cutoff and/or the persistence length for the Kamada-Kawai layout.",
+        help="Autmatically optimise the cut-off and/or the persistence length for the Kamada-Kawai layout.",
     )
 
     optional_arg.add_argument(
@@ -140,7 +145,7 @@ def populate_args(parser):
         "--plot",
         dest="save_plots",
         action="store_true",
-        help="Plot the matrix, density and Kamada-Kawai plots, even when a single cutoff is selected.",
+        help="Plot the matrix, density plot and Kamada-Kawai plots.",
     )
 
     optional_arg.add_argument(
@@ -167,7 +172,7 @@ def populate_args(parser):
         "--force",
         dest="force",
         action="store_true",
-        help="Force METALoci to rewrite existing data.")
+        help="Force METALoci to rewrite existing data. This will remove the object and re-create it.")
 
     optional_arg.add_argument(
         "-u",
@@ -471,6 +476,10 @@ def run(opts: list):
 
         persistence_length = opts.persistence_length
 
+        if persistence_length < 0:
+
+            sys.exit("Persistence length must be a positive number.")
+
     else:
 
         persistence_length = None
@@ -478,10 +487,6 @@ def run(opts: list):
         if opts.optimise:
 
             persistence_length = "optimise"
-
-    if persistence_length is not None and persistence_length < 0:
-
-        sys.exit("Persistence length must be a positive number.")
 
     if opts.regions is None:
 

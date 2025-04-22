@@ -26,4 +26,4 @@ sphinx-rtd-theme==2.0.0
 sphinx==7.3.7
 tqdm==4.66.3
 sphinx-argparse
-
+cppy>=1.2.0

@@ -10,7 +10,7 @@ Install metaloci from PyPI:
 
 .. code-block:: bash
 
-    conda create -n metaloci -c bioconda python==3.9 bedtools==2.31.1
+    conda create -n metaloci -c bioconda python==3.9 bedtools
     conda activate metaloci
     pip install metaloci
 

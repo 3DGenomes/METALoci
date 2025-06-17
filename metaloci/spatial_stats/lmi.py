@@ -26,7 +26,7 @@ from metaloci.misc import misc
 warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
 
 
-def construct_voronoi(mlobject: mlo.MetalociObject, buffer: float) -> pd.DataFrame:
+def construct_voronoi(mlobject: mlo.MetalociObject, buffer: float, del_args: pd.Series = None) -> pd.DataFrame:
     """
     Takes a Kamada-Kawai layout in a METALoci object and calculates the geometry of each voronoi
     around each point of the Kamada-Kawai, in order the make a gaudi plot.
@@ -87,6 +87,11 @@ def construct_voronoi(mlobject: mlo.MetalociObject, buffer: float) -> pd.DataFra
 
     df_geometry = pd.DataFrame(df_geometry)
 
+    if del_args is not None:
+
+        df_geometry["bin_index"] = df_geometry["bin_index"].apply(
+                    lambda x: x if x < del_args.i else x + del_args.num_bins_to_delete)
+    
     return df_geometry
 
 
@@ -187,7 +192,7 @@ def load_region_signals(mlobject: mlo.MetalociObject, signal_data: dict, signal_
 
 
 def compute_lmi(mlobject: mlo.MetalociObject, signal_type: str, neighbourhood: float, n_permutations: int = 9999,
-                signipval: float = 0.05, silent: bool = False, poi_only=False) -> pd.DataFrame:
+                signipval: float = 0.05, silent: bool = False, poi_only=False, del_args = None) -> pd.DataFrame:
     """
     Computes Local Moran's Index for a signal type and outputs information of the LMI value and its p-value
     for each bin for a given signal, as well as some other information.
@@ -223,13 +228,37 @@ def compute_lmi(mlobject: mlo.MetalociObject, signal_type: str, neighbourhood: f
 
     for _, row in mlobject.lmi_geometry.iterrows():
 
-        signal_values.append(np.nanmedian([filtered_signal_type[key][row.bin_index] for key in filtered_signal_type]))
+        if del_args is not None: # If metaloci scan, handle deleted bins
+
+            if row.bin_index > del_args.i:
+
+                signal_values.append(np.nanmedian([filtered_signal_type[signal][row.bin_index - del_args.num_bins_to_delete] for signal in filtered_signal_type]))
+
+            else:
+                
+                signal_values.append(np.nanmedian([filtered_signal_type[signal][row.bin_index] for signal in filtered_signal_type]))
+
+        else:
+
+            signal_values.append(np.nanmedian([filtered_signal_type[signal][row.bin_index] for signal in filtered_signal_type]))
 
     signal_geometry = {"v": [], "geometry": []}
 
     for _, poly in mlobject.lmi_geometry.sort_values(by="moran_index").reset_index().iterrows():
 
-        signal_geometry["v"].append(signal_values[poly.bin_index])
+        if del_args is not None: # If metaloci scan, handle deleted bins
+
+            if poly.bin_index > del_args.i:
+
+                signal_geometry["v"].append(signal_values[poly.bin_index - del_args.num_bins_to_delete])
+
+            else:
+
+                signal_geometry["v"].append(signal_values[poly.bin_index])
+        else:
+
+            signal_geometry["v"].append(signal_values[poly.bin_index])
+        
         signal_geometry["geometry"].append(poly.geometry)
 
     gpd_signal = gpd.GeoDataFrame(signal_geometry)  # Stored in Geopandas DataFrame to do LMI
@@ -271,17 +300,30 @@ def compute_lmi(mlobject: mlo.MetalociObject, signal_type: str, neighbourhood: f
         df_lmi["bin_chr"].append(mlobject.chrom)
         df_lmi["bin_start"].append(bin_start)
         df_lmi["bin_end"].append(bin_end)
-        df_lmi["signal"].append(signal_values[row.bin_index])
+
+        if del_args is not None: # This is to handle the case when bins are deleted in metaloci scan
+
+            if row.bin_index > del_args.i:
+
+                df_lmi["signal"].append(signal_values[row.bin_index - del_args.num_bins_to_delete])
+
+            else:
+
+                df_lmi["signal"].append(signal_values[row.bin_index])
+        else:
+
+            df_lmi["signal"].append(signal_values[row.bin_index])
+
         df_lmi["moran_index"].append(row.moran_index)
         df_lmi["moran_quadrant"].append(moran_local_object.q[row.moran_index])
         df_lmi["LMI_score"].append(round(moran_local_object.Is[row.moran_index], 9))
         df_lmi["LMI_pvalue"].append(round(moran_local_object.p_sim[row.moran_index], 9))
-        # df_lmi["ZSig"].append(y[row.moran_index])
-        # df_lmi["ZLag"].append(lags[row.moran_index])
         df_lmi["ZSig"].append(ZSig[row.moran_index])
         df_lmi["ZLag"].append(ZLag[row.moran_index])
 
+
     df_lmi = pd.DataFrame(df_lmi)
+    
     # Changing the data types to the proper ones so the pickle file has a smaller size.
     df_lmi["ID"] = df_lmi["ID"].astype(str)
     df_lmi["bin_index"] = df_lmi["bin_index"].astype(np.ushort)

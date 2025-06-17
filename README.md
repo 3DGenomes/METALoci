@@ -21,7 +21,7 @@ may be any numerical signal (as long as it is in a .bed file, with the location 
 ## Install metaloci from PyPI:
 
 ```bash
-conda create -n metaloci -c bioconda python==3.9 bedtools==2.31.1
+conda create -n metaloci -c bioconda python==3.9 bedtools
 conda activate metaloci
 pip install metaloci
 ```

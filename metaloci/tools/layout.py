@@ -259,7 +259,6 @@ def get_region_layout(row: pd.Series, args: pd.Series, progress=None, counter: i
         mlobject = mlo.MetalociObject(
             region=row.coords,
             resolution=args.resolution,
-            # persistence_length=args.persistence_length,
             save_path=save_path,
         )
 

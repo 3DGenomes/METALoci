@@ -693,7 +693,7 @@ def write_bed(mlobject: mlo.MetalociObject, signal_type: str, neighbourhood: int
             print(f"\t-> Bed file with metalocis location saved to: {bed_file_name}")
 
 
-def write_moran_data(mlobject: mlo.MetalociObject, args, silent=False) -> None:
+def write_moran_data(mlobject: mlo.MetalociObject, args, scan: bool = False, silent: bool = False) -> None:
     """
     Writes the Moran data to a file.
 
@@ -703,25 +703,58 @@ def write_moran_data(mlobject: mlo.MetalociObject, args, silent=False) -> None:
         METALoci object with the Moran data.
     args : argparse.Namespace
         Arguments from the command line.
+    scan : bool, optional
+        Whether the data is part of a scan (default: False).
     silent : bool, optional
-        Variable that controls the verbosity of the function (useful for multiprocessing), by default False.
+        Controls verbosity (default: False).
     """
+    
+    region_sanitized = re.sub(r'[:|-]', '_', mlobject.region)
 
     for signal, df in mlobject.lmi_info.items():
 
-        moran_data_path = os.path.join(args.work_dir, mlobject.chrom, "moran_data", signal)
+        # Determine base directory
+        if scan:
+            
+            moran_data_path = os.path.join(
+                args.work_dir, "scan", mlobject.chrom, "moran_data", signal,
+                f"{region_sanitized}_{args.create_gif}"
+            )
 
+        else:
+
+            moran_data_path = os.path.join(
+                args.work_dir, mlobject.chrom, "moran_data", signal, region_sanitized
+            )
+
+        # Create directory once
         pathlib.Path(moran_data_path).mkdir(parents=True, exist_ok=True)
-        df.to_csv(
-            os.path.join(
-                moran_data_path,
-                f"{re.sub(':|-', '_', mlobject.region)}_{signal}.tsv"),
-            sep="\t", index=False, float_format="%.12f")
 
+        # Determine file name
+        if scan:
+
+            if args.wt:
+
+                filename = f"{region_sanitized}_{signal}_wt.tsv"
+
+            else:
+
+                suffix = mlobject.save_path.rsplit('.mlo', 1)[0].rsplit('_', 1)[-1]
+                filename = f"{region_sanitized}_{signal}_{suffix}.tsv"
+        else:
+
+            filename = f"{region_sanitized}_{signal}.tsv"
+
+        # Full file path
+        file_path = os.path.join(moran_data_path, filename)
+
+        # Save to file
+        df.to_csv(file_path, sep="\t", index=False, float_format="%.12f")
+
+        # Print message if not silent
         if not silent:
 
-            print(F"\t-> Moran data saved to "
-                  f"'{moran_data_path}/{re.sub(':|-', '_', mlobject.region)}_{signal}.tsv'")
+            print(f"\t-> Moran data saved to '{file_path}'")
 
 
 def get_poi_data(line: pd.Series, args: pd.Series):

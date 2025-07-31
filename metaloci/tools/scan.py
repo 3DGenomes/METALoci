@@ -28,20 +28,20 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 import pandas as pd
-from PIL import Image
-from scipy.sparse import csr_matrix
-from scipy.spatial import distance
-
 from metaloci import mlo
 from metaloci.graph_layout import kk
 from metaloci.misc import misc
 from metaloci.plot import plot
 from metaloci.spatial_stats import lmi
+from PIL import Image
+from scipy.sparse import csr_matrix
+from scipy.spatial import distance
 
 HELP = "METALoci modeling with iterative bin deletion.\n"
 
 DESCRIPTION = """
-Creates several METALoci models by iteratively deleting stetches of bins in the region.
+Creates several METALoci models by iteratively deleting stetches of bins in the region. If asked to, it generates a 
+video with all possible deletions.
 """
 
 
@@ -55,7 +55,6 @@ def populate_args(parser):
         ArgumentParser to populate the arguments through the normal METALoci caller.
     """
 
-    # TODO We do not have the silent argument in this parser, don't know if we have to add it...
     parser.formatter_class = lambda prog: HelpFormatter(prog, width=120, max_help_position=60)
 
     input_arg = parser.add_argument_group(title="Input arguments")
@@ -182,6 +181,27 @@ def populate_args(parser):
     )
 
     optional_arg.add_argument(
+        "-l",
+        "--persistence-length",
+        dest="persistence_length",
+        metavar="FLOAT",
+        type=float,
+        default=None,
+        help="Persistence length to use. If not set, it will be optimised.",
+    )
+
+    optional_arg.add_argument(
+        "-o",
+        "--cutoffs",
+        dest="cutoffs",
+        metavar="FLOAT",
+        type=float,
+        nargs="+",
+        default=None,
+        help="Cutoffs to use for the Kamada-Kawai algorithm. If not set, it will be optimised.",
+    )
+
+    optional_arg.add_argument(
         "-f",
         "--force",
         dest="force",
@@ -192,13 +212,13 @@ def populate_args(parser):
 
 def scan(row: pd.Series, args: pd.Series, silent):
 
-    INFLUENCE = 1.5
+    INFLUENCE = 1.5 
     BFACT = 2
 
     region_chrom, _, _, _ = re.split(r":|-|_", row.coords)
-    save_path = os.path.join(args.work_dir, 'scan', region_chrom, 'objects', f"{re.sub(':|-', '_', row.coords)}.mlo")
+    save_path = os.path.join(args.work_dir, 'scan', region_chrom, 'objects', f"{re.sub(':|-', '_', row.coords)}", f"{re.sub(':|-', '_', row.coords)}.mlo")
 
-    pathlib.Path(os.path.join(args.work_dir, 'scan', region_chrom, 'objects',)).mkdir(parents=True, exist_ok=True)
+    pathlib.Path(os.path.join(args.work_dir, 'scan', region_chrom, 'objects', f"{re.sub(':|-', '_', row.coords)}")).mkdir(parents=True, exist_ok=True)
 
     mlobject = mlo.MetalociObject(
             region=row.coords,
@@ -231,8 +251,14 @@ def scan(row: pd.Series, args: pd.Series, silent):
 
         return
 
-    mlobject.kk_cutoff["values"] = kk.estimate_cutoff(mlobject, args.optimise)
-    mlobject.persistence_length = kk.estimate_persistence_length(mlobject, args.optimise)
+    if args.persistence_length == "optimise":
+
+        mlobject.persistence_length = kk.estimate_persistence_length(mlobject, args.optimise)
+
+    if mlobject.kk_cutoff["values"] == "optimise":
+
+        mlobject.kk_cutoff["values"] = kk.estimate_cutoff(mlobject, args.optimise)
+
 
     print("Computing wild-type...", end="\r")
 
@@ -258,7 +284,7 @@ def scan(row: pd.Series, args: pd.Series, silent):
 
     if mlobject.lmi_geometry is None: 
 
-        mlobject.lmi_geometry = lmi.construct_voronoi(mlobject, mlobject.kk_distances.diagonal(1).mean() * INFLUENCE)
+        mlobject.lmi_geometry = lmi.construct_voronoi(mlobject, mlobject.kk_distances.diagonal(1).mean() * INFLUENCE) 
 
     for signal_type in list(mlobject.signals_dict.keys()):
 
@@ -269,6 +295,10 @@ def scan(row: pd.Series, args: pd.Series, silent):
         
         plot.create_composite_figure(mlobject, signal_type, del_args = args, silent = True)    
         misc.write_moran_data(mlobject, args, scan = True, silent = True)
+
+    with open(mlobject.save_path, "wb") as hamlo_namendle:
+        
+        mlobject.save(hamlo_namendle)
 
     print("Computing wild-type -> done.")
     print("Computing iterative deletions...\n")
@@ -309,7 +339,9 @@ def scan(row: pd.Series, args: pd.Series, silent):
 
             with mp.Pool(processes=args.threads) as pool:
 
-                pool.starmap(compute_deletion, [(del_args, copy.deepcopy(mlobject), i, True, progress) for i in range(num_bins - num_bins_to_delete)])
+                pool.starmap(compute_deletion, [(del_args, copy.deepcopy(mlobject), i, True, progress) 
+                                                for i in range(num_bins - num_bins_to_delete)]
+                                                )
 
                 pool.close()
                 pool.join()
@@ -324,6 +356,7 @@ def scan(row: pd.Series, args: pd.Series, silent):
 
             compute_deletion(del_args, mlobject, i, silent=False)
 
+
     if args.create_gif:
 
         for signal_type in mlobject.signals_dict:
@@ -333,7 +366,7 @@ def scan(row: pd.Series, args: pd.Series, silent):
             folder = os.path.join(args.work_dir, "scan", mlobject.chrom, "plots", signal_type, base_name)
             results_folder_path = os.path.join(args.work_dir, "scan", mlobject.chrom, "results", signal_type)
             pathlib.Path(results_folder_path).mkdir(parents=True, exist_ok=True)
-            output_mp4 = os.path.join(results_folder_path, f"{mlobject.chrom}_{mlobject.start}_{mlobject.end}_{intact_poi}.mp4")
+            output_mp4 = os.path.join(results_folder_path, f"{mlobject.chrom}_{mlobject.start}_{mlobject.end}_{intact_poi}_{args.create_gif}.mp4")
             fps = 1 / args.frame_duration
 
             # Load and sort image paths
@@ -472,7 +505,6 @@ def compute_deletion(del_args: pd.Series, mlobject: mlo.MetalociObject, i: int, 
         # Remove a stretch of bins from the matrix
         mlobject.matrix = del_args.intact_matrix[np.ix_(keep_indices, keep_indices)]
 
-        
         # Properly set the poi, because after the deletion bins are shifted
         if gif_poi in delete_indices:
 
@@ -535,8 +567,23 @@ def run(opts: list):
 
     cutoffs = {}
     cutoffs["cutoff_type"] = "percentage"
-    cutoffs["values"] = "optimise"
-    persistence_length = "optimise"
+
+    if opts.cutoffs is None:
+
+        cutoffs["values"] = "optimise"
+
+    else:
+
+        cutoffs["values"] = opts.cutoffs
+
+    if opts.persistence_length is None:
+
+        opts.persistence_length = "optimise"
+
+    else:
+
+        persistence_length = opts.persistence_length
+
     df_regions = pd.DataFrame({"coords": [opts.regions], "symbol": ["symbol"], "id": ["id"]})
     signals = [opts.signals[0]]
 

@@ -19,13 +19,12 @@ import h5py
 import hicstraw
 import networkx as nx
 import pandas as pd
-from scipy.sparse import csr_matrix
-from scipy.spatial import distance
-
 from metaloci import mlo
 from metaloci.graph_layout import kk
 from metaloci.misc import misc
 from metaloci.plot import plot
+from scipy.sparse import csr_matrix
+from scipy.spatial import distance
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
@@ -88,7 +87,7 @@ def populate_args(parser):
         metavar="PATH",
         type=str,
         help="Region to apply LMI in format chrN:start-end_poi or file containing the regions of interest. " \
-        "If a file is provided, it must contain as a header 'coords', 'symbol' and 'id', and one region per line, \ "
+        "If a file is provided, it must contain as a header 'coords', 'symbol' and 'id', and one region per line, " \
         "The metaloci region file can be generated with 'metaloci sniffer'. " \
         "'poi' is the point of interest in the region (its bin number)."
     )
@@ -145,7 +144,16 @@ def populate_args(parser):
         "--plot",
         dest="save_plots",
         action="store_true",
+        default=False,
         help="Plot the matrix, density plot and Kamada-Kawai plots.",
+    )
+
+    optional_arg.add_argument(
+        "-rp",
+        "--remove-poi",
+        dest="remove_poi",
+        action="store_true",
+        help="Remove the point of interest from the Kamada-Kawai layout.",
     )
 
     optional_arg.add_argument(
@@ -234,7 +242,7 @@ def get_region_layout(row: pd.Series, args: pd.Series, progress=None, counter: i
 
                 if not silent:
 
-                    print("\tPlotting Kamada-Kawai...")
+                    print("\t1Plotting Kamada-Kawai...")
 
                 plot.save_mm_kk(mlobject, args.work_dir)
 
@@ -345,7 +353,7 @@ def get_region_layout(row: pd.Series, args: pd.Series, progress=None, counter: i
                     
                     print("\tPlotting Kamada-Kawai...")
 
-                plot.save_mm_kk(mlobject, args.work_dir)
+                plot.save_mm_kk(mlobject, args.work_dir, remove_poi = args.remove_poi)
 
                 if progress is not None:
 
@@ -393,7 +401,7 @@ def get_region_layout(row: pd.Series, args: pd.Series, progress=None, counter: i
 
                         print("\tPlotting Kamada-Kawai...")
 
-                    plot.save_mm_kk(mlobject, args.work_dir)
+                    plot.save_mm_kk(mlobject, args.work_dir, remove_poi=args.remove_poi)
 
             if not silent:
 
@@ -573,7 +581,9 @@ def run(opts: list):
                              "optimise": opts.optimise,
                              "force": opts.force,
                              "save_plots": opts.save_plots,
-                             "total_num": len(df_regions)})
+                             "total_num": len(df_regions),
+                             "remove_poi": opts.remove_poi,                      
+                            })
 
     start_timer = time()
 

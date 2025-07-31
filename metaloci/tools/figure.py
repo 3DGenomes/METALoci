@@ -514,6 +514,7 @@ def run(opts: list):
     # the signals in a list. If not, store the signal in a list. If there are more than one signal, check if they are
     # files, if so exit. If not, store the signals in a list.
     if len(opts.signals) == 1:
+        
         if os.path.isfile(opts.signals[0]) and os.access(opts.signals[0], os.R_OK):
 
                 with open(opts.signals[0], "r", encoding="utf-8") as handler:

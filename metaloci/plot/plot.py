@@ -18,15 +18,14 @@ from adjustText import adjust_text
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.lines import Line2D
 from matplotlib.ticker import FormatStrFormatter, MaxNLocator
+from metaloci import mlo
+from metaloci.graph_layout import kk
+from metaloci.misc import misc
 from PIL import Image, ImageDraw, ImageFont
 from pybedtools import BedTool
 from scipy.ndimage import rotate
 from scipy.stats import linregress
 from shapely.geometry import Point
-
-from metaloci import mlo
-from metaloci.graph_layout import kk
-from metaloci.misc import misc
 
 
 def mixed_matrices_plot(mlobject: mlo.MetalociObject):
@@ -129,6 +128,7 @@ def kk_plot_to_subplot(ax, mlobject: mlo.MetalociObject, restraints: bool = True
     ax.axis("off")
 
     if restraints:
+
         nx.draw(
             mlobject.kk_graph,
             mlobject.kk_nodes,
@@ -137,7 +137,9 @@ def kk_plot_to_subplot(ax, mlobject: mlo.MetalociObject, restraints: bool = True
             ax=ax,
             **options,
         )
+
     else:
+
         sns.scatterplot(x=xs, y=ys, hue=range(len(xs)), palette="coolwarm", legend=False, s=50, zorder=2, ax=ax)
 
     g = sns.lineplot(x=xs, y=ys, sort=False, lw=2, color="black", legend=False, zorder=1, ax=ax)
@@ -148,7 +150,10 @@ def kk_plot_to_subplot(ax, mlobject: mlo.MetalociObject, restraints: bool = True
     g.annotate(f"       {mlobject.chrom}:{mlobject.start}", (xs[0], ys[0]), size=9)
     g.annotate(f"       {mlobject.chrom}:{mlobject.end}", (xs[len(xs) - 1], ys[len(ys) - 1]), size=9)
 
-    poi_x, poi_y = xs[mlobject.poi], ys[mlobject.poi]
+    if mlobject.poi is not None: 
+
+        poi_x, poi_y = xs[mlobject.poi], ys[mlobject.poi]
+        sns.scatterplot(x=[poi_x], y=[poi_y], s=50 * 1.5, ec="lime", fc="none", zorder=4, ax=ax)
 
     if neighbourhood:
 
@@ -156,11 +161,10 @@ def kk_plot_to_subplot(ax, mlobject: mlo.MetalociObject, restraints: bool = True
                             fill=False, linestyle=":", alpha=0.5, lw=1, zorder=3)
         ax.add_patch(circle)
 
-    sns.scatterplot(x=[poi_x], y=[poi_y], s=50 * 1.5, ec="lime", fc="none", zorder=4, ax=ax)
 
 
 def get_kk_plot(mlobject: mlo.MetalociObject, restraints: bool = True, 
-                neighbourhood: bool =  False):
+                neighbourhood: bool =  False, remove_poi: bool = False):
     """
     Generate Kamada-Kawai plot from pre-calculated restraints.
 
@@ -178,6 +182,7 @@ def get_kk_plot(mlobject: mlo.MetalociObject, restraints: bool = True,
     kk_plt : matplotlib.pyplot.figure.Figure
         Kamada-Kawai layout plot object.
     """
+
     xs = [mlobject.kk_nodes[n][0] for n in mlobject.kk_nodes]
     ys = [mlobject.kk_nodes[n][1] for n in mlobject.kk_nodes]
 
@@ -208,6 +213,9 @@ def get_kk_plot(mlobject: mlo.MetalociObject, restraints: bool = True,
     g.annotate(f"       {mlobject.chrom}:{mlobject.start}", (xs[0], ys[0]), size=9)
     g.annotate(f"       {mlobject.chrom}:{mlobject.end}", (xs[len(xs) - 1], ys[len(ys) - 1]), size=9)
 
+    if remove_poi and mlobject.poi is not None:
+        
+        mlobject.poi = None
 
     if mlobject.poi is not None: # in case of 'metaloci scan' where we are removing the poi
 
@@ -763,7 +771,7 @@ def get_lmi_scatterplot(mlobject: mlo.MetalociObject, merged_lmi_geometry: pd.Da
     alpha_sp = [1.0 if val < signipval else 0.1 for val in merged_lmi_geometry.LMI_pvalue]
     colors_sp = [colors_lmi[val] for val in merged_lmi_geometry.moran_quadrant]
 
-    plt.scatter(x=x, y=y, s=100, ec="white", fc=colors_sp, alpha=alpha_sp)
+    plt.scatter(x=x, y=y, s=100, ec="white", c=colors_sp, alpha=alpha_sp)
 
     if mlobject.poi is not None: # in case of 'metaloci scan' where we are removing the poi
 
@@ -884,7 +892,7 @@ def get_color_alpha(quadrant: int):
     return colors.get(quadrant, "orange"), 0.5
 
 
-def save_mm_kk(mlobject: mlo.MetalociObject, work_dir: str):
+def save_mm_kk(mlobject: mlo.MetalociObject, work_dir: str, remove_poi: bool = False):
     """
     Save the mixed matrices and Kamada-Kawai plot for a given METALoci object.
 
@@ -908,7 +916,7 @@ def save_mm_kk(mlobject: mlo.MetalociObject, work_dir: str):
             f"{mlobject.kk_cutoff['values']:.2f}_"\
             f"pl-{mlobject.persistence_length:.2f}_" + "{}.pdf"
 
-    get_kk_plot(mlobject).savefig(
+    get_kk_plot(mlobject, neighbourhood = True, remove_poi = remove_poi).savefig(
         os.path.join(
             work_dir,
             mlobject.chrom,
@@ -948,16 +956,20 @@ def create_composite_figure(mlobject: mlo.MetalociObject, signal_type: str, del_
         mark_regions (pd.DataFrame, optional): A DataFrame specifying regions to be marked on the plots. Defaults to None.
         signipval (float, optional): The significance p-value threshold for certain plots. Defaults to 0.05.
         silent (bool, optional): If True, suppresses console output. Defaults to False.
+
     Returns:
         None
+
     Side Effects:
         - Saves multiple plot images (e.g., Hi-C plot, Kamada-Kawai plot, Gaudi Signal plot, etc.) in PNG and PDF formats.
         - Creates a composite image combining all individual plots.
         - Deletes intermediate plot files after the composite image is created.
+
     Notes:
         - The function dynamically adjusts plot filenames and configurations based on the provided arguments.
         - If `del_args` is provided, additional processing is performed to handle deletion-specific configurations.
         - The composite image is saved as a PNG and optionally as a PDF, with intermediate files being removed afterward.
+    
     """
 
     plot_opt = {"bbox_inches": "tight", "dpi": 300, "transparent": True}
@@ -1194,9 +1206,10 @@ def create_number_image(output_path: os.path, number: int = None, font_size: flo
         font_size (int): The size of the font to use for rendering the number.
         image_size (tuple): The size of the image in pixels as a tuple (width, height).
         font_path (str, optional): The file path to a TTF font file. If not provided, the function
-            will attempt to use the "DejaVuSans-Bold.ttf" font. If this font is not available,
-            a RuntimeError will be raised.
+        will attempt to use the "DejaVuSans-Bold.ttf" font. If this font is not available,
+        a RuntimeError will be raised.
     Notes:
+
         - The image is created with a transparent background.
         - The number is rendered in black color.
         - The output directory will be created if it does not exist.
@@ -1243,12 +1256,15 @@ def get_lmi_change_scan_plot(moran_data_folder: os.path, results_folder: os.path
     for the given POI, and calculates the mean and standard deviation of the scores. It then 
     plots the scores along with the mean, ±2 standard deviation range, and highlights points 
     that fall outside this range.
+
     Parameters:
         moran_data_folder (str): Path to the folder containing the TSV files with Moran's I data.
         poi (int): The point of interest (POI) for which the LMI scores are analyzed.
+
     Saves:
         A PNG file named `lmi_change_scan_plot_<poi>.png` in the specified folder, containing 
         the generated plot.
+        
     Notes:
         - Points with LMI scores below (mean - 2 * std_dev) are highlighted in blue, and points 
           above (mean + 2 * std_dev) are highlighted in red.

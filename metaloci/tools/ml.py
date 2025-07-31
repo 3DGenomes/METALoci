@@ -16,7 +16,6 @@ from datetime import timedelta
 from time import time
 
 import pandas as pd
-
 from metaloci import mlo
 from metaloci.misc import misc
 from metaloci.spatial_stats import lmi
@@ -73,7 +72,7 @@ def populate_args(parser):
         metavar="PATH",
         type=str,
         help="Region to apply LMI in format chrN:start-end_poi or file containing the regions of interest. " \
-        "If a file is provided, it must contain as a header 'coords', 'symbol' and 'id', and one region per line, \ "
+        "If a file is provided, it must contain as a header 'coords', 'symbol' and 'id', and one region per line, " \
         "The metaloci region file can be generated with 'metaloci sniffer'. " \
         "'poi' is the point of interest in the region (its bin number)."
     )

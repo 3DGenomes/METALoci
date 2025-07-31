@@ -8,7 +8,7 @@ from argparse import (
 from importlib.metadata import version
 
 from metaloci.tests import test_tools
-from metaloci.tools import figure, layout, ml, prep
+from metaloci.tools import figure, layout, ml, prep, scan
 from metaloci.utility_scripts import bts, compressor, gene_selector, sniffer
 
 
@@ -84,6 +84,17 @@ def create_parser():
                                              )
     args_pp["figure"].set_defaults(func=figure.run)
     figure.populate_args(args_pp["figure"])
+
+    args_pp["scan"] = subparser.add_parser("scan", 
+                                             description=scan.DESCRIPTION, 
+                                             help=scan.HELP, 
+                                             add_help=False, 
+                                             formatter_class=RawTextHelpFormatter
+                                             )
+    args_pp["scan"].set_defaults(func=scan.run)
+    scan.populate_args(args_pp["scan"])
+
+
 
     args_pp["compressor"] = subparser.add_parser("compressor", 
                                                 description=compressor.DESCRIPTION, 

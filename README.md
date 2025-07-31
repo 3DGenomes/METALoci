@@ -21,18 +21,26 @@ may be any numerical signal (as long as it is in a .bed file, with the location 
 ## Install metaloci from PyPI:
 
 ```bash
-conda create -n metaloci -c bioconda python==3.9 bedtools
+conda create -n metaloci -c bioconda python==3.12 bedtools
 conda activate metaloci
 pip install metaloci
+```
+
+Do you have trouble compiling dependencies? Perhaps you need an upgraded version of libcurl.
+
+In Ubuntu, you can do this with:
+
+```bash
+sudo apt install -y libcurl4-openssl-dev
 ```
 
 If you are experiencing any unexpected results with METALoci (e.g. your signal after binning is 0 for every bin), we 
 suggest to update the version of **awk** you are using. The recommended version is 5.1.0 or newer.
 
-In Ubuntu, you can do this with:
+In Ubuntu, you can install it with:
 
 ```bash
-sudo apt install gawk
+sudo apt install -y gawk
 ```
 
 ## Contributors

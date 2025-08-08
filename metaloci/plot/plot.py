@@ -705,7 +705,7 @@ def get_highlight(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, neig
 
     else:
 
-        if mlobject.poi is None:
+        if mlobject.poi is not None:
 
             poi_row = lmi_geometry[lmi_geometry.bin_index == mlobject.poi].squeeze()
 

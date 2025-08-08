@@ -26,11 +26,10 @@ from time import time
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import pandas as pd
-from PIL import Image
-
 from metaloci import misc, mlo
 from metaloci.misc import misc
 from metaloci.plot import plot
+from PIL import Image
 
 HELP = "Plots METALoci output."
 
@@ -172,8 +171,8 @@ def populate_args(parser):
         action="store_true",
         help="Flag to select highlighting of the signal plots. If True, only the neighbouring bins from the point of \
         interest will be highlighted (independently of the quadrant and significance of those bins, but only if the \
-        point of interest is significant). If False, all significant regions that correspond to the quadrant selected \
-        with -q will be highlighted (default: False)."
+        point of interest is significant and in a quadrant of interest). If False, all significant regions that \
+        correspond to the quadrant selected with -q will be highlighted (default: False)."
     )
 
     style_arg.add_argument(

@@ -30,7 +30,7 @@ setup(
     author="Leo Zuber, Iago Maceda, Juan Antonio Rodríguez and Marc Martí-Renom",
     author_email="martirenom@cnag.eu",
     classifiers=[
-        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.12",
         "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
         "Topic :: Scientific/Engineering :: Bio-Informatics",
         "Operating System :: POSIX :: Linux",

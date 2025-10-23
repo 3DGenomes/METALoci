@@ -162,7 +162,6 @@ def kk_plot_to_subplot(ax, mlobject: mlo.MetalociObject, restraints: bool = True
         ax.add_patch(circle)
 
 
-
 def get_kk_plot(mlobject: mlo.MetalociObject, restraints: bool = True, 
                 neighbourhood: bool =  False, remove_poi: bool = False):
     """
@@ -374,11 +373,11 @@ def get_gaudi_signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFra
     the signal value. The point of interest is represented by a green point.
     """
 
-    min_value = lmi_geometry.signal.min()
-    max_value = lmi_geometry.signal.max()
+    min_value = lmi_geometry.Sig.min()
+    max_value = lmi_geometry.Sig.max()
 
     gaudi_signal_fig, ax = plt.subplots(figsize=(12, 10), subplot_kw={"aspect": "equal"})
-    lmi_geometry.plot(column="signal", cmap=cmap_user, linewidth=2, edgecolor="white", ax=ax)
+    lmi_geometry.plot(column="Sig", cmap=cmap_user, linewidth=2, edgecolor="white", ax=ax)
 
     if mark_regions is not None:
 
@@ -637,7 +636,7 @@ def signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, neighb
     plt.xticks(bins, coords_b)
     plt.ylabel(f"{lmi_geometry.ID[0]}")
 
-    ax = sns.lineplot(x=lmi_geometry.bin_index, y=lmi_geometry.signal, color="black", lw=0.7)
+    ax = sns.lineplot(x=lmi_geometry.bin_index, y=lmi_geometry.Sig, color="black", lw=0.7)
 
     ax.yaxis.set_major_locator(MaxNLocator(nbins=5, integer=True))
     ax.yaxis.set_major_formatter(FormatStrFormatter("%.2f"))
@@ -727,7 +726,7 @@ def get_highlight(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, neig
 
 
 def get_lmi_scatterplot(mlobject: mlo.MetalociObject, merged_lmi_geometry: pd.DataFrame, neighbourhood: float,
-                        signipval: float = 0.05, colors_lmi: dict = None) -> tuple:
+                        signipval: float = 0.05, zscore_signal: bool = False, colors_lmi: dict = None) -> tuple:
     """
     Get a scatterplot of Z-scores of signal vs Z-score of signal spacial lag, given LMI values.
 
@@ -762,9 +761,18 @@ def get_lmi_scatterplot(mlobject: mlo.MetalociObject, merged_lmi_geometry: pd.Da
     weights = lp.weights.DistanceBand.from_dataframe(merged_lmi_geometry, neighbourhood)
     weights.transform = "r"
 
-    # The weird bit is to get the name of the signal it's currently being calculated.
-    x = mlobject.lmi_info[merged_lmi_geometry["ID"][0]]["ZSig"]
-    y = mlobject.lmi_info[merged_lmi_geometry["ID"][0]]["ZLag"]
+    if zscore_signal:
+
+        # The weird bit is to get the name of the signal it's currently being calculated.
+        x = mlobject.lmi_info[merged_lmi_geometry["ID"][0]]["ZSig"]
+        y = mlobject.lmi_info[merged_lmi_geometry["ID"][0]]["ZLag"]
+
+    else:
+
+        print(mlobject.lmi_info[merged_lmi_geometry["ID"][0]])
+
+        x = mlobject.lmi_info[merged_lmi_geometry["ID"][0]]["Sig"]
+        y = mlobject.lmi_info[merged_lmi_geometry["ID"][0]]["Lag"]
 
     _, _, r_value_scat, p_value_scat, _ = linregress(x, y)
     scatter_fig, ax = plt.subplots(figsize=(5, 5))
@@ -784,11 +792,18 @@ def get_lmi_scatterplot(mlobject: mlo.MetalociObject, merged_lmi_geometry: pd.Da
     sns.despine(top=True, right=True, left=False, bottom=False, offset=10, trim=False)
 
     plt.title(f"Moran Local Scatterplot\n[r: {r_value_scat:4.2f} | p-value: {p_value_scat:.1e}]", fontsize=11)
-    plt.axvline(x=0, color="k", linestyle=":")
-    plt.axhline(y=0, color="k", linestyle=":")
+    plt.axvline(x=np.mean(x), color="k", linestyle=":")
+    plt.axhline(y=np.mean(y), color="k", linestyle=":")
 
-    ax.set_xlabel(f"Z-score ({merged_lmi_geometry.ID[0]})")
-    ax.set_ylabel(f"Z-score ({merged_lmi_geometry.ID[0]} Spatial Lag)")
+    if zscore_signal:
+        
+        ax.set_xlabel(f"Z-score ({merged_lmi_geometry.ID[0]})")
+        ax.set_ylabel(f"Z-score ({merged_lmi_geometry.ID[0]} Spatial Lag)")
+
+    else:
+
+        ax.set_xlabel(f"{merged_lmi_geometry.ID[0]}")
+        ax.set_ylabel(f"{merged_lmi_geometry.ID[0]} Spatial Lag")
 
     r_value_scat = float(r_value_scat)
     p_value_scat = float(p_value_scat)
@@ -829,48 +844,26 @@ def place_composite(image: Image.Image, image_to_add: str, ifactor: float, ixloc
 
 def get_x_axis_label_signal_plot(mlobject: mlo.MetalociObject):
     """
-    Get bin indexes and corresponding coordinates for a given METALoci object.
+    Get the x-axis labels for the signal plot.
 
     Parameters
     ----------
     mlobject : mlo.MetalociObject
-        The METALoci object containing LMI geometry information.
+        METALoci object.
 
     Returns
     -------
     bins : list
-        A list of bin indices, representing the start position of each bin.
+        List of bin indices for the x-axis labels.
     coords_b : list
-        A list of coordinate values, representing the start position of each bin with comma formatting.
-
-    Notes
-    -----
-    This function calculates the bin indices and corresponding coordinates based on the 'mlobject' parameters.
-    It extracts the LMI geometry information from the 'mlobject' and calculates the bin indices for each quadrant.
-
-    The function returns two lists:
-    - 'bins': A list of bin indices, with one element for each quadrant (total of 3 elements).
-    - 'coords_b': A list of coordinate values, formatted with commas, representing the start position of each bin.
+        List of coordinate labels for the x-axis.
     """
-    total_bins = len(mlobject.lmi_geometry)
-    resolution = mlobject.resolution
-    start = mlobject.start
 
-    # Bin indices for: first, middle, last
-    bins = [0, (total_bins - 1) // 2, total_bins - 1]
-
-    # Coordinates: start, midpoint (true midpoint between start and end), end
-    coord_start = start
-    coord_end = start + total_bins * resolution
-    coord_mid = (coord_start + coord_end) // 2
-
-    coords_b = [
-        f"{coord_start:,}",
-        f"{coord_mid:,}",
-        f"{coord_end:,}"
-    ]
+    bins = [0, len(mlobject.lmi_geometry) // 2 - 1, len(mlobject.lmi_geometry) - 1]
+    coords_b = [f"{mlobject.start + b * mlobject.resolution:,}" for b in bins]
 
     return bins, coords_b
+
 
 def get_color_alpha(quadrant: int):
     """

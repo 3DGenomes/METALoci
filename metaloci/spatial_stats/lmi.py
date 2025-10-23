@@ -14,14 +14,13 @@ import numpy as np
 import pandas as pd
 from esda.moran import Moran_Local
 from libpysal.weights.spatial_lag import lag_spatial
+from metaloci import mlo
+from metaloci.misc import misc
 from scipy.spatial import Voronoi
 from scipy.stats import zscore
 from shapely.errors import ShapelyDeprecationWarning
 from shapely.geometry import LineString, Point
 from shapely.ops import polygonize
-
-from metaloci import mlo
-from metaloci.misc import misc
 
 warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
 
@@ -158,7 +157,7 @@ def load_region_signals(mlobject: mlo.MetalociObject, signal_data: dict, signal_
 
     if not all(signal in signal_data.columns for signal in signal_types):
 
-        print("Trying to compute a signal that has not been previously processed in prep. Exiting.")
+        print("Trying to compute a signal that has not been previously processed in prep. Exiting.") 
 
         return None
 
@@ -273,8 +272,8 @@ def compute_lmi(mlobject: mlo.MetalociObject, signal_type: str, neighbourhood: f
         y, weights, permutations=n_permutations, n_jobs=1
     )  # geoda_quadsbool (default=False) If False use PySAL Scheme: HH=1, LH=2, LL=3, HL=4
 
-    ZSig = zscore(y)
-    ZLag = zscore(lag_spatial(moran_local_object.w, moran_local_object.z))
+    Sig = y
+    Lag = lag_spatial(moran_local_object.w, moran_local_object.y)
 
     if not silent:
 
@@ -300,27 +299,28 @@ def compute_lmi(mlobject: mlo.MetalociObject, signal_type: str, neighbourhood: f
         df_lmi["bin_chr"].append(mlobject.chrom)
         df_lmi["bin_start"].append(bin_start)
         df_lmi["bin_end"].append(bin_end)
-
-        if del_args is not None: # This is to handle the case when bins are deleted in metaloci scan
-
-            if row.bin_index > del_args.i:
-
-                df_lmi["signal"].append(signal_values[row.bin_index - del_args.num_bins_to_delete])
-
-            else:
-
-                df_lmi["signal"].append(signal_values[row.bin_index])
-        else:
-
-            df_lmi["signal"].append(signal_values[row.bin_index])
-
         df_lmi["moran_index"].append(row.moran_index)
         df_lmi["moran_quadrant"].append(moran_local_object.q[row.moran_index])
         df_lmi["LMI_score"].append(round(moran_local_object.Is[row.moran_index], 9))
         df_lmi["LMI_pvalue"].append(round(moran_local_object.p_sim[row.moran_index], 9))
-        df_lmi["ZSig"].append(ZSig[row.moran_index])
-        df_lmi["ZLag"].append(ZLag[row.moran_index])
 
+        if del_args is not None: # This is to handle the case when bins are deleted in metaloci scan
+
+            if row.moran_index > del_args.i:
+
+                df_lmi["Sig"].append(Sig[row.moran_index - del_args.num_bins_to_delete])
+
+            else:
+
+                df_lmi["Sig"].append(Sig[row.moran_index])
+        else:
+
+            df_lmi["Sig"].append(Sig[row.moran_index])
+
+        # df_lmi["Lag"] = df_lmi.get("Lag", [])  # Initialize the list if it doesn't exist
+        df_lmi["Lag"].append(Lag[row.moran_index])
+        df_lmi["ZSig"].append(zscore(Sig)[row.moran_index])
+        df_lmi["ZLag"].append(zscore(Lag)[row.moran_index])
 
     df_lmi = pd.DataFrame(df_lmi)
     
@@ -330,11 +330,12 @@ def compute_lmi(mlobject: mlo.MetalociObject, signal_type: str, neighbourhood: f
     df_lmi["bin_chr"] = df_lmi["bin_chr"].astype(str)
     df_lmi["bin_start"] = df_lmi["bin_start"].astype(np.uintc)
     df_lmi["bin_end"] = df_lmi["bin_end"].astype(np.uintc)
-    df_lmi["signal"] = df_lmi["signal"].astype(np.single)
     df_lmi["moran_index"] = df_lmi["moran_index"].astype(np.ushort)
     df_lmi["moran_quadrant"] = df_lmi["moran_quadrant"].astype(np.ubyte)
     df_lmi["LMI_score"] = df_lmi["LMI_score"].astype(np.half)
     df_lmi["LMI_pvalue"] = df_lmi["LMI_pvalue"].astype(np.half)
+    df_lmi["Sig"] = df_lmi["Sig"].astype(np.half)
+    df_lmi["Lag"] = df_lmi["Lag"].astype(np.half)
     df_lmi["ZSig"] = df_lmi["ZSig"].astype(np.half)
     df_lmi["ZLag"] = df_lmi["ZLag"].astype(np.half)
 
@@ -391,6 +392,8 @@ def get_bed(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, neighbourh
     bed : pd.DataFrame
         BED file with the bins that are significant in the Local Moran's I.
     """
+
+    print("\tGetting significant bins around point of interest...")
 
     if poi is None:
 

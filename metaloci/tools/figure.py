@@ -137,6 +137,14 @@ def populate_args(parser):
     )
 
     optional_arg.add_argument(
+        "-z",
+        "--zscore",
+        dest="zscore_signal",
+        action="store_true",
+        help="Flag to use z-score transformed signal values for the scatter plot (default: %(default)s).",
+    )
+
+    optional_arg.add_argument(
         "-m",
         "--mp",
         dest="multiprocess",
@@ -334,7 +342,7 @@ def get_figures(row: pd.Series, args: pd.Series, progress=None, counter: int = N
             print("\t\tLMI Scatter plot", end="\r")
 
         lmi_plt, r_value, p_value = plot.get_lmi_scatterplot(mlobject, merged_lmi_geometry,
-                                                                neighbourhood, args.signipval)
+                                                                neighbourhood, args.signipval, args.zscore_signal)
 
         if lmi_plt is not None:
 
@@ -563,6 +571,7 @@ def run(opts: list):
                              "signipval": opts.signipval,
                              "rm_types": opts.rm_types,
                              "mark_regions": mark_regions,
+                             "zscore_signal": opts.zscore_signal,
                              "debug": opts.debug,
                              "total_num": len(df_regions),
                              "INFLUENCE": INFLUENCE,

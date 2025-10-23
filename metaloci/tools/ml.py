@@ -321,13 +321,17 @@ def get_lmi(row: pd.Series, args: pd.Series,
     if mlobject.lmi_info is not None and args.force is False:
 
         # If the list of signals already processed is equal to the list of signals to process, skip to the next region.
-        if [signal for signal in mlobject.lmi_info.keys()] == list(mlobject.signals_dict.keys()):
+        # if [signal for signal in mlobject.lmi_info.keys()] == list(mlobject.signals_dict.keys()):
+
+        # if the list of signals already processed contains every signal to process, skip to the next region.
+        if all(signal in mlobject.lmi_info.keys() for signal in mlobject.signals_dict.keys()):
 
             if progress is not None:
 
                 progress["done"] = True
 
-            for signal, df in mlobject.lmi_info.items():
+            # for signal, df in mlobject.lmi_info.items():
+            for signal in list(mlobject.signals_dict.keys()):
 
                 if args.moran_info:
 

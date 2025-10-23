@@ -17,10 +17,9 @@ import cooler
 import hicstraw
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
-
 from metaloci import mlo
 from metaloci.spatial_stats import lmi
+from tqdm import tqdm
 
 
 def signal_binnarize(data: pd.DataFrame, sum_type: str) -> pd.DataFrame:
@@ -483,6 +482,7 @@ def gtfparser(gene_file: Path, name: str, extend: int, resolution: int) -> tuple
     gene_type_keys = list(gene_type_count.keys())
 
     for type_index, type_name in enumerate(gene_type_keys):
+
         print(f"Index: {type_index+1}; {type_name}")
 
     chrom_index = None
@@ -509,12 +509,14 @@ def gtfparser(gene_file: Path, name: str, extend: int, resolution: int) -> tuple
 
         chrom_type_patttern = re.compile(r'gene_type "\w+";')
         filename = f"{name}_all_{int(extend * 2)}_{resolution}_agg_coords.txt"
+
         print("Parsing all genes...")
 
     else:
 
         chrom_type_patttern = re.compile(f'gene_type "{gene_type_keys[chrom_index - 1]}";')
         filename = f"{name}_{gene_type_keys[chrom_index - 1]}_{int(extend * 2)}_{resolution}_gene_coords.txt"
+        
         print(f"Gene type chosen: {gene_type_keys[chrom_index - 1]}")
 
     id_tss = defaultdict(int)
@@ -581,11 +583,11 @@ def bedparser(gene_file_f: Path, name: str, extend: int,
 
     print("Gathering information from the annotation file...")
 
-    filename = f"{name}_all_{extend}_{resolution}_agg.txt"
-
+    filename = f"{name}_all_{int(extend*2)}_{resolution}_agg.txt"
     colnames = ["chrom", "start", "end", "symbol", "id"]
 
     if strand:
+
         colnames.append("strand")
 
     bed_file = pd.read_table(gene_file_f, names=colnames)
@@ -593,10 +595,15 @@ def bedparser(gene_file_f: Path, name: str, extend: int,
     for _, row in bed_file.iterrows():
 
         id_chrom[row.id] = row.chrom
+
         if strand:
+
             id_tss[row.id] = row.start if row.strand == "+" else row.end
+
         else:
+
             id_tss[row.id] = row.start
+
         id_name[row.id] = row.symbol
 
     return id_chrom, id_tss, id_name, filename

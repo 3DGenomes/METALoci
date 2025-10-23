@@ -245,8 +245,39 @@ def run(opts: list):
     for row in tqdm(data.itertuples(), total=len(data)):
 
         chrom_bin = bins_by_chrom.get_group(row.chrom)
-        bin_start = max(0, (row.bin_index - n_of_bins))
-        bin_end = min(chrom_bin.index.max(), (row.bin_index + n_of_bins))
+        # Filter out incomplete bins (bins smaller than resolution)
+        chrom_bin = chrom_bin[chrom_bin['end'] - chrom_bin['start'] == resolution].copy()
+
+        if len(chrom_bin) == 0:
+
+            print(f"Warning: No complete bins found for chromosome {row.chrom}")
+
+            continue
+            
+        chrom_max_index = chrom_bin.index.max()
+        # Calculate desired window boundaries
+        desired_start = row.bin_index - n_of_bins
+        desired_end = row.bin_index + n_of_bins
+        
+        # Adjust boundaries to maintain full window size when near chromosome ends
+        if desired_start < 0:
+
+            # Near chromosome start: shift window right
+            bin_start = chrom_bin.index.min()
+            bin_end = min(chrom_max_index, bin_start + 2 * n_of_bins)
+
+        elif desired_end > chrom_max_index:
+
+            # Near chromosome end: shift window left
+            bin_end = chrom_max_index
+            bin_start = max(chrom_bin.index.min(), bin_end - 2 * n_of_bins)
+
+        else:
+            
+            # Gene is in middle of chromosome: use centered window
+            bin_start = desired_start
+            bin_end = desired_end
+        
         region_bin = chrom_bin.loc[(chrom_bin.index >= bin_start) & (chrom_bin.index <= bin_end)].reset_index()
         coords = f"{row.chrom}:{region_bin.iloc[0].start}-{region_bin.iloc[-1].end}"
 

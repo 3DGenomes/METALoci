@@ -769,8 +769,6 @@ def get_lmi_scatterplot(mlobject: mlo.MetalociObject, merged_lmi_geometry: pd.Da
 
     else:
 
-        print(mlobject.lmi_info[merged_lmi_geometry["ID"][0]])
-
         x = mlobject.lmi_info[merged_lmi_geometry["ID"][0]]["Sig"]
         y = mlobject.lmi_info[merged_lmi_geometry["ID"][0]]["Lag"]
 

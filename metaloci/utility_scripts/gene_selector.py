@@ -234,9 +234,7 @@ def run(opts: list):
     print(f"A total of {genes.shape[0]} genes will be parsed.")
 
     HEADER = "coords\tsymbol\tid"
-
-    header_parts = [f"\t{sig}_LMIq\t{sig}_LMIscore\t{sig}_LMIpval\t{sig}_signal\t{sig}_lag" for sig in signal_list]
-
+    header_parts = [f"\t{sig}_LMIq\t{sig}_LMIscore\t{sig}_LMIpval\t{sig}_Sig\t{sig}_Lag\t{sig}_ZSig\t{sig}_ZLag" for sig in signal_list]
     HEADER += ''.join(header_parts)
 
     with open(out_file_name, mode="w", encoding="utf-8") as out_file_handler:

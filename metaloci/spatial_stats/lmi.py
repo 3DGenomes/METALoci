@@ -317,7 +317,6 @@ def compute_lmi(mlobject: mlo.MetalociObject, signal_type: str, neighbourhood: f
 
             df_lmi["Sig"].append(Sig[row.moran_index])
 
-        # df_lmi["Lag"] = df_lmi.get("Lag", [])  # Initialize the list if it doesn't exist
         df_lmi["Lag"].append(Lag[row.moran_index])
         df_lmi["ZSig"].append(zscore(Sig)[row.moran_index])
         df_lmi["ZLag"].append(zscore(Lag)[row.moran_index])
@@ -334,10 +333,10 @@ def compute_lmi(mlobject: mlo.MetalociObject, signal_type: str, neighbourhood: f
     df_lmi["moran_quadrant"] = df_lmi["moran_quadrant"].astype(np.ubyte)
     df_lmi["LMI_score"] = df_lmi["LMI_score"].astype(np.half)
     df_lmi["LMI_pvalue"] = df_lmi["LMI_pvalue"].astype(np.half)
-    df_lmi["Sig"] = df_lmi["Sig"].astype(np.half)
-    df_lmi["Lag"] = df_lmi["Lag"].astype(np.half)
-    df_lmi["ZSig"] = df_lmi["ZSig"].astype(np.half)
-    df_lmi["ZLag"] = df_lmi["ZLag"].astype(np.half)
+    df_lmi["Sig"] = df_lmi["Sig"].astype(np.float32)
+    df_lmi["Lag"] = df_lmi["Lag"].astype(np.float32)
+    df_lmi["ZSig"] = df_lmi["ZSig"].astype(np.float32)
+    df_lmi["ZLag"] = df_lmi["ZLag"].astype(np.float32)
 
     return df_lmi
 
@@ -392,8 +391,9 @@ def get_bed(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, neighbourh
     bed : pd.DataFrame
         BED file with the bins that are significant in the Local Moran's I.
     """
+    if not silent:
 
-    print("\tGetting significant bins around point of interest...")
+        print("\tGetting significant bins around point of interest...")
 
     if poi is None:
 

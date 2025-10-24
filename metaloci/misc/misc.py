@@ -817,7 +817,7 @@ def get_poi_data(line: pd.Series, args: pd.Series):
 
             poi_data = mlo_data["lmi_info"][signal].loc[mlo_data["poi"]].to_dict()
 
-            table_line += f"\t{poi_data['moran_quadrant']}\t{poi_data['LMI_score']}\t{poi_data['LMI_pvalue']}\t{poi_data['ZSig']}\t{poi_data['ZLag']}"
+            table_line += f"\t{poi_data['moran_quadrant']}\t{poi_data['LMI_score']}\t{poi_data['LMI_pvalue']}\t{poi_data['Sig']}\t{poi_data['Lag']}\t{poi_data['ZSig']}\t{poi_data['ZLag']}"
 
             if args.region_file:
 

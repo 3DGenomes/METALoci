@@ -66,7 +66,7 @@ To run METALoci, we will need some example data. You can download it with:
     git clone https://github.com/3DGenomes/METALoci && mv METALoci/metaloci/tests/data . && mv METALoci/docs/tutorial.ipynb . && rm -rf METALoci
 
 This will download the example data to a folder named ``data`` in your current working directory. The data consists of a
-Hi-C matrix, a few ChIP-Seq signals, and a ``.gtf`` file to generate the region file.
+Hi-C matrix, a few ChIP-seq signals, and a ``.gtf`` file to generate the region file.
 
 .. _generating_a_metaloci_region_file:
 
@@ -104,7 +104,11 @@ only contains the regions of chromosome 19. You can generate the region file wit
 
 .. code-block:: bash
 
-    metaloci sniffer -w example_working_directory -s data/mm39_chrom_sizes.txt -g data/gencode.vM35.annotation_chr19.gtf.gz -r 10000 -wi 4000000
+    metaloci sniffer -w example_working_directory -s data/mm39_chrom_sizes.txt -g data/gencode.vM39.annotation_chr19.gtf.gz -r 10000 -wi 4000000
+
+.. note::
+
+    The ''.gtf'' file name could change depending on the version you download from GENCODE.'
 
 When prompted, select 'protein coding', with ``6 + ENTER``. This should create a new working directory and create a 
 ``metaloci region file`` inside it.
@@ -146,7 +150,7 @@ This will create a new folder called ``signal`` inside the working directory.
 
 .. note::
 
-    If you happen to have a very big signal file (i.e. very high resolution ChIP-Seq data for a lot of different marks),
+    If you happen to have a very big signal file (i.e. very high resolution ChIP-seq data for a lot of different marks),
     this script may take a long time to run and use a large amount of memory. The biggest signal file that has been
     tested consisted of a 67 G ``.bed`` file with 11512 different signals. It required ~300 G of memory in an HPC 
     environment and took ~30 hours to run. With a smaller signal file, the script should run in a few minutes 
@@ -198,7 +202,7 @@ only process the first 16 regions. To subset the file, run:
 
 .. code-block:: bash
 
-    { head -n 1 example_working_directory/example_working_directory_protein_coding_2000000_10000_gene_coords.txt; tail -n +2 example_working_directory/example_working_directory_protein_coding_2000000_10000_gene_coords.txt | shuf -n 16; } > example_working_directory/example_working_directory_protein_coding_2000000_10000_gene_subset_coords.txt && rm example_working_directory/example_working_directory_protein_coding_2000000_10000_gene_coords.txt
+    { head -n 1 example_working_directory/example_working_directory_protein_coding_4000000_10000_gene_coords.txt; tail -n +2 example_working_directory/example_working_directory_protein_coding_4000000_10000_gene_coords.txt | shuf -n 16; } > example_working_directory/example_working_directory_protein_coding_2000000_10000_gene_subset_coords.txt && rm example_working_directory/example_working_directory_protein_coding_2000000_10000_gene_coords.txt
     
 
 And then run the layout script, which will automatically recognise the new region file:
@@ -279,7 +283,7 @@ To plot the results, run:
 
 .. code-block:: bash
 
-    metaloci figure -w example_working_directory -s mm39_organoid_ATAC_4000_chr19 
+    metaloci figure -w example_working_directory -s mm39_organoid_ATAC_4000_chr19 -z
 
 You can check the plots in the ``plots`` folder inside the chromosome folder. A 'composite' image with all the plots 
 will also be generated.
@@ -301,7 +305,7 @@ Interpreting the results
     :alt: composite example figure
     :align: left
     
-    Example output for region chr19:41370000-45380000_200 in mm39 myeloid cells with ATAC-Seq.
+    Example output for region chr19:41370000-45380000_200 in mm39 myeloid cells with ATAC-seq.
 
 The ``composite figure`` shows the results of the pipeline for a single region. The following plots have been generated:
 

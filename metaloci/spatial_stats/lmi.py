@@ -333,10 +333,10 @@ def compute_lmi(mlobject: mlo.MetalociObject, signal_type: str, neighbourhood: f
     df_lmi["moran_quadrant"] = df_lmi["moran_quadrant"].astype(np.ubyte)
     df_lmi["LMI_score"] = df_lmi["LMI_score"].astype(np.half)
     df_lmi["LMI_pvalue"] = df_lmi["LMI_pvalue"].astype(np.half)
-    df_lmi["Sig"] = df_lmi["Sig"].astype(np.float32)
-    df_lmi["Lag"] = df_lmi["Lag"].astype(np.float32)
-    df_lmi["ZSig"] = df_lmi["ZSig"].astype(np.float32)
-    df_lmi["ZLag"] = df_lmi["ZLag"].astype(np.float32)
+    df_lmi["Sig"] = df_lmi["Sig"].astype(np.half)
+    df_lmi["Lag"] = df_lmi["Lag"].astype(np.half)
+    df_lmi["ZSig"] = df_lmi["ZSig"].astype(np.half)
+    df_lmi["ZLag"] = df_lmi["ZLag"].astype(np.half)
 
     return df_lmi
 

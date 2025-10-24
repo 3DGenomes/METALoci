@@ -636,6 +636,9 @@ def signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, neighb
     plt.xticks(bins, coords_b)
     plt.ylabel(f"{lmi_geometry.ID[0]}")
 
+    # Cast lmi_geometry.Sig to float32 to avoid new matplotlib version error
+    lmi_geometry.Sig = lmi_geometry.Sig.astype(np.float32)
+    
     ax = sns.lineplot(x=lmi_geometry.bin_index, y=lmi_geometry.Sig, color="black", lw=0.7)
 
     ax.yaxis.set_major_locator(MaxNLocator(nbins=5, integer=True))

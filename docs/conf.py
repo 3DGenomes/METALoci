@@ -6,6 +6,7 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
+import io
 import os
 import sys
 
@@ -20,12 +21,20 @@ import sphinx_rtd_theme
 # Add the 'src' directory to sys.path to make the modules discoverable by Sphinx
 # sys.path.insert(0, os.path.join(project_root, 'src'))
 
+def read(*paths, **kwargs):
+    """Read the contents of a text file safely."""
+    with io.open(
+        os.path.join(os.path.dirname(__file__), *paths),
+        encoding=kwargs.get("encoding", "utf8"),
+    ) as open_file:
+        return open_file.read().strip()
+
 sys.path.insert(0, os.path.abspath('..'))
 
 project = 'METALoci'
-copyright = '2024'
+copyright = '2025'
 author = 'Iago Maceda, Marc A. Marti-Renom, Leo Zuber'
-release = '1.0'
+release = read("..", "metaloci", "VERSION")
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration

@@ -335,7 +335,9 @@ def get_lmi(row: pd.Series, args: pd.Series,
 
                 if args.moran_info:
 
-                    misc.write_moran_data(mlobject, args, silent)
+                    print(scan)
+
+                    misc.write_moran_data(mlobject, args, silent=silent)
 
                 if args.save_bed:
 
@@ -368,7 +370,7 @@ def get_lmi(row: pd.Series, args: pd.Series,
 
             if args.moran_info:
 
-                misc.write_moran_data(mlobject, args, silent)
+                misc.write_moran_data(mlobject, args, silent=silent)
 
             if args.save_bed:
 
@@ -528,7 +530,7 @@ def run(opts):
                         
                     if progress["mlo_not_found"] is not None:
 
-                        print(f"\t.mlo file not found for one or more regions. Make sure to run 'metaloci layout first'"
+                        print(f"\t.mlo file not found for one or more regions. Make sure to run 'metaloci layout' first."
                                 "\n\tExiting...")
 
                     pool.close()

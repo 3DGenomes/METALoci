@@ -6,9 +6,8 @@ import random
 
 import networkx as nx
 import numpy as np
-from scipy.sparse import csr_matrix
-
 from metaloci import mlo
+from scipy.sparse import csr_matrix
 
 
 def get_restraints_matrix(mlobject: mlo.MetalociObject, optimise: bool = False, silent: bool = False) -> mlo.MetalociObject:
@@ -239,6 +238,7 @@ def estimate_cutoff(mlobject: mlo.MetalociObject, optimise : bool = False) -> fl
 
         except:
 
+            counter += 1
             continue
 
         degrees = []

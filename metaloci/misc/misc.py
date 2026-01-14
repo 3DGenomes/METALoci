@@ -869,6 +869,7 @@ def write_bad_region(mlobject, work_dir):
         if not any(mlobject.region in line.split('\t', 1)[0] for line in handler) and mlobject.bad_region is not None:
 
             handler.write(log)
+            handler.flush()
 
 
 def has_exactly_one_line(file_path: str) -> bool:

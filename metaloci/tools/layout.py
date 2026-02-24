@@ -299,13 +299,15 @@ def get_region_layout(row: pd.Series, args: pd.Series, progress=None, counter: i
 
         # optimise can get stuck in bad regions for some reason I don't understand, so we set a default cutoff if
         # we know the region is bad.
-        if mlobject.bad_region is None and mlobject.kk_cutoff["values"] == "optimise":
+        if mlobject.kk_cutoff["values"] == "optimise":
 
-            mlobject.kk_cutoff["values"] = kk.estimate_cutoff(mlobject, args.optimise)
+            if mlobject.bad_region is None:
 
-        else:
+                mlobject.kk_cutoff["values"] = kk.estimate_cutoff(mlobject, args.optimise)
 
-            mlobject.kk_cutoff["values"] = [0.2]
+            else:
+
+                mlobject.kk_cutoff["values"] = [0.2]
 
         if mlobject.persistence_length == "optimise":
 

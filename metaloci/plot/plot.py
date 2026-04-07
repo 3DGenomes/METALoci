@@ -7,6 +7,7 @@ import pathlib
 import re
 from collections import defaultdict
 
+import fitz  # PyMuPDF
 import geopandas as gpd
 import libpysal as lp
 import matplotlib.pyplot as plt
@@ -18,14 +19,15 @@ from adjustText import adjust_text
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.lines import Line2D
 from matplotlib.ticker import FormatStrFormatter, MaxNLocator
-from metaloci import mlo
-from metaloci.graph_layout import kk
-from metaloci.misc import misc
 from PIL import Image, ImageDraw, ImageFont
 from pybedtools import BedTool
 from scipy.ndimage import rotate
 from scipy.stats import linregress
 from shapely.geometry import Point
+
+from metaloci import mlo
+from metaloci.graph_layout import kk
+from metaloci.misc import misc
 
 
 def mixed_matrices_plot(mlobject: mlo.MetalociObject):
@@ -841,6 +843,42 @@ def place_composite(image: Image.Image, image_to_add: str, ifactor: float, ixloc
     image.paste(img, (ixloc, iyloc))
 
     return image
+
+def place_pdf(page: fitz.Page, pdf_path: str, target_width: float, x: float, y: float):
+    """
+    Open a PDF file, extract the first page, and place it on a given page at a specified location and size.
+    Parameters
+    ----------
+    page : fitz.Page
+        The page on which the PDF will be placed.
+    pdf_path : str
+        The file path of the PDF to be placed.
+    target_width : float
+        The desired width of the placed PDF on the page.
+    x : float
+        The x-coordinate of the top-left corner where the PDF will be placed on the page.
+    y : float
+        The y-coordinate of the top-left corner where the PDF will be placed on the page.
+    """
+
+
+    src = fitz.open(pdf_path)
+    src_page = src[0]
+
+    rect = src_page.rect
+    w, h = rect.width, rect.height
+
+    # compute scale based on desired width
+    scale = target_width / w
+
+    new_w = target_width
+    new_h = h * scale
+
+    dest = fitz.Rect(x, y, x + new_w, y + new_h)
+
+    page.show_pdf_page(dest, src, 0)
+
+    src.close()
 
 
 def get_x_axis_label_signal_plot(mlobject: mlo.MetalociObject):

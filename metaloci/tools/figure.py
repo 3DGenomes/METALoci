@@ -23,13 +23,15 @@ from argparse import SUPPRESS, HelpFormatter
 from datetime import timedelta
 from time import time
 
+import fitz  # PyMuPDF
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import pandas as pd
+from PIL import Image
+
 from metaloci import misc, mlo
 from metaloci.misc import misc
 from metaloci.plot import plot
-from PIL import Image
 
 HELP = "Plots METALoci output."
 
@@ -410,11 +412,42 @@ def get_figures(row: pd.Series, args: pd.Series, progress=None, counter: int = N
         composite_image = plot.place_composite(composite_image, f"{plot_filename}_gtp.png", 0.25, 1600, 900)
 
         composite_image.save(f"{plot_filename}.png")
-        plt.figure(figsize=(15, 15))
-        plt.imshow(composite_image)
-        plt.axis("off")
-        plt.savefig(f"{plot_filename}.pdf", **plot_opt)
-        plt.close()
+
+        img1 = Image.open(f"{plot_filename}_lmi.png")
+        img2 = Image.open(f"{plot_filename}_gsp.png")
+        img3 = Image.open(f"{plot_filename}_gtp.png")
+        maxx = int((img1.size[1] * 0.4 + img2.size[1] * 0.25 + img3.size[1] * 0.25) * 1.3)
+        yticks_signal = [f"{round(i, 3):.2f}" for i in ax.get_yticks()[1:-1]]
+        signal_left = {4: 31, 5: 20, 6: 9, 7: 1, 8: -11}
+        max_chr_yax = max(len(str(i)) for i in yticks_signal)
+
+        if float(min(yticks_signal)) < 0:
+
+            negative_axis_correction = 5
+
+        else:
+
+            negative_axis_correction = 0
+
+        if max_chr_yax not in list(signal_left.keys()):
+
+            signal_left[max_chr_yax] = -21
+
+        page_width = maxx
+        page_height = 1550
+        doc = fitz.open()
+        page = doc.new_page(width=page_width, height=page_height)
+
+        plot.place_pdf(page, f"{plot_filename}_hic.pdf", 1130, 100, 50)
+        plot.place_pdf(page, f"{plot_filename}_signal.pdf", 1063 + (32 - signal_left[max_chr_yax]), 
+                        signal_left[max_chr_yax] + negative_axis_correction, 595)
+        plot.place_pdf(page, f"{plot_filename}_kk.pdf", 800, 1300, 50)
+        plot.place_pdf(page, f"{plot_filename}_lmi.pdf", 600, 75, 850)
+        plot.place_pdf(page, f"{plot_filename}_gsp.pdf", 700, 850, 900)
+        plot.place_pdf(page, f"{plot_filename}_gtp.pdf", 700, 1600, 900)
+
+        doc.save(f"{plot_filename}.pdf")
+        doc.close()
 
         if not silent:
 

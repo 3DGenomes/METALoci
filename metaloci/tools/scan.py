@@ -28,14 +28,15 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 import pandas as pd
+from PIL import Image
+from scipy.sparse import csr_matrix
+from scipy.spatial import distance
+
 from metaloci import mlo
 from metaloci.graph_layout import kk
 from metaloci.misc import misc
 from metaloci.plot import plot
 from metaloci.spatial_stats import lmi
-from PIL import Image
-from scipy.sparse import csr_matrix
-from scipy.spatial import distance
 
 HELP = "METALoci modeling with iterative bin deletion.\n"
 
@@ -250,15 +251,14 @@ def scan(row: pd.Series, args: pd.Series, silent):
     if mlobject.matrix is None:
 
         return
-
-    if args.persistence_length == "optimise":
-
-        mlobject.persistence_length = kk.estimate_persistence_length(mlobject, args.optimise)
-
+    
     if mlobject.kk_cutoff["values"] == "optimise":
 
         mlobject.kk_cutoff["values"] = kk.estimate_cutoff(mlobject, args.optimise)
 
+    if args.persistence_length == "optimise":
+
+        mlobject.persistence_length = kk.estimate_persistence_length(mlobject, args.optimise)
 
     print("Computing wild-type...", end="\r")
 
@@ -505,6 +505,11 @@ def compute_deletion(del_args: pd.Series, mlobject: mlo.MetalociObject, i: int, 
         # Remove a stretch of bins from the matrix
         mlobject.matrix = del_args.intact_matrix[np.ix_(keep_indices, keep_indices)]
 
+        # if gif_popi doesnt exist, set it to the poi of the intact object
+        if gif_poi is None:
+
+            gif_poi = del_args.intact_poi
+
         # Properly set the poi, because after the deletion bins are shifted
         if gif_poi in delete_indices:
 
@@ -580,9 +585,10 @@ def run(opts: list):
 
         opts.persistence_length = "optimise"
 
-    else:
+    elif not isinstance(opts.persistence_length, (int, float)):
 
-        persistence_length = opts.persistence_length
+        print("Persistence length must be a number. Exiting...")
+        sys.exit("Exiting...")
 
     df_regions = pd.DataFrame({"coords": [opts.regions], "symbol": ["symbol"], "id": ["id"]})
     signals = [opts.signals[0]]
@@ -629,7 +635,7 @@ def run(opts: list):
                              "hic_path": opts.hic_file,
                              "resolution": opts.resolution,
                              "cutoffs": cutoffs,
-                             "persistence_length": persistence_length,
+                             "persistence_length": opts.persistence_length,
                              "optimise": False, # perhaps not needed
                              "signals": signals,
                              "num_bins_to_delete": opts.num_bins_to_delete,

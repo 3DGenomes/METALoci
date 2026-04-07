@@ -335,8 +335,6 @@ def get_lmi(row: pd.Series, args: pd.Series,
 
                 if args.moran_info:
 
-                    print(scan)
-
                     misc.write_moran_data(mlobject, args, silent=silent)
 
                 if args.save_bed:

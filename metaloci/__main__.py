@@ -1,3 +1,4 @@
+import shutil
 import sys
 from argparse import (
     ArgumentParser,
@@ -10,6 +11,21 @@ from importlib.metadata import version
 from metaloci.tests import test_tools
 from metaloci.tools import figure, layout, ml, prep, scan
 from metaloci.utility_scripts import bts, compressor, gene_selector, sniffer
+
+
+def check_external_dependencies():
+    missing = []
+
+    if shutil.which("bedtools") is None:
+        missing.append("bedtools")
+
+    if missing:
+        sys.exit(
+            "Error: Missing required external dependencies:\n"
+            + "\n".join(f"  - {dep}" for dep in missing)
+            + "\n\nInstall with:\n"
+              "  conda install -c bioconda bedtools"
+        )
 
 
 def create_parser():
@@ -116,6 +132,9 @@ def main(arguments=None):
     """
     Main function to run METALoci CLI.
     """
+
+    check_external_dependencies()
+
     if arguments is None:
 
         arguments = sys.argv

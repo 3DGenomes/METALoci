@@ -25,6 +25,11 @@ conda create -n metaloci -c bioconda python==3.12 bedtools
 conda activate metaloci
 pip install metaloci
 ```
+This package requires the external tool:
+
+- bedtools (>=2.30)
+
+Make sure it is installed and available in your PATH.
 
 Do you have trouble compiling dependencies? Perhaps you need an upgraded version of libcurl.
 

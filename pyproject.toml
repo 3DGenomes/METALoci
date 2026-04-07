@@ -1,3 +1,47 @@
 [build-system]
-requires = ["setuptools>78.1.1,<81", "wheel"]
+requires = ["setuptools>=61", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "metaloci"
+dynamic = ["version", "dependencies", "readme"]
+
+description = "METALoci: spatially auto-correlated signals in 3D genomes"
+authors = [
+    { name = "Leo Zuber" },
+    { name = "Iago Maceda" },
+    { name = "Juan Antonio Rodríguez" },
+    { name = "Marc Martí-Renom", email = "martirenom@cnag.eu" }
+]
+
+license = { text = "GPL-3.0-only" }
+
+classifiers = [
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Operating System :: POSIX :: Linux"
+]
+
+requires-python = ">=3.12"
+
+[project.urls]
+Homepage = "https://github.com/3DGenomes/METALoci/"
+
+[project.scripts]
+metaloci = "metaloci.__main__:main"
+
+[tool.setuptools]
+packages = { find = { exclude = ["tests", ".github"] } }
+
+[tool.setuptools.package-data]
+metaloci = [
+    "tests/data/*",
+    "tests/data/hic/*.mcool",
+    "tests/data/signal/*.bed"
+]
+
+[tool.setuptools.dynamic]
+version = { file = "metaloci/VERSION" }
+readme = { file = "README.md", content-type = "text/markdown" }
+dependencies = { file = "requirements.txt" }

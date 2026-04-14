@@ -16,13 +16,13 @@ numba==0.61.2
 numpy==1.26.4
 pandas==2.3.3
 pillow==12.1.1
-pybedtools==0.9.1
+pybedtools
 scipy==1.16.1
 seaborn==0.11.0
 setuptools
 shapely==2.1.1
-sphinx-rtd-theme==2.0.0
-sphinx==7.3.7
+sphinx-rtd-theme
+sphinx
 tqdm==4.66.3
 sphinx-argparse
 cppy>=1.2.0

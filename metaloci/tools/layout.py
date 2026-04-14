@@ -136,7 +136,7 @@ def populate_args(parser):
         "--optimise",
         dest="optimise",
         action="store_true",
-        help="Autmatically optimise the cut-off and/or the persistence length for the Kamada-Kawai layout.",
+        help="Automatically optimise the cut-off and/or the persistence length for the Kamada-Kawai layout.",
     )
 
     optional_arg.add_argument(
@@ -242,7 +242,7 @@ def get_region_layout(row: pd.Series, args: pd.Series, progress=None, counter: i
 
                 if not silent:
 
-                    print("\t1Plotting Kamada-Kawai...")
+                    print("\tPlotting Kamada-Kawai...")
 
                 plot.save_mm_kk(mlobject, args.work_dir)
 

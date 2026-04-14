@@ -12,6 +12,7 @@ from collections import defaultdict
 from importlib.metadata import version
 from pathlib import Path
 from pickle import UnpicklingError
+import fcntl
 
 import cooler
 import hicstraw
@@ -645,7 +646,10 @@ def binsearcher(id_tss: dict, id_chrom: dict, id_name: dict, bin_genome: pd.Data
     print("Aggregating genes that are located in the same bin...")
 
     data = pd.DataFrame(data)
-    data = data.groupby(["chrom", "bin_index"])[data.columns].agg(",".join).reset_index()
+    data[["gene_name", "gene_id"]] = data[["gene_name", "gene_id"]].astype(str)
+    data = (
+    data.groupby(["chrom", "bin_index"], as_index=False).agg({"gene_name": ",".join, "gene_id": ",".join}))
+    # data = data.groupby(["chrom", "bin_index"])[data.columns].agg(",".join).reset_index()
 
     data[["chrom"]] = data[["chrom"]].astype(str)
     data[["bin_index"]] = data[["bin_index"]].astype(int)
@@ -848,9 +852,33 @@ def get_poi_data(line: pd.Series, args: pd.Series):
             regionfile_h.write(f"{region_line}\n")
 
 
+# def write_bad_region(mlobject, work_dir):
+#     """
+#     Writes the bad regions, after quality checking, to a file.
+
+#     Parameters
+#     ----------
+#     mlobject : mlo.MetalociObject
+#         METALoci object.
+#     work_dir : str
+#         Path to the working directory.
+#     """
+
+#     with open(f"{work_dir}bad_regions.txt", "a+", encoding="utf-8") as handler:
+
+#         log = f"{mlobject.region}\t{mlobject.bad_region}\n"
+
+#         handler.seek(0)
+
+#         if not any(mlobject.region in line.split('\t', 1)[0] for line in handler) and mlobject.bad_region is not None:
+
+#             handler.write(log)
+#             handler.flush()
+
 def write_bad_region(mlobject, work_dir):
     """
     Writes the bad regions, after quality checking, to a file.
+    Thread-safe and multi-process-safe using file locking.
 
     Parameters
     ----------
@@ -859,17 +887,41 @@ def write_bad_region(mlobject, work_dir):
     work_dir : str
         Path to the working directory.
     """
+    
+    if mlobject.bad_region is None:
 
-    with open(f"{work_dir}bad_regions.txt", "a+", encoding="utf-8") as handler:
+        return
+    
+    bad_regions_file = os.path.join(work_dir, "bad_regions.txt")
+    log = f"{mlobject.region}\t{mlobject.bad_region}\n"
+    
+    # Ensure the file exists
+    if not os.path.exists(bad_regions_file):
 
-        log = f"{mlobject.region}\t{mlobject.bad_region}\n"
-
-        handler.seek(0)
-
-        if not any(mlobject.region in line.split('\t', 1)[0] for line in handler) and mlobject.bad_region is not None:
-
-            handler.write(log)
-            handler.flush()
+        open(bad_regions_file, 'a').close()
+    
+    # Open file for reading and writing
+    with open(bad_regions_file, "r+", encoding="utf-8") as handler:
+        
+        # Acquire exclusive lock (blocks until available)
+        fcntl.flock(handler.fileno(), fcntl.LOCK_EX)
+        
+        try:
+            # Read all existing entries
+            handler.seek(0)
+            existing_regions = {line.split('\t', 1)[0] for line in handler if line.strip()}
+            
+            # Only write if region not already present
+            if mlobject.region not in existing_regions:
+                
+                handler.seek(0, 2)  # Move to end of file
+                handler.write(log)
+                handler.flush()
+                os.fsync(handler.fileno())  # Force write to disk
+        
+        finally:
+            # Release lock (automatic on close, but explicit is safer)
+            fcntl.flock(handler.fileno(), fcntl.LOCK_UN)
 
 
 def has_exactly_one_line(file_path: str) -> bool:

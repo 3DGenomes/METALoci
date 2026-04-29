@@ -27,11 +27,10 @@ import fitz  # PyMuPDF
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import pandas as pd
-from PIL import Image
-
 from metaloci import misc, mlo
 from metaloci.misc import misc
 from metaloci.plot import plot
+from PIL import Image
 
 HELP = "Plots METALoci output."
 
@@ -443,8 +442,8 @@ def get_figures(row: pd.Series, args: pd.Series, progress=None, counter: int = N
                         signal_left[max_chr_yax] + negative_axis_correction, 595)
         plot.place_pdf(page, f"{plot_filename}_kk.pdf", 800, 1300, 50)
         plot.place_pdf(page, f"{plot_filename}_lmi.pdf", 600, 75, 850)
-        plot.place_pdf(page, f"{plot_filename}_gsp.pdf", 700, 850, 900)
-        plot.place_pdf(page, f"{plot_filename}_gtp.pdf", 700, 1600, 900)
+        plot.place_pdf(page, f"{plot_filename}_gsp.pdf", 650, 800, 850)
+        plot.place_pdf(page, f"{plot_filename}_gtp.pdf", 650, 1550, 850)
 
         doc.save(f"{plot_filename}.pdf")
         doc.close()

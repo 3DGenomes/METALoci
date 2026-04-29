@@ -18,6 +18,7 @@ import cooler
 import h5py
 import hicstraw
 import networkx as nx
+import numpy as np
 import pandas as pd
 from metaloci import mlo
 from metaloci.graph_layout import kk
@@ -173,6 +174,14 @@ def populate_args(parser):
         type=int,
         action="store",
         help="Number of threads to use in multiprocessing. (default: %(default)s)"
+    )
+
+    optional_arg.add_argument(
+        "-ri",
+        "--random_init",
+        dest="random_init",
+        action="store_true",
+        help="Use random initialisation for the Kamada-Kawai layout instead of the default spring layout."
     )
 
     optional_arg.add_argument(
@@ -350,8 +359,17 @@ def get_region_layout(row: pd.Series, args: pd.Series, progress=None, counter: i
 
                 print("\tLayouting Kamada-Kawai...")
 
+
+            if args.random_init:
+
+                pos_arg = {node: (np.random.rand(), np.random.rand()) for node in range(mlobject.matrix.shape[0])}
+
+            else:
+                
+                pos_arg = None
+
             mlobject.kk_graph = nx.from_scipy_sparse_array(csr_matrix(mlobject.kk_restraints_matrix))
-            mlobject.kk_nodes = nx.kamada_kawai_layout(mlobject.kk_graph)
+            mlobject.kk_nodes = nx.kamada_kawai_layout(mlobject.kk_graph, pos=pos_arg)
             mlobject.kk_coords = list(mlobject.kk_nodes.values())
             mlobject.kk_distances = distance.cdist(mlobject.kk_coords, mlobject.kk_coords, "euclidean")
 
@@ -540,6 +558,9 @@ def run(opts: list):
         print(f"save_plots ->\n\t{opts.save_plots}")
         print(f"multiprocess ->\n\t{opts.multiprocess}")
         print(f"cores ->\n\t{opts.threads}")
+        print(f"optimise ->\n\t{opts.optimise}")
+        print(f"remove_poi ->\n\t{opts.remove_poi}")
+        print(f"random_init ->\n\t{opts.random_init}")        
 
         sys.exit()
 
@@ -590,7 +611,8 @@ def run(opts: list):
                              "force": opts.force,
                              "save_plots": opts.save_plots,
                              "total_num": len(df_regions),
-                             "remove_poi": opts.remove_poi,                      
+                             "remove_poi": opts.remove_poi,        
+                             "random_init": opts.random_init              
                             })
 
     start_timer = time()

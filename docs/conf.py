@@ -32,7 +32,7 @@ def read(*paths, **kwargs):
 sys.path.insert(0, os.path.abspath('..'))
 
 project = 'METALoci'
-copyright = '2025'
+copyright = '2024-2026'
 author = 'Iago Maceda, Marc A. Marti-Renom, Leo Zuber'
 release = read("..", "metaloci", "VERSION")
 

@@ -1,6 +1,7 @@
 """
 Miscellaneous functions for METALoci
 """
+import fcntl
 import gzip
 import os
 import pathlib
@@ -12,7 +13,6 @@ from collections import defaultdict
 from importlib.metadata import version
 from pathlib import Path
 from pickle import UnpicklingError
-import fcntl
 
 import cooler
 import hicstraw
@@ -242,7 +242,7 @@ def signal_normalization(region_signal: pd.DataFrame, pseudocounts: float = None
     return signal
 
 
-def check_names(hic_file: Path, data: Path, coords: Path, resolution: int = None) -> list:
+def check_names(hic_file: Path, data: list[Path], coords: Path, resolution: int = None) -> list:
     """
     Checks if the chromosome names in the signal, cool/mcool/hic and chromosome sizes
     files are the same.
@@ -251,8 +251,8 @@ def check_names(hic_file: Path, data: Path, coords: Path, resolution: int = None
     ----------
     hic_file : Path
         Path to the cooler file.
-    data : Path
-        Path to the signal file.
+    data : list[Path]
+        List of signal files.
     coords : Path
         Path to the chromosome sizes file.
     resolution : int, optional
@@ -262,58 +262,62 @@ def check_names(hic_file: Path, data: Path, coords: Path, resolution: int = None
     -------
     chrom_list : list
         List of chromosomes in the cooler file.
-
     """
 
-    with open(data[0], "r", encoding="utf-8") as handler:
+    def chrom_style(path: Path, first_data_line: int = 0) -> str:
 
-        if [line.strip() for line in handler][10].startswith("chr"):
+        with path.open("r", encoding="utf-8") as handler:
 
-            signal_chr_nom = "chrN"
+            lines = handler.readlines()
 
-        else:
+        return "chrN" if lines[first_data_line].strip().startswith("chr") else "N"
 
-            signal_chr_nom = "N"
+    def cooler_chroms(path: Path) -> list:
 
-    if hic_file.endswith(".cool"):
+        path = Path(path)
 
-        chrom_list = cooler.Cooler(hic_file).chromnames
+        if path.suffix == ".cool":
 
-    elif hic_file.endswith(".mcool"):
+            return cooler.Cooler(path.as_posix()).chromnames
+        
+        if path.suffix == ".mcool":
 
-        chrom_list = cooler.Cooler(f"{hic_file}::/resolutions/{resolution}").chromnames
+            if resolution is None:
 
-    elif hic_file.endswith(".hic"):
+                raise ValueError("resolution is required for .mcool files")
+            
+            return cooler.Cooler(f"{path.as_posix()}::/resolutions/{resolution}").chromnames
+        
+        if path.suffix == ".hic":
 
-        chrom_list = [chrom.name for chrom in hicstraw.HiCFile(hic_file).getChromosomes()][1:]
+            return [chrom.name for chrom in hicstraw.HiCFile(path.as_posix()).getChromosomes()][1:]
+        
+        raise ValueError(f"Unsupported file type: {path.suffix}")
+    
+    hic_file = pathlib.Path(hic_file)
+    data = [pathlib.Path(file) for file in data]
+    coords = pathlib.Path(coords)
 
-    if "chr" in chrom_list[0]:
+    signal_styles = {chrom_style(file, first_data_line=10) for file in data}
 
-        cooler_chr_nom = "chrN"
+    if len(signal_styles) != 1:
 
-    else:
+        sys.exit("Signal files do not use the same chromosome nomenclature.")
 
-        cooler_chr_nom = "N"
-
-    with open(coords, "r", encoding="utf-8") as handler:
-
-        if [line.strip() for line in handler][0].startswith("chr"):
-
-            coords_chr_nom = "chrN"
-
-        else:
-
-            coords_chr_nom = "N"
+    signal_chr_nom = signal_styles.pop()
+    chrom_list = cooler_chroms(hic_file)
+    cooler_chr_nom = "chrN" if chrom_list and chrom_list[0].startswith("chr") else "N"
+    coords_chr_nom = chrom_style(coords, first_data_line=0)
 
     if not signal_chr_nom == cooler_chr_nom == coords_chr_nom:
 
         sys.exit(
-            f"\nThe signal, cooler and chromosome sizes files do not have the same nomenclature for chromosomes:\n\
-            \n\tSignal chromosomes nomenclature is '{signal_chr_nom}'.\
-            \n\tHi-C chromosomes nomenclature is '{cooler_chr_nom}'.\
-            \n\tChromosome sizes nomenclature is '{coords_chr_nom}'.\
-            \n\nPlease, rename the chromosome names.\
-            \n\nExiting..."
+            f"\nThe signal, cooler and chromosome sizes files do not have the same nomenclature for chromosomes:\n"
+            f"\n\tSignal chromosomes nomenclature is '{signal_chr_nom}'."
+            f"\n\tHi-C chromosomes nomenclature is '{cooler_chr_nom}'."
+            f"\n\tChromosome sizes nomenclature is '{coords_chr_nom}'."
+            f"\n\nPlease, rename the chromosome names."
+            f"\n\nExiting..."
         )
 
     return chrom_list
@@ -913,7 +917,7 @@ def write_bad_region(mlobject, work_dir):
             
             # Only write if region not already present
             if mlobject.region not in existing_regions:
-                
+
                 handler.seek(0, 2)  # Move to end of file
                 handler.write(log)
                 handler.flush()

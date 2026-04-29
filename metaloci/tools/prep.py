@@ -17,11 +17,10 @@ import cooler
 import h5py
 import hicstraw
 import pandas as pd
+from metaloci.misc import misc
 from numba.core.errors import NumbaDeprecationWarning, NumbaPendingDeprecationWarning
 from pybedtools import BedTool
 from tqdm import tqdm
-
-from metaloci.misc import misc
 
 warnings.simplefilter('ignore', category=NumbaDeprecationWarning)
 warnings.simplefilter('ignore', category=NumbaPendingDeprecationWarning)
@@ -196,7 +195,7 @@ def run(opts: list):
         if resolution not in available_resolutions:
 
             print(
-                f"The given resolution is not in the provided mcooler file.\nThe available resolutions are: \
+                f"The given resolution is not in the provided mcool file.\nThe available resolutions are: \
                 {', '.join(misc.natural_sort([str(x) for x in available_resolutions]))}"
             )
             sys.exit("Exiting...")
@@ -210,7 +209,7 @@ def run(opts: list):
         if resolution not in available_resolutions:
 
             print(
-                f"The given resolution is not in the provided mcooler file.\nThe available resolutions are: \
+                f"The given resolution is not in the provided hic file.\nThe available resolutions are: \
                 {', '.join(misc.natural_sort([str(x) for x in available_resolutions]))}"
             )
             sys.exit("Exiting...")

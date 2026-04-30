@@ -28,15 +28,14 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 import pandas as pd
-from PIL import Image
-from scipy.sparse import csr_matrix
-from scipy.spatial import distance
-
 from metaloci import mlo
 from metaloci.graph_layout import kk
 from metaloci.misc import misc
 from metaloci.plot import plot
 from metaloci.spatial_stats import lmi
+from PIL import Image
+from scipy.sparse import csr_matrix
+from scipy.spatial import distance
 
 HELP = "METALoci modeling with iterative bin deletion.\n"
 
@@ -304,7 +303,8 @@ def scan(row: pd.Series, args: pd.Series, silent):
     print("Computing iterative deletions...\n")
 
     intact_matrix = mlobject.matrix.copy()
-    intact_signals = mlobject.signals_dict.copy()
+    # Make explicit copies of signal arrays to avoid shared-reference mutations
+    intact_signals = {k: v.copy() for k, v in mlobject.signals_dict.items()}
     intact_poi = mlobject.poi
     num_bins_to_delete = args.num_bins_to_delete
     num_bins = intact_matrix.shape[0]
@@ -403,7 +403,7 @@ def scan(row: pd.Series, args: pd.Series, silent):
                 quality=10, ffmpeg_log_level="error"
             )
 
-            print(f"MP4 video saved as {output_mp4}")
+            print(f"\n\nMP4 video saved as {output_mp4}")
 
             # Plot LMI change scan
             moran_data_folder = os.path.join(args.work_dir, "scan", mlobject.chrom, "moran_data", signal_type,
@@ -439,7 +439,7 @@ def compute_deletion(del_args: pd.Series, mlobject: mlo.MetalociObject, i: int, 
     INFLUENCE = 1.5
     BFACT = 2
     del_args.i = i
-    mlobject = copy.deepcopy(mlobject)
+    mlobject_del = copy.deepcopy(mlobject)
     len_matrix = len(mlobject.matrix)
     gif_poi = del_args.create_gif
     save_path_i = mlobject.save_path.replace('.mlo', f'_{i}.mlo')
@@ -456,16 +456,17 @@ def compute_deletion(del_args: pd.Series, mlobject: mlo.MetalociObject, i: int, 
         with open(save_path_i, "rb") as f:
 
             state = pickle.load(f)
-            mlobject = mlo.reconstruct(state)
+            mlobject_del = mlo.reconstruct(state)
 
         delete_indices = list(range(i, i + del_args.num_bins_to_delete))
         
         # Adjust gif_poi if needed
         if min(delete_indices) < gif_poi:
+
             gif_poi -= del_args.num_bins_to_delete
 
         # Determine which point of interest to compare
-        compare = gif_poi if mlobject.poi is None else mlobject.poi
+        compare = gif_poi if mlobject_del.poi is None else mlobject_del.poi
 
         if compare == gif_poi: # check if the previously computed poi is the same as the one in the args
 
@@ -499,11 +500,11 @@ def compute_deletion(del_args: pd.Series, mlobject: mlo.MetalociObject, i: int, 
     
     if to_do:
 
-        mlobject.save_path = mlobject.save_path.replace('.mlo', f'_{i}.mlo')
-        mlobject.kk_distances = None
+        mlobject_del.save_path = mlobject_del.save_path.replace('.mlo', f'_{i}.mlo')
+        mlobject_del.kk_distances = None
 
         # Remove a stretch of bins from the matrix
-        mlobject.matrix = del_args.intact_matrix[np.ix_(keep_indices, keep_indices)]
+        mlobject_del.matrix = del_args.intact_matrix[np.ix_(keep_indices, keep_indices)]
 
         # if gif_popi doesnt exist, set it to the poi of the intact object
         if gif_poi is None:
@@ -513,44 +514,50 @@ def compute_deletion(del_args: pd.Series, mlobject: mlo.MetalociObject, i: int, 
         # Properly set the poi, because after the deletion bins are shifted
         if gif_poi in delete_indices:
 
-            mlobject.poi = None
+            mlobject_del.poi = None
 
         elif min(delete_indices) < gif_poi:
 
-            mlobject.poi = gif_poi - del_args.num_bins_to_delete
+            mlobject_del.poi = gif_poi - del_args.num_bins_to_delete
 
         elif min(delete_indices) > gif_poi:
 
-            mlobject.poi = gif_poi
+            mlobject_del.poi = gif_poi
 
         # Remove those same bins from the signal data, which is a numpy array
         for signal_type in del_args.intact_signals.keys():
 
-            mlobject.signals_dict[signal_type] = del_args.intact_signals[signal_type][keep_indices]
+            print(del_args.intact_signals[signal_type])
+
+            mlobject_del.signals_dict[signal_type] = del_args.intact_signals[signal_type][keep_indices]
+            
+            print(mlobject_del.signals_dict[signal_type])
 
         # Calculate KK layout
-        mlobject = kk.get_restraints_matrix(mlobject, False, silent)  # Get submatrix of restraints
-        mlobject.kk_graph = nx.from_scipy_sparse_array(csr_matrix(mlobject.kk_restraints_matrix))
-        mlobject.kk_nodes = nx.kamada_kawai_layout(mlobject.kk_graph)
-        mlobject.kk_coords = list(mlobject.kk_nodes.values())
-        mlobject.kk_distances = distance.cdist(mlobject.kk_coords, mlobject.kk_coords, "euclidean")
-        neighbourhood = mlobject.kk_distances.diagonal(1).mean() * INFLUENCE * BFACT
-        mlobject.lmi_geometry = lmi.construct_voronoi(mlobject, mlobject.kk_distances.diagonal(1).mean() * INFLUENCE, 
-                                                      del_args = del_args)
+        mlobject_del = kk.get_restraints_matrix(mlobject_del, False, silent)  # Get submatrix of restraints
+        mlobject_del.kk_graph = nx.from_scipy_sparse_array(csr_matrix(mlobject_del.kk_restraints_matrix))
+        mlobject_del.kk_nodes = nx.kamada_kawai_layout(mlobject_del.kk_graph, pos = mlobject.kk_coords)
+        mlobject_del.kk_coords = list(mlobject_del.kk_nodes.values())
+        mlobject_del.kk_distances = distance.cdist(mlobject_del.kk_coords, mlobject_del.kk_coords, "euclidean")
+        neighbourhood = mlobject_del.kk_distances.diagonal(1).mean() * INFLUENCE * BFACT
+        mlobject_del.lmi_geometry = lmi.construct_voronoi(mlobject_del, mlobject_del.kk_distances.diagonal(1).mean() * 
+                                                          INFLUENCE, del_args = del_args)
 
-    for signal_type in mlobject.signals_dict.keys():
+    for signal_type in mlobject_del.signals_dict.keys():
+
+        print(mlobject_del.signals_dict["ATAC"].shape)
 
         if to_do:
 
-            mlobject.lmi_info[signal_type] = lmi.compute_lmi(mlobject, signal_type, neighbourhood,
-                                                            9999, 0.05, silent, False, del_args = del_args)
+            mlobject_del.lmi_info[signal_type] = lmi.compute_lmi(mlobject_del, signal_type, neighbourhood,
+                                                                9999, 0.05, silent, False, del_args = del_args)
 
-        plot.create_composite_figure(mlobject, signal_type, del_args = del_args, signipval = signipval,  silent = silent)
-        misc.write_moran_data(mlobject, del_args, scan = True, silent = silent)
+        plot.create_composite_figure(mlobject_del, signal_type, del_args = del_args, signipval = signipval,  silent = silent)
+        misc.write_moran_data(mlobject_del, del_args, scan = True, silent = silent)
         
-        with open(mlobject.save_path, "wb") as hamlo_namendle:
+        with open(mlobject_del.save_path, "wb") as hamlo_namendle:
 
-            mlobject.save(hamlo_namendle)
+            mlobject_del.save(hamlo_namendle)
 
         if progress is not None:
 
@@ -561,7 +568,6 @@ def compute_deletion(del_args: pd.Series, mlobject: mlo.MetalociObject, i: int, 
             print(f"\033[A{'  '*int(sp.Popen(['tput','cols'], stdout=sp.PIPE).communicate()[0].strip())}\033[A")
             print(f"\t[{progress['value']}/{len(keep_indices)}] | Time spent: {timedelta(seconds=round(time_spent))} | "
                 f"ETR: {timedelta(seconds=round(time_remaining))}", end='\r')
-
         
 
 def run(opts: list):

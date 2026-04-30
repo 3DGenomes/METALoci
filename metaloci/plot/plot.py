@@ -19,15 +19,14 @@ from adjustText import adjust_text
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.lines import Line2D
 from matplotlib.ticker import FormatStrFormatter, MaxNLocator
+from metaloci import mlo
+from metaloci.graph_layout import kk
+from metaloci.misc import misc
 from PIL import Image, ImageDraw, ImageFont
 from pybedtools import BedTool
 from scipy.ndimage import rotate
 from scipy.stats import linregress
 from shapely.geometry import Point
-
-from metaloci import mlo
-from metaloci.graph_layout import kk
-from metaloci.misc import misc
 
 
 def mixed_matrices_plot(mlobject: mlo.MetalociObject):
@@ -1033,19 +1032,25 @@ def create_composite_figure(mlobject: mlo.MetalociObject, signal_type: str, del_
 
             if del_args.create_gif is not None:
 
-                delete_indices = list(range(del_args.i, del_args.i + del_args.num_bins_to_delete))
-
-                if del_args.create_gif in delete_indices:
-
-                    mlobject.poi = None
-
-                else:
-
-                    mlobject.poi = del_args.create_gif
+                gif_poi = del_args.create_gif
 
             else:
             
-                mlobject.poi = del_args.intact_poi
+                gif_poi = del_args.intact_poi
+
+            delete_indices = list(range(del_args.i, del_args.i + del_args.num_bins_to_delete))
+            
+            if gif_poi in delete_indices:
+
+                mlobject.poi = None
+
+            elif min(delete_indices) < gif_poi:
+
+                mlobject.poi = gif_poi - del_args.num_bins_to_delete
+
+            elif min(delete_indices) > gif_poi:
+
+                mlobject.poi = gif_poi
 
             plot_filename = os.path.join(
                 plot_filename,
@@ -1140,7 +1145,7 @@ def create_composite_figure(mlobject: mlo.MetalociObject, signal_type: str, del_
         print("\t\tLMI Scatter plot", end="\r")
 
     lmi_plt, r_value, p_value = get_lmi_scatterplot(mlobject, merged_lmi_geometry,
-                                                            neighbourhood, signipval)
+                                                            neighbourhood, signipval, False)
 
     if lmi_plt is not None:
 

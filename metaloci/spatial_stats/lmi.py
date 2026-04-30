@@ -304,19 +304,7 @@ def compute_lmi(mlobject: mlo.MetalociObject, signal_type: str, neighbourhood: f
         df_lmi["LMI_score"].append(round(moran_local_object.Is[row.moran_index], 9))
         df_lmi["LMI_pvalue"].append(round(moran_local_object.p_sim[row.moran_index], 9))
 
-        if del_args is not None: # This is to handle the case when bins are deleted in metaloci scan
-
-            if row.moran_index > del_args.i:
-
-                df_lmi["Sig"].append(Sig[row.moran_index - del_args.num_bins_to_delete])
-
-            else:
-
-                df_lmi["Sig"].append(Sig[row.moran_index])
-        else:
-
-            df_lmi["Sig"].append(Sig[row.moran_index])
-
+        df_lmi["Sig"].append(Sig[row.moran_index])
         df_lmi["Lag"].append(Lag[row.moran_index])
         df_lmi["ZSig"].append(zscore(Sig)[row.moran_index])
         df_lmi["ZLag"].append(zscore(Lag)[row.moran_index])

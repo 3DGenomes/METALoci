@@ -188,7 +188,7 @@ def run(opts: list):
 
         hic_chroms = misc.check_names(hic_path, data, coords)
 
-    if hic_path.endswith(".mcool"):
+    elif hic_path.endswith(".mcool"):
 
         available_resolutions = [int(x) for x in list(h5py.File(hic_path)["resolutions"].keys())]
 

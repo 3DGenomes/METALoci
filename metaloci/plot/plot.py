@@ -1365,3 +1365,23 @@ def get_lmi_change_scan_plot(moran_data_folder: os.path, results_folder: os.path
     plt.tight_layout()
     plt.savefig(os.path.join(results_folder, f"lmi_change_scan_plot_{poi}.png"), dpi=300)
     plt.close()
+
+def place_pdf_match_png(page,pdf_path, png_path, factor, x, y):
+                        
+    png = Image.open(png_path)
+
+    display_w = png.width * factor
+    display_h = png.height * factor
+
+    src = fitz.open(pdf_path)
+
+    dest = fitz.Rect(
+        x,
+        y,
+        x + display_w,
+        y + display_h,
+    )
+
+    page.show_pdf_page(dest, src, 0)
+
+    src.close()

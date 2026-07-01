@@ -255,6 +255,14 @@ def get_figures(row: pd.Series, args: pd.Series, progress=None, counter: int = N
 
         return
 
+    if mlobject.kk_distances is None:
+
+        if not silent:
+
+            print("\n\tKamada-Kawai layout not calculated for this region.\n\tSkipping to the next one...")
+
+        return
+    
     neighbourhood = mlobject.kk_distances.diagonal(1).mean() * args.INFLUENCE * args.BFACT
 
     for signal in args.signals:
@@ -437,13 +445,13 @@ def get_figures(row: pd.Series, args: pd.Series, progress=None, counter: int = N
         doc = fitz.open()
         page = doc.new_page(width=page_width, height=page_height)
 
-        plot.place_pdf(page, f"{plot_filename}_hic.pdf", 1130, 100, 50)
-        plot.place_pdf(page, f"{plot_filename}_signal.pdf", 1063 + (32 - signal_left[max_chr_yax]), 
-                        signal_left[max_chr_yax] + negative_axis_correction, 595)
-        plot.place_pdf(page, f"{plot_filename}_kk.pdf", 800, 1300, 50)
-        plot.place_pdf(page, f"{plot_filename}_lmi.pdf", 600, 75, 850)
-        plot.place_pdf(page, f"{plot_filename}_gsp.pdf", 650, 800, 850)
-        plot.place_pdf(page, f"{plot_filename}_gtp.pdf", 650, 1550, 850)
+        plot.place_pdf_match_png(page, f"{plot_filename}_hic.pdf", f"{plot_filename}_hic.png", 0.5, 100, 50)
+        plot.place_pdf_match_png(page, f"{plot_filename}_signal.pdf", f"{plot_filename}_signal.png", 0.4,
+                        signal_left[max_chr_yax] + negative_axis_correction, 640)
+        plot.place_pdf_match_png(page, f"{plot_filename}_kk.pdf", f"{plot_filename}_kk.png", 0.3, 1300, 50)
+        plot.place_pdf_match_png(page, f"{plot_filename}_lmi.pdf", f"{plot_filename}_lmi.png", 0.4, 75, 900)
+        plot.place_pdf_match_png(page, f"{plot_filename}_gsp.pdf", f"{plot_filename}_gsp.png", 0.25, 900, 900)
+        plot.place_pdf_match_png(page, f"{plot_filename}_gtp.pdf", f"{plot_filename}_gtp.png", 0.25, 1600, 900)
 
         doc.save(f"{plot_filename}.pdf")
         doc.close()

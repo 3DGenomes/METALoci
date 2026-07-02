@@ -115,14 +115,13 @@ def get_subset_matrix(mlobject: mlo.MetalociObject, optimise: bool = False, sile
 
     if top < len(np.diag(mlobject.matrix)):
 
-        if not silent:
-
-            print(f"\tCut-off is too high for {mlobject.region}. Try lowering it.")
-
-        mlobject.bad_region = "cut-off"
-
         if not optimise:
-                
+
+            if not silent:
+
+                print(f"\tCut-off is too high for {mlobject.region}. Try lowering it.")
+
+            mlobject.bad_region = "cut-off"
             mlobject.subset_matrix = None
 
             return mlobject
@@ -183,10 +182,9 @@ def estimate_cutoff(mlobject: mlo.MetalociObject, optimise : bool = False) -> fl
         Estimated cutoff for the Kamada-Kawai layout processing.
     """
 
-    # Set the initial interval for the cutoff, and counter for early stopping
+    # Set the initial interval for the cutoff
     min_cut = 0.1
     max_cut = 0.4
-    counter = 0
 
     # We first compute a hypothetical cutoff to get the a maximum amount of connections.
     mlobject.kk_cutoff["values"] = 0.25
@@ -222,14 +220,15 @@ def estimate_cutoff(mlobject: mlo.MetalociObject, optimise : bool = False) -> fl
         
         return [0.2] # Default
     
-    min_degrees = 0
-    target = int(max_degrees * 0.25) 
+    target = int(max_degrees * 0.25)
+    best_cutoff = [0.2] # Default starting point
+    best_error = np.inf # Initialise best error to infinity
 
     # The number of connections the node with the least amount of connections has to be 25% of the node with highest 
     # amount of connections. We find the cut-off that satisfies this condition.
-    while int(min_degrees) != target:
+    for _ in range(50): # Try 50 times to find a cut-off that satisfies the condition, at the end return the best one found
 
-        mlobject.kk_cutoff["values"] = round(random.uniform(min_cut, max_cut), 3) # Random cut-off
+        mlobject.kk_cutoff["values"] = (min_cut + max_cut) / 2 # Binary search using midpoint
         mlobject = get_restraints_matrix(mlobject, silent=True)
 
         try: # As it can fail if restraints if the cut-off is too extreme
@@ -237,8 +236,6 @@ def estimate_cutoff(mlobject: mlo.MetalociObject, optimise : bool = False) -> fl
             mlobject.kk_graph = nx.from_scipy_sparse_array(csr_matrix(mlobject.kk_restraints_matrix))
 
         except:
-
-            counter += 1
             continue
 
         degrees = []
@@ -250,26 +247,34 @@ def estimate_cutoff(mlobject: mlo.MetalociObject, optimise : bool = False) -> fl
         degrees = [x for x in degrees if x != 2] # As this is always the minimum, out
         degrees = [x for x in degrees if x != 1] # First or last without connections, out
         degrees = [x for x in degrees if x != 0] # Empty bins, out
-        min_degrees = int(np.min(degrees))
+        low_degree = np.percentile(degrees, 5) # Get the 5th percentile of the degrees to avoid outliers
+        error = abs(low_degree - target) # Calculate the error between the low degree and the target.
+        # More tolerance than looking for exact match so less fall-backs to default cut-off.
 
         # binary search
-        if min_degrees > target:
+        if error < best_error:
+            best_error = error
+            best_cutoff = [mlobject.kk_cutoff["values"]]
 
-            max_cut = mlobject.kk_cutoff["values"] + 0.02
+        if low_degree > target:
 
-        elif min_degrees < target:
+            max_cut = mlobject.kk_cutoff["values"]
 
-            min_cut = mlobject.kk_cutoff["values"] - 0.02
+        elif low_degree < target:
 
-        counter += 1
+            min_cut = mlobject.kk_cutoff["values"]
 
-        if counter > 40 and min_degrees != target: # If it does not find it in 40 tries, it will return the default.
-            
-            return [0.2] # Default
+        else: # low_degree == target, we found the perfect cut-off
+
+            best_cutoff = [mlobject.kk_cutoff["values"]]
+
+            break
+
     
-    mlobject.kk_cutoff["values"] = [mlobject.kk_cutoff["values"]]
+    mlobject.kk_cutoff["values"] = best_cutoff
 
     return mlobject.kk_cutoff["values"]
+
 
 
 def estimate_persistence_length(mlobject: mlo.MetalociObject, optimise : bool = False) -> float:

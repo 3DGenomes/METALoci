@@ -300,11 +300,22 @@ def get_lmi(row: pd.Series, args: pd.Series,
 
     # If the signal is not present in the signals folder (has not been processed with prep) but it is in the list of
     # signal to process, raise an exception and print which signals need to be processed.
-    if mlobject.signals_dict is None and progress is not None:
+    if mlobject.signals_dict is None:
 
-        progress["missing_signal"] = list(mlobject.signals_dict.keys())
+        missing_signals = [signal for signal in args.signals if signal not in signal_data.columns]
 
-        raise Exception()  # This exception is probably a bad idea
+        if progress is not None:
+
+            progress["missing_signal"] = missing_signals
+
+            raise Exception()
+        
+        else:
+
+            raise Exception(
+                "Trying to compute signals that have not been previously processed in prep: "
+                f"{missing_signals}"
+            )
 
     # Get average distance between consecutive points to define influence, which should be ~2 particles of radius.
     neighbourhood = mlobject.kk_distances.diagonal(1).mean() * INFLUENCE * BFACT
@@ -521,7 +532,7 @@ def run(opts):
 
                     if progress["missing_signal"] is not None:
 
-                        print(f"\tSignal '{progress['missing_signal']}' is in the signal list but has not been"
+                        print(f"\tSignal '{progress['missing_signal']}' is in the signal list but has not been "
                                 "processed with prep."
                                 "\n\tProcess that signal or remove it from the signal list."
                                 "\n\tExiting...")

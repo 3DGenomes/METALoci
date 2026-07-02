@@ -539,7 +539,8 @@ def run(opts):
 
         except KeyboardInterrupt:
 
-            pool.terminate()
+            pool.close()
+            pool.join()
 
     else:
 

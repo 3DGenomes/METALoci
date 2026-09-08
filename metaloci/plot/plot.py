@@ -972,8 +972,8 @@ def save_mm_kk(mlobject: mlo.MetalociObject, work_dir: str, remove_poi: bool = F
     plt.close()
 
 
-def create_composite_figure(mlobject: mlo.MetalociObject, signal_type: str, del_args: pd.Series = False, 
-                            neighourhood_circle: bool = False, args: pd.Series = False, mark_regions: pd.DataFrame = None, 
+def create_composite_figure(mlobject: mlo.MetalociObject, signal_type: str, del_args: pd.Series = None, 
+                            neighbourhood_circle: bool = False, args: pd.Series = None, mark_regions: pd.DataFrame = None, 
                             signipval : float = 0.05, silent : bool = False):
     """
     Generates a composite figure consisting of multiple plots related to Hi-C data analysis and saves the resulting 
@@ -1100,7 +1100,7 @@ def create_composite_figure(mlobject: mlo.MetalociObject, signal_type: str, del_
         print("\t\tHi-C plot -> done.")
         print("\t\tKamada-Kawai plot", end="\r")
 
-    kk_plt = get_kk_plot(mlobject, neighbourhood=neighourhood_circle)
+    kk_plt = get_kk_plot(mlobject, neighbourhood=neighbourhood_circle)
     kk_plt.savefig(f"{plot_filename}_kk.pdf", **plot_opt)
     kk_plt.savefig(f"{plot_filename}_kk.png", **plot_opt)
     plt.close()
@@ -1111,7 +1111,7 @@ def create_composite_figure(mlobject: mlo.MetalociObject, signal_type: str, del_
         print("\t\tGaudi Signal plot", end="\r")
 
     gs_plt = get_gaudi_signal_plot(mlobject, merged_lmi_geometry, mark_regions=mark_regions,
-                                        neighbourhood=neighourhood_circle)
+                                        neighbourhood=neighbourhood_circle)
     gs_plt.savefig(f"{plot_filename}_gsp.pdf", **plot_opt)
     gs_plt.savefig(f"{plot_filename}_gsp.png", **plot_opt)
     plt.close()
@@ -1122,7 +1122,7 @@ def create_composite_figure(mlobject: mlo.MetalociObject, signal_type: str, del_
         print("\t\tGaudi Type plot", end="\r")
 
     gt_plt = get_gaudi_type_plot(mlobject, merged_lmi_geometry, signipval, mark_regions=mark_regions,
-                                    neighbourhood=neighourhood_circle)
+                                    neighbourhood=neighbourhood_circle)
     gt_plt.savefig(f"{plot_filename}_gtp.pdf", **plot_opt)
     gt_plt.savefig(f"{plot_filename}_gtp.png", **plot_opt)
     plt.close()
@@ -1144,8 +1144,15 @@ def create_composite_figure(mlobject: mlo.MetalociObject, signal_type: str, del_
         print("\t\tSignal plot -> done.")
         print("\t\tLMI Scatter plot", end="\r")
 
-    lmi_plt, r_value, p_value = get_lmi_scatterplot(mlobject, merged_lmi_geometry,
-                                                            neighbourhood, signipval, False)
+    if del_args is not None:
+
+        lmi_plt, r_value, p_value = get_lmi_scatterplot(mlobject, merged_lmi_geometry,
+                                                            neighbourhood, signipval, del_args.zscore_signal)
+
+    else:
+        
+        lmi_plt, r_value, p_value = get_lmi_scatterplot(mlobject, merged_lmi_geometry,
+                                                            neighbourhood, signipval, args.zscore_signal)
 
     if lmi_plt is not None:
 
@@ -1186,8 +1193,6 @@ def create_composite_figure(mlobject: mlo.MetalociObject, signal_type: str, del_
 
         signal_left[max_chr_yax] = -21
 
-    # create a new png image of size 2x2 with the number 1
-
     composite_image = Image.new(mode="RGBA", size=(maxx, 1550))
     # HiC image
     composite_image = place_composite(composite_image, f"{plot_filename}_hic.png", 0.5, 100, 50)
@@ -1214,12 +1219,53 @@ def create_composite_figure(mlobject: mlo.MetalociObject, signal_type: str, del_
     plt.savefig(f"{plot_filename}.pdf", **plot_opt)
     plt.close()
 
-    os.remove(f"{plot_filename}_hic.png")
-    os.remove(f"{plot_filename}_signal.png")
-    os.remove(f"{plot_filename}_kk.png")
-    os.remove(f"{plot_filename}_lmi.png")
-    os.remove(f"{plot_filename}_gsp.png")
-    os.remove(f"{plot_filename}_gtp.png")
+
+    if del_args is None:
+
+        img1 = Image.open(f"{plot_filename}_lmi.png")
+        img2 = Image.open(f"{plot_filename}_gsp.png")
+        img3 = Image.open(f"{plot_filename}_gtp.png")
+        maxx = int((img1.size[1] * 0.4 + img2.size[1] * 0.25 + img3.size[1] * 0.25) * 1.3)
+        yticks_signal = [f"{round(i, 3):.2f}" for i in ax.get_yticks()[1:-1]]
+        signal_left = {4: 31, 5: 20, 6: 9, 7: 1, 8: -11}
+        max_chr_yax = max(len(str(i)) for i in yticks_signal)
+
+        if float(min(yticks_signal)) < 0:
+
+            negative_axis_correction = 5
+
+        else:
+
+            negative_axis_correction = 0
+
+        if max_chr_yax not in list(signal_left.keys()):
+
+            signal_left[max_chr_yax] = -21
+
+        page_width = maxx
+        page_height = 1550
+        doc = fitz.open()
+        page = doc.new_page(width=page_width, height=page_height)
+
+        place_pdf_match_png(page, f"{plot_filename}_hic.pdf", f"{plot_filename}_hic.png", 0.5, 100, 50)
+        place_pdf_match_png(page, f"{plot_filename}_signal.pdf", f"{plot_filename}_signal.png", 0.4,
+                        signal_left[max_chr_yax] + negative_axis_correction, 640)
+        place_pdf_match_png(page, f"{plot_filename}_kk.pdf", f"{plot_filename}_kk.png", 0.3, 1400, 50)
+        place_pdf_match_png(page, f"{plot_filename}_lmi.pdf", f"{plot_filename}_lmi.png", 0.4, 75, 900)
+        place_pdf_match_png(page, f"{plot_filename}_gsp.pdf", f"{plot_filename}_gsp.png", 0.25, 900, 850)
+        place_pdf_match_png(page, f"{plot_filename}_gtp.pdf", f"{plot_filename}_gtp.png", 0.25, 1600, 850)
+
+        doc.save(f"{plot_filename}.pdf")
+        doc.close()
+
+    if args is not None and args.rm_types or del_args is not None:
+
+            os.remove(f"{plot_filename}_hic.png")
+            os.remove(f"{plot_filename}_signal.png")
+            os.remove(f"{plot_filename}_kk.png")
+            os.remove(f"{plot_filename}_lmi.png")
+            os.remove(f"{plot_filename}_gsp.png")
+            os.remove(f"{plot_filename}_gtp.png")
 
     if del_args is not None:
 
@@ -1230,7 +1276,12 @@ def create_composite_figure(mlobject: mlo.MetalociObject, signal_type: str, del_
         os.remove(f"{plot_filename}_gsp.pdf")
         os.remove(f"{plot_filename}_gtp.pdf")
         os.remove(f"{plot_filename}.pdf")
+
+    if del_args is not None:
+
         os.remove(f"{plot_filename}_number.png")
+
+    return r_value, p_value
 
 
 def create_number_image(output_path: os.path, number: int = None, font_size: float = 192, 
@@ -1324,8 +1375,6 @@ def get_lmi_change_scan_plot(moran_data_folder: os.path, results_folder: os.path
             moran_data[i] = match.iloc[0, 8] 
 
     moran_data = pd.DataFrame.from_dict(moran_data, orient="index", columns=["LMI_score"])
-    # moran_data_wt = pd.read_csv(moran_data_wt_path, sep="\t")
-    # moran_data_wt = moran_data_wt.iloc[poi, 8]
 
     # Calculate mean and standard deviation
     mean_lmi = moran_data["LMI_score"].mean()

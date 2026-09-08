@@ -306,6 +306,18 @@ def get_region_layout(row: pd.Series, args: pd.Series, progress=None, counter: i
         mlobject.kk_cutoff["cutoff_type"] = args.cutoffs["cutoff_type"]
         mlobject.kk_cutoff["values"] = args.cutoffs["values"]
 
+        if mlobject.kk_cutoff["values"] == "optimise" and mlobject.persistence_length == "optimise" and not silent:
+
+            print("\tOptimisation of cut-off (-i) and persistence length (-p) enabled. Both will be optimised automatically.")
+
+        elif mlobject.kk_cutoff["values"] == "optimise" and not silent:
+
+            print("\tOptimisation of cut-off (-i) enabled. The cut-off will be optimised automatically.")
+
+        elif mlobject.persistence_length == "optimise" and not silent:
+
+            print("\tOptimisation of persistence length (-i) enabled. The persistence length will be optimised automatically.")
+
         # optimise can get stuck in bad regions for some reason I don't understand, so we set a default cutoff if
         # we know the region is bad.
         if mlobject.kk_cutoff["values"] == "optimise":
@@ -622,6 +634,14 @@ def run(opts: list):
     if opts.multiprocess:
 
         print(f"\n------> {len(df_regions)} regions will be computed.\n")
+        
+        if cutoffs["values"] == "optimise":
+            
+            print("\tOptimisation of cut-off (-i) enabled. The cut-off will be optimised automatically.")
+
+        if persistence_length == "optimise":
+
+            print("\tOptimisation of persistence length (-i) enabled. The persistence length will be optimised automatically.\n")
 
         try:
 

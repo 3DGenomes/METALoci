@@ -202,6 +202,14 @@ def populate_args(parser):
     )
 
     optional_arg.add_argument(
+        "-z",
+        "--zscore",
+        dest="zscore_signal",
+        action="store_true",
+        help="Flag to use z-score transformed signal values for the scatter plot (default: %(default)s).",
+    )
+
+    optional_arg.add_argument(
         "-f",
         "--force",
         dest="force",
@@ -325,6 +333,7 @@ def scan(row: pd.Series, args: pd.Series, silent):
         "intact_signals": intact_signals,
         "signipval": args.signipval,
         "create_gif": args.create_gif,
+        "rm_types": True,
         "force": args.force,
         "wt": False
     })
@@ -348,7 +357,8 @@ def scan(row: pd.Series, args: pd.Series, silent):
 
         except KeyboardInterrupt:
 
-            pool.terminate()
+            pool.close()
+            pool.join()
 
     else:
 
@@ -441,7 +451,7 @@ def compute_deletion(del_args: pd.Series, mlobject: mlo.MetalociObject, i: int, 
     del_args.i = i
     mlobject_del = copy.deepcopy(mlobject)
     len_matrix = len(mlobject.matrix)
-    gif_poi = del_args.create_gif
+    gif_poi = del_args.create_gif if del_args.create_gif is not None else mlobject.poi
     save_path_i = mlobject.save_path.replace('.mlo', f'_{i}.mlo')
     signipval = del_args.signipval
     to_do = True
@@ -497,6 +507,7 @@ def compute_deletion(del_args: pd.Series, mlobject: mlo.MetalociObject, i: int, 
     keep_indices = [j for j in range(num_bins) if j not in delete_indices]
 
     del_args.delete_indices = delete_indices
+    del_args.zscore_signal = True
     
     if to_do:
 
@@ -527,12 +538,8 @@ def compute_deletion(del_args: pd.Series, mlobject: mlo.MetalociObject, i: int, 
         # Remove those same bins from the signal data, which is a numpy array
         for signal_type in del_args.intact_signals.keys():
 
-            print(del_args.intact_signals[signal_type])
-
             mlobject_del.signals_dict[signal_type] = del_args.intact_signals[signal_type][keep_indices]
             
-            print(mlobject_del.signals_dict[signal_type])
-
         # Calculate KK layout
         mlobject_del = kk.get_restraints_matrix(mlobject_del, False, silent)  # Get submatrix of restraints
         mlobject_del.kk_graph = nx.from_scipy_sparse_array(csr_matrix(mlobject_del.kk_restraints_matrix))
@@ -545,13 +552,10 @@ def compute_deletion(del_args: pd.Series, mlobject: mlo.MetalociObject, i: int, 
 
     for signal_type in mlobject_del.signals_dict.keys():
 
-        print(mlobject_del.signals_dict["ATAC"].shape)
-
         if to_do:
 
             mlobject_del.lmi_info[signal_type] = lmi.compute_lmi(mlobject_del, signal_type, neighbourhood,
                                                                 9999, 0.05, silent, False, del_args = del_args)
-
         plot.create_composite_figure(mlobject_del, signal_type, del_args = del_args, signipval = signipval,  silent = silent)
         misc.write_moran_data(mlobject_del, del_args, scan = True, silent = silent)
         
@@ -636,7 +640,6 @@ def run(opts: list):
         print("HiC file format not supported. Supported formats are: cool, mcool, hic.")
         sys.exit("Exiting...")
 
-
     parsed_args = pd.Series({"work_dir": opts.work_dir,
                              "hic_path": opts.hic_file,
                              "resolution": opts.resolution,
@@ -650,8 +653,10 @@ def run(opts: list):
                              "create_gif": opts.create_gif,
                              "frame_duration": opts.frame_duration,
                              "signipval": opts.signipval,
+                             "rm_types": True,
                              "wt": True,
                              "force": opts.force,
+                             "zscore_signal": opts.zscore_signal
     })
 
     start_timer = time()

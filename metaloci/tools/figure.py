@@ -205,6 +205,13 @@ def populate_args(parser):
         "point of interest. (default: False)."
     )
 
+    style_arg.add_argument(
+        "-r",
+        "--restraints",
+        dest="restraints",
+        action="store_false",
+        help="Flag to plot the restraints on the Kamada-Kawai and Gaudí plots. (default: True)."
+    )
 
 def get_figures(row: pd.Series, args: pd.Series, progress=None, counter: int = None, silent: bool = True):
     """
@@ -228,7 +235,6 @@ def get_figures(row: pd.Series, args: pd.Series, progress=None, counter: int = N
         
         print(f"\n------> Working on region {row.coords} [{counter + 1}/{args.total_num}]\n")
 
-    plot_opt = {"bbox_inches": "tight", "dpi": 300, "transparent": True}
     save_path = f"{args.work_dir}{row.coords.split(':', 1)[0]}/objects/{re.sub(':|-', '_', row.coords)}.mlo"
 
     try:
@@ -275,187 +281,9 @@ def get_figures(row: pd.Series, args: pd.Series, progress=None, counter: int = N
             
             print(f"\tPlotting signal: {signal}")
 
-        plot_filename = os.path.join(args.work_dir, mlobject.chrom, "plots",
-                                        signal, f"{mlobject.chrom}_{mlobject.start}_{mlobject.end}_{mlobject.poi}")
-        pathlib.Path(plot_filename).mkdir(parents=True, exist_ok=True)
-
-        plot_filename = os.path.join(
-            plot_filename,
-            f"{mlobject.chrom}_{mlobject.start}_{mlobject.end}_{mlobject.poi}_{mlobject.resolution}_{signal}",
-        )
-        merged_lmi_geometry = pd.merge(
-            mlobject.lmi_info[signal],
-            mlobject.lmi_geometry,
-            on=["bin_index", "moran_index"],
-            how="inner",
-        )
-        merged_lmi_geometry = gpd.GeoDataFrame(merged_lmi_geometry, geometry=merged_lmi_geometry.geometry)
-
-        if not silent:
-            
-            print("\t\tHi-C plot", end="\r")
-
-        hic_plt = plot.get_hic_plot(mlobject, clean_mat=args.clean_matrix)
-
-        hic_plt.savefig(f"{plot_filename}_hic.pdf", **plot_opt)
-        hic_plt.savefig(f"{plot_filename}_hic.png", **plot_opt)
-        plt.close()
-
-        if not silent:
-
-            print("\t\tHi-C plot -> done.")
-            print("\t\tKamada-Kawai plot", end="\r")
-
-        kk_plt = plot.get_kk_plot(mlobject, neighbourhood=args.neighbourhood_circle)
-        kk_plt.savefig(f"{plot_filename}_kk.pdf", **plot_opt)
-        kk_plt.savefig(f"{plot_filename}_kk.png", **plot_opt)
-        plt.close()
-
-        if not silent:
-            
-            print("\t\tKamada-Kawai plot -> done.")
-            print("\t\tGaudi Signal plot", end="\r")
-
-        gs_plt = plot.get_gaudi_signal_plot(mlobject, merged_lmi_geometry, mark_regions=args.mark_regions,
-                                            neighbourhood=args.neighbourhood_circle)
-        gs_plt.savefig(f"{plot_filename}_gsp.pdf", **plot_opt)
-        gs_plt.savefig(f"{plot_filename}_gsp.png", **plot_opt)
-        plt.close()
-
-        if not silent:
-            
-            print("\t\tGaudi Signal plot -> done.")
-            print("\t\tGaudi Type plot", end="\r")
-
-        gt_plt = plot.get_gaudi_type_plot(mlobject, merged_lmi_geometry, args.signipval, mark_regions=args.mark_regions,
-                                          neighbourhood=args.neighbourhood_circle)
-        gt_plt.savefig(f"{plot_filename}_gtp.pdf", **plot_opt)
-        gt_plt.savefig(f"{plot_filename}_gtp.png", **plot_opt)
-        plt.close()
+        r_value, p_value = plot.create_composite_figure(mlobject, signal, neighbourhood_circle=args.neighbourhood_circle,
+                                    mark_regions=args.mark_regions, signipval=args.signipval, args=args, silent=silent)
         
-        if not silent:
-            
-            print("\t\tGaudi Type plot -> done.")
-            print("\t\tSignal plot", end="\r")
-
-        sig_plt, ax = plot.signal_plot(mlobject, merged_lmi_geometry, neighbourhood,
-                                        args.quadrants, args.signipval, args.metaloci_only)
-
-        sig_plt.savefig(f"{plot_filename}_signal.pdf", **plot_opt)
-        sig_plt.savefig(f"{plot_filename}_signal.png", **plot_opt)
-        plt.close()
-
-        if not silent:
-
-            print("\t\tSignal plot -> done.")
-            print("\t\tLMI Scatter plot", end="\r")
-
-        lmi_plt, r_value, p_value = plot.get_lmi_scatterplot(mlobject, merged_lmi_geometry,
-                                                                neighbourhood, args.signipval, args.zscore_signal)
-
-        if lmi_plt is not None:
-
-            lmi_plt.savefig(f"{plot_filename}_lmi.pdf", **plot_opt)
-            lmi_plt.savefig(f"{plot_filename}_lmi.png", **plot_opt)
-            plt.close()
-            
-            if not silent:
-                
-                print("\t\tLMI Scatter plot -> done.")
-
-        else:
-
-            if signal == args.signals[-1]:
-
-                if not silent:
-                    
-                    print("\t\tSkipping to next region...")
-
-                continue
-            
-            if not silent:
-                
-                print("\t\tSkipping to next signal...")
-
-            continue
-
-        if not silent:
-
-            print(f"\t\tFinal composite figure for region '{row.coords}' and signal '{signal}'", end="\r")
-
-        img1 = Image.open(f"{plot_filename}_lmi.png")
-        img2 = Image.open(f"{plot_filename}_gsp.png")
-        img3 = Image.open(f"{plot_filename}_gtp.png")
-        maxx = int((img1.size[1] * 0.4 + img2.size[1] * 0.25 + img3.size[1] * 0.25) * 1.3)
-        yticks_signal = [f"{round(i, 3):.2f}" for i in ax.get_yticks()[1:-1]]
-        signal_left = {3: 39, 4: 32, 5: 21, 6: 10, 7: -1, 8: -11}
-        max_chr_yax = max(len(str(i)) for i in yticks_signal)
-
-        if float(min(yticks_signal)) < 0:
-
-            negative_axis_correction = 5
-
-        else:
-
-            negative_axis_correction = 0
-
-        if max_chr_yax not in list(signal_left.keys()):
-
-            signal_left[max_chr_yax] = -21
-
-        composite_image = Image.new(mode="RGBA", size=(maxx, 1550))
-        # HiC image
-        composite_image = plot.place_composite(composite_image, f"{plot_filename}_hic.png", 0.5, 100, 50)
-        # Signal image
-        composite_image = plot.place_composite(composite_image, f"{plot_filename}_signal.png", 0.4,
-                                                signal_left[max_chr_yax] + negative_axis_correction, 640)
-        # KK image
-        composite_image = plot.place_composite(composite_image, f"{plot_filename}_kk.png", 0.3, 1300, 50)
-        # LMI scatter image
-        composite_image = plot.place_composite(composite_image, f"{plot_filename}_lmi.png", 0.4, 75, 900)
-        # Gaudi signal image
-        composite_image = plot.place_composite(composite_image, f"{plot_filename}_gsp.png", 0.25, 900, 900)
-        # Gaudi signal image
-        composite_image = plot.place_composite(composite_image, f"{plot_filename}_gtp.png", 0.25, 1600, 900)
-
-        composite_image.save(f"{plot_filename}.png")
-
-        img1 = Image.open(f"{plot_filename}_lmi.png")
-        img2 = Image.open(f"{plot_filename}_gsp.png")
-        img3 = Image.open(f"{plot_filename}_gtp.png")
-        maxx = int((img1.size[1] * 0.4 + img2.size[1] * 0.25 + img3.size[1] * 0.25) * 1.3)
-        yticks_signal = [f"{round(i, 3):.2f}" for i in ax.get_yticks()[1:-1]]
-        signal_left = {4: 31, 5: 20, 6: 9, 7: 1, 8: -11}
-        max_chr_yax = max(len(str(i)) for i in yticks_signal)
-
-        if float(min(yticks_signal)) < 0:
-
-            negative_axis_correction = 5
-
-        else:
-
-            negative_axis_correction = 0
-
-        if max_chr_yax not in list(signal_left.keys()):
-
-            signal_left[max_chr_yax] = -21
-
-        page_width = maxx
-        page_height = 1550
-        doc = fitz.open()
-        page = doc.new_page(width=page_width, height=page_height)
-
-        plot.place_pdf_match_png(page, f"{plot_filename}_hic.pdf", f"{plot_filename}_hic.png", 0.5, 100, 50)
-        plot.place_pdf_match_png(page, f"{plot_filename}_signal.pdf", f"{plot_filename}_signal.png", 0.4,
-                        signal_left[max_chr_yax] + negative_axis_correction, 640)
-        plot.place_pdf_match_png(page, f"{plot_filename}_kk.pdf", f"{plot_filename}_kk.png", 0.3, 1300, 50)
-        plot.place_pdf_match_png(page, f"{plot_filename}_lmi.pdf", f"{plot_filename}_lmi.png", 0.4, 75, 900)
-        plot.place_pdf_match_png(page, f"{plot_filename}_gsp.pdf", f"{plot_filename}_gsp.png", 0.25, 900, 900)
-        plot.place_pdf_match_png(page, f"{plot_filename}_gtp.pdf", f"{plot_filename}_gtp.png", 0.25, 1600, 900)
-
-        doc.save(f"{plot_filename}.pdf")
-        doc.close()
-
         if not silent:
 
             print(f"\t\tFinal composite figure for region '{row.coords}' and signal '{signal}' -> done.")
@@ -494,15 +322,6 @@ def get_figures(row: pd.Series, args: pd.Series, progress=None, counter: int = N
                     if not any(log in line for line in handler):
 
                         handler.write(log)
-        
-        if args.rm_types:
-
-                os.remove(f"{plot_filename}_hic.png")
-                os.remove(f"{plot_filename}_signal.png")
-                os.remove(f"{plot_filename}_kk.png")
-                os.remove(f"{plot_filename}_lmi.png")
-                os.remove(f"{plot_filename}_gsp.png")
-                os.remove(f"{plot_filename}_gtp.png")
 
     if progress is not None:
 
@@ -596,10 +415,11 @@ def run(opts: list):
         print(f"metaloci_only ->\n\t{opts.metalocis}")
         print(f"quadrants ->\n\t{opts.quart}")
         print(f"signipval ->\n\t{opts.signipval}")
-        print(f"rmtypes ->\n\t{opts.rm__types}")
+        print(f"rmtypes ->\n\t{opts.rm_types}")
         print(f"mark_regions ->\n\t{mark_regions}")
         print(f"influence ->\n\t{INFLUENCE}")
         print(f"bfact ->\n\t{BFACT}")
+        print(f"restraints ->\n\t{opts.restraints}")
 
         sys.exit()
 
@@ -617,7 +437,8 @@ def run(opts: list):
                              "INFLUENCE": INFLUENCE,
                              "BFACT": BFACT,
                              "clean_matrix": opts.clean_matrix,
-                             "neighbourhood_circle": opts.neighbourhood_circle
+                             "neighbourhood_circle": opts.neighbourhood_circle,
+                             "restraints": opts.restraints
                              })
 
     start_timer = time()

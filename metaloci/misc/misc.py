@@ -59,6 +59,10 @@ def signal_binnarize(data: pd.DataFrame, sum_type: str) -> pd.DataFrame:
 
         data = data.groupby(["chrom", "start", "end"])[data.columns[3: len(data.columns)]].count().reset_index()
 
+    elif sum_type == "sum":
+
+        data = data.groupby(["chrom", "start", "end"])[data.columns[3: len(data.columns)]].sum().reset_index()
+
     return data
 
 

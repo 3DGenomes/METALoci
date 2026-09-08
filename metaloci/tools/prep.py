@@ -120,7 +120,7 @@ def populate_args(parser):
         metavar="STR",
         type=str,
         default="median",
-        choices=["median", "mean", "min", "max", "count"],
+        choices=["median", "mean", "min", "max", "count", "sum"],
         help="Type of summarization to use when merging signal in a single bin. " \
         "Options: %(choices)s. Default: %(default)s.")
 

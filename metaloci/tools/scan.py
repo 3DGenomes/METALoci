@@ -210,6 +210,18 @@ def populate_args(parser):
     )
 
     optional_arg.add_argument(
+        "-gf",
+        "--gaussian_filter",
+        dest="gaussian_filter",
+        metavar="FLOAT",
+        type=float,
+        default=None,
+        help="Apply a Gaussian filter to the Hi-C matrix before computing the Kamada-Kawai layout. "
+        "The value provided is the standard deviation of the Gaussian kernel. "
+        "If not provided, no Gaussian filter will be applied."
+    )
+
+    optional_arg.add_argument(
         "-f",
         "--force",
         dest="force",
@@ -252,6 +264,10 @@ def scan(row: pd.Series, args: pd.Series, silent):
         mlobject.matrix = hicstraw.HiCFile(args.hic_path).getMatrixZoomData(
             mlobject.chrom, mlobject.chrom, 'observed', 'VC_SQRT', 'BP', mlobject.resolution).getRecordsAsMatrix(
             mlobject.start, mlobject.end, mlobject.start, mlobject.end)
+        
+    if args.gaussian_filter is not None:
+
+            mlobject.gaussian_filter = args.gaussian_filter
 
     mlobject = misc.clean_matrix(mlobject)
 
@@ -430,7 +446,7 @@ def _map_poi_after_deletion(poi: int | None, delete_indices: list[int]) -> int |
     Returns:
         int | None: The new POI in the compact layout, or None if the POI is no longer valid (i.e., it was deleted).
     """
-    
+
     if poi is None:
 
         return None
@@ -672,7 +688,8 @@ def run(opts: list):
                              "rm_types": True,
                              "wt": True,
                              "force": opts.force,
-                             "zscore_signal": opts.zscore_signal
+                             "zscore_signal": opts.zscore_signal,
+                             "gaussian_filter": opts.gaussian_filter
     })
 
     start_timer = time()

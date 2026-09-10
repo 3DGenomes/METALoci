@@ -122,6 +122,7 @@ class MetalociObject:
 
         self.resolution = resolution
         self.save_path = save_path
+        self.gaussian_filter = None
         self.persistence_length = None
         self.subset_matrix = None
         self.matrix = None

@@ -7,6 +7,7 @@ import random
 import networkx as nx
 import numpy as np
 from metaloci import mlo
+from scipy import ndimage
 from scipy.sparse import csr_matrix
 
 
@@ -33,6 +34,8 @@ def get_restraints_matrix(mlobject: mlo.MetalociObject, optimise: bool = False, 
     # Get subset matrix
     mlobject = get_subset_matrix(mlobject, optimise, silent)
 
+
+
     if mlobject.subset_matrix is None:
 
         mlobject.kk_restraints_matrix = None
@@ -44,6 +47,8 @@ def get_restraints_matrix(mlobject: mlo.MetalociObject, optimise: bool = False, 
     restraints_matrix = 1 / restraints_matrix  # Convert to distance matrix instead of similarity matrix
     restraints_matrix = np.triu(restraints_matrix, k=0)  # Remove lower triangle
     restraints_matrix = np.nan_to_num(restraints_matrix, nan=0, posinf=0, neginf=0)  # Clean nans and infs
+
+
 
     mlobject.kk_restraints_matrix = restraints_matrix
 
@@ -130,6 +135,12 @@ def get_subset_matrix(mlobject: mlo.MetalociObject, optimise: bool = False, sile
 
     # Subset to cutoff percentile
     subset_matrix = mlobject.matrix.copy()
+
+    #smooth matrix with gaussian filter
+    if mlobject.gaussian_filter:
+
+        subset_matrix = ndimage.gaussian_filter(subset_matrix, sigma=mlobject.gaussian_filter)
+
     subset_matrix = np.where(subset_matrix == 1.0, 0, subset_matrix)
     subset_matrix[subset_matrix < np.nanmin(mlobject.flat_matrix[mlobject.kk_top_indexes])] = 0
 

@@ -311,14 +311,15 @@ def get_hic_plot(mlobject: mlo.MetalociObject, del_args = None, cmap_user: str =
     mid = int(array.shape[0] / 2)
 
     if mlobject.poi is not None: # In case of 'metaloci scan' where we are removing the poi
-    
-        poi_factor = mlobject.poi / mlobject.lmi_geometry["bin_index"].shape[0]
-        poi_x = int(poi_factor * int(array.shape[0]))
-        
-        if del_args is not None and del_args.delete_indices is not None:  
 
-            poi_factor = mlobject.poi / (len_array) # lmi_geometry now has different length due to deletions
-            poi_x = int(poi_factor * int(array.shape[0]))
+        poi_index = mlobject.poi
+
+        if del_args is not None and del_args.delete_indices is not None:
+
+            poi_index = del_args.create_gif if del_args.create_gif is not None else del_args.intact_poi
+
+        poi_factor = poi_index / len_array
+        poi_x = int(poi_factor * int(array.shape[0]))
 
     array = array[:mid, :]
     array[array == 0] = np.nan
@@ -569,7 +570,8 @@ def get_gaudi_type_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame
 
 
 def signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, neighbourhood: float,
-                quadrants: list = None, signipval: float = 0.05, metaloci_only: bool = False):
+                quadrants: list = None, signipval: float = 0.05, metaloci_only: bool = False,
+                original_num_bins: int = None, plot_poi: int = None):
     """
     Generate a signal plot to visualize the signal intensity and the positions of significant bins.
 
@@ -609,7 +611,11 @@ def signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, neighb
 
         quadrants = [1, 3]
 
-    bins, coords_b = get_x_axis_label_signal_plot(mlobject)
+    if original_num_bins is None:
+
+        original_num_bins = len(mlobject.lmi_geometry)
+
+    bins, coords_b = get_x_axis_label_signal_plot(mlobject, original_num_bins)
     metalocis = get_highlight(mlobject, lmi_geometry, neighbourhood, quadrants, signipval, metaloci_only)
     sig_plt = plt.figure(figsize=(10, 1.5))
 
@@ -629,9 +635,9 @@ def signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, neighb
 
     plt.tick_params(axis="both", which="minor", labelsize=24)
 
-    if mlobject.poi is not None: # in case of 'metaloci scan' where we are removing the poi
+    if plot_poi is not None:
 
-        plt.axvline(x=mlobject.poi, color="lime", linestyle="--", lw=1, zorder=1, alpha=0.6)
+        plt.axvline(x=plot_poi, color="lime", linestyle="--", lw=1, zorder=1, alpha=0.6)
 
     plt.xlabel(f"chromosome {mlobject.chrom}")
     plt.xticks(bins, coords_b)
@@ -640,11 +646,14 @@ def signal_plot(mlobject: mlo.MetalociObject, lmi_geometry: pd.DataFrame, neighb
     # Cast lmi_geometry.Sig to float32 to avoid new matplotlib version error
     lmi_geometry.Sig = lmi_geometry.Sig.astype(np.float32)
     
-    ax = sns.lineplot(x=lmi_geometry.bin_index, y=lmi_geometry.Sig, color="black", lw=0.7)
+    signal_by_bin = pd.Series(np.nan, index=range(original_num_bins), dtype=float)
+    signal_by_bin.loc[lmi_geometry.bin_index.astype(int)] = lmi_geometry.Sig.to_numpy()
+    ax = sns.lineplot(x=signal_by_bin.index, y=signal_by_bin.to_numpy(), color="black", lw=0.7)
 
     ax.yaxis.set_major_locator(MaxNLocator(nbins=5, integer=True))
     ax.yaxis.set_major_formatter(FormatStrFormatter("%.2f"))
     ax.margins(x=0)
+    ax.set_xlim(0, original_num_bins - 1)
     ax.axhline(y=0, color="k", zorder=0)
     sns.despine(top=True, right=True, left=False, bottom=True, offset=None, trim=False)
 
@@ -880,7 +889,7 @@ def place_pdf(page: fitz.Page, pdf_path: str, target_width: float, x: float, y: 
     src.close()
 
 
-def get_x_axis_label_signal_plot(mlobject: mlo.MetalociObject):
+def get_x_axis_label_signal_plot(mlobject: mlo.MetalociObject, num_bins: int = None):
     """
     Get the x-axis labels for the signal plot.
 
@@ -897,7 +906,11 @@ def get_x_axis_label_signal_plot(mlobject: mlo.MetalociObject):
         List of coordinate labels for the x-axis.
     """
 
-    bins = [0, len(mlobject.lmi_geometry) // 2 - 1, len(mlobject.lmi_geometry) - 1]
+    if num_bins is None:
+
+        num_bins = len(mlobject.lmi_geometry)
+
+    bins = [0, num_bins // 2 - 1, num_bins - 1]
     coords_b = [f"{mlobject.start + b * mlobject.resolution:,}" for b in bins]
 
     return bins, coords_b
@@ -1040,18 +1053,6 @@ def create_composite_figure(mlobject: mlo.MetalociObject, signal_type: str, del_
 
             delete_indices = list(range(del_args.i, del_args.i + del_args.num_bins_to_delete))
             
-            if gif_poi in delete_indices:
-
-                mlobject.poi = None
-
-            elif min(delete_indices) < gif_poi:
-
-                mlobject.poi = gif_poi - del_args.num_bins_to_delete
-
-            elif min(delete_indices) > gif_poi:
-
-                mlobject.poi = gif_poi
-
             plot_filename = os.path.join(
                 plot_filename,
                 f"{mlobject.chrom}_{mlobject.start}_{mlobject.end}_{del_args.intact_poi}_"
@@ -1132,8 +1133,19 @@ def create_composite_figure(mlobject: mlo.MetalociObject, signal_type: str, del_
         print("\t\tGaudi Type plot -> done.")
         print("\t\tSignal plot", end="\r")
 
+    original_num_bins = (len(del_args.intact_signals[signal_type])
+                         if del_args is not None and not del_args.wt else None)
+
+    if del_args is not None and not del_args.wt and mlobject.poi is not None:
+
+        plot_poi = del_args.create_gif if del_args.create_gif is not None else del_args.intact_poi
+
+    else:
+
+        plot_poi = mlobject.poi
+
     sig_plt, ax = signal_plot(mlobject, merged_lmi_geometry, neighbourhood,
-                                    [1, 3], signipval, False)
+                                    [1, 3], signipval, False, original_num_bins, plot_poi)
 
     sig_plt.savefig(f"{plot_filename}_signal.pdf", **plot_opt)
     sig_plt.savefig(f"{plot_filename}_signal.png", **plot_opt)
@@ -1338,82 +1350,137 @@ def create_number_image(output_path: os.path, number: int = None, font_size: flo
 
 def get_lmi_change_scan_plot(moran_data_folder: os.path, results_folder: os.path = None, poi: int = None):
     """
-    Generates and saves a scatter plot visualizing the change in LMI (Local Moran's I) scores 
-    over a series of deletions for a given point of interest (POI).
-    The function reads multiple TSV files from the specified folder, extracts the LMI scores 
-    for the given POI, and calculates the mean and standard deviation of the scores. It then 
-    plots the scores along with the mean, ±2 standard deviation range, and highlights points 
-    that fall outside this range.
+    Generate a WT-referenced LMI and spatial-lag scan plot.
+
+    The wild-type row is assigned position zero and is used as the reference line
+    for both panels. Deletion rows are positioned by their one-based scan index.
 
     Parameters:
         moran_data_folder (str): Path to the folder containing the TSV files with Moran's I data.
+        results_folder (str): Directory where the resulting PDF is saved.
         poi (int): The point of interest (POI) for which the LMI scores are analyzed.
 
     Saves:
-        A PNG file named `lmi_change_scan_plot_<poi>.png` in the specified folder, containing 
-        the generated plot.
-        
-    Notes:
-        - Points with LMI scores below (mean - 2 * std_dev) are highlighted in blue, and points 
-          above (mean + 2 * std_dev) are highlighted in red.
+        A PDF named `lmi_change_scan_plot_<poi>.pdf` in ``results_folder``.
     """
 
-    moran_data_paths = glob.glob(f"{moran_data_folder}/*.tsv")[:-1]
-    moran_data_wt_path = glob.glob(f"{moran_data_folder}/*.tsv")[-1]
-    moran_data_paths = misc.natural_sort(moran_data_paths)
+    moran_data_paths = glob.glob(os.path.join(moran_data_folder, "*.tsv"))
+    wt_paths = [path for path in moran_data_paths if path.endswith("_wt.tsv")]
 
-    moran_data = {}
+    if not wt_paths:
 
-    for i, path in enumerate(moran_data_paths):
+        raise ValueError(f"No wild-type Moran data found in {moran_data_folder}.")
 
-        df = pd.read_csv(path, sep="\t")
-        
-        match = df[df.iloc[:, 1] == poi]  
+    def get_poi_row(path):
 
-        if not match.empty:
+        data = pd.read_csv(path, sep="\t")
+        matches = data[data["bin_index"] == poi]
 
-            moran_data[i] = match.iloc[0, 8] 
+        if matches.empty:
 
-    moran_data = pd.DataFrame.from_dict(moran_data, orient="index", columns=["LMI_score"])
+            return None
 
-    # Calculate mean and standard deviation
-    mean_lmi = moran_data["LMI_score"].mean()
-    std_dev = moran_data["LMI_score"].std()
+        row = matches.iloc[0]
 
-    plt.figure(figsize=(20, 3))
-    sns.scatterplot(x=moran_data.index, y=moran_data["LMI_score"],
-                    color="gray", edgecolor="black", label="LMI score")
-    plt.axhline(y=mean_lmi, color="black", linestyle="--", label="mean LMI score")
-    plt.axhspan(mean_lmi - 2 * std_dev, mean_lmi + 2 * std_dev, color="gray", alpha=0.3, label="±2 SD")
+        return {
+            "lmi_score": float(row["LMI_score"]),
+            "lmi_pval": float(row["LMI_pvalue"]),
+            "lag": float(row["Lag"]),
+        }
 
-    # Tight limits with slight padding
-    ymin = moran_data["LMI_score"].min()
-    ymax = moran_data["LMI_score"].max()
-    padding = 0.05 * (ymax - ymin)
-    ymin -= padding
-    ymax += padding
-    plt.ylim(ymin, ymax)
+    wt_row = get_poi_row(wt_paths[0])
 
-    for x, row in moran_data.iterrows():
+    if wt_row is None:
 
-        score = row["LMI_score"]
+        raise ValueError(f"POI {poi} was not found in the wild-type Moran data.")
 
-        if score < mean_lmi - 2 * std_dev:
+    rows = [{"pos": 0, **wt_row}]
 
-            plt.vlines(x=x, ymin=ymin, ymax=score, color="blue", linestyle=":", lw=1, alpha=0.5)
+    for path in misc.natural_sort([path for path in moran_data_paths if path not in wt_paths]):
 
-        elif score > mean_lmi + 2 * std_dev:
+        deletion_row = get_poi_row(path)
 
-            plt.vlines(x=x, ymin=ymin, ymax=score, color="red", linestyle=":", lw=1, alpha=0.5)
-    
-    xticks = [x for x in moran_data.index if x % 50 == 0]
-    plt.xticks(xticks, xticks)    
-    plt.ylabel("LMI Score")
-    plt.title(f"LMI Score change over deletions for poi {poi}")
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig(os.path.join(results_folder, f"lmi_change_scan_plot_{poi}.png"), dpi=300)
-    plt.close()
+        if deletion_row is None:
+
+            continue
+
+        suffix = pathlib.Path(path).stem.rsplit("_", 1)[-1]
+        rows.append({"pos": int(suffix) + 1, **deletion_row})
+
+    results_df = pd.DataFrame(rows).sort_values("pos")
+    reference = results_df[results_df["pos"] == 0].iloc[0]
+    scan_df = results_df[results_df["pos"] != 0].copy()
+
+    if scan_df.empty:
+
+        raise ValueError(f"No deletion Moran data containing POI {poi} was found.")
+
+    mean_lmi = reference["lmi_score"]
+    lag_ref = reference["lag"]
+    std_dev = scan_df["lmi_score"].std()
+
+    pval = scan_df["lmi_pval"].clip(lower=np.finfo(float).tiny)
+    log10_pval = -np.log10(pval)
+
+    fig = plt.figure(figsize=(35, 6), constrained_layout=True)
+    grid = fig.add_gridspec(
+        2,
+        2,
+        width_ratios=[1, 0.025],
+        height_ratios=[3, 1],
+        hspace=0,
+        wspace=0.08,
+    )
+    ax_sc = fig.add_subplot(grid[0, 0])
+    ax_lag = fig.add_subplot(grid[1, 0], sharex=ax_sc)
+    cax = fig.add_subplot(grid[:, 1])
+
+    ax_sc.axhspan(mean_lmi - 2 * std_dev, mean_lmi + 2 * std_dev,
+                  color="grey", alpha=0.3, zorder=0)
+    ax_sc.axhline(mean_lmi, color="grey", linewidth=1, zorder=1)
+
+    scatter = ax_sc.scatter(
+        scan_df["pos"],
+        scan_df["lmi_score"],
+        c=log10_pval,
+        cmap="viridis",
+        edgecolor="k",
+        linewidth=0.3,
+        zorder=3,
+    )
+
+    bottom, top = ax_sc.get_ylim()
+    below = scan_df[scan_df["lmi_score"] < mean_lmi - 2 * std_dev]
+    above = scan_df[scan_df["lmi_score"] > mean_lmi + 2 * std_dev]
+    ax_sc.vlines(below["pos"], bottom, below["lmi_score"], color="blue",
+                 linestyle="--", linewidth=1, zorder=2)
+    ax_sc.vlines(above["pos"], bottom, above["lmi_score"], color="red",
+                 linestyle="--", linewidth=1, zorder=2)
+    ax_sc.set_ylim(bottom, top)
+
+    for x, y in zip(scan_df["pos"], scan_df["lmi_score"]):
+
+        ax_sc.annotate(f"{int(x)}", (x, y), xytext=(0, 5),
+                       textcoords="offset points", ha="center", fontsize=6)
+
+    colorbar = fig.colorbar(scatter, cax=cax)
+    colorbar.set_label("-log10(p-value)")
+
+    ax_sc.set_ylabel("LMI score")
+    ax_sc.set_title(f"LMI scan for POI {poi}")
+
+    lag_colors = ["red" if value > lag_ref else "blue" for value in scan_df["lag"]]
+    ax_lag.bar(scan_df["pos"], scan_df["lag"], color=lag_colors, width=0.8)
+    ax_lag.axhline(lag_ref, color="grey", linewidth=1, zorder=1)
+    ax_lag.set_ylabel("Lag")
+    ax_lag.set_xlabel("deletion scan position")
+    ax_sc.set_xlim(-1, scan_df["pos"].max() + 1)
+
+    output_path = os.path.join(results_folder, f"lmi_change_scan_plot_{poi}.pdf")
+    fig.savefig(output_path, format="pdf")
+    plt.close(fig)
+
+    return fig
 
 def place_pdf_match_png(page,pdf_path, png_path, factor, x, y):
                         

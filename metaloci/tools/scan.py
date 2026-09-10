@@ -349,7 +349,7 @@ def scan(row: pd.Series, args: pd.Series, silent):
             with mp.Pool(processes=args.threads) as pool:
 
                 pool.starmap(compute_deletion, [(del_args, copy.deepcopy(mlobject), i, True, progress) 
-                                                for i in range(num_bins - num_bins_to_delete)]
+                                                for i in range(num_bins - num_bins_to_delete + 1)]
                                                 )
 
                 pool.close()
@@ -362,7 +362,7 @@ def scan(row: pd.Series, args: pd.Series, silent):
 
     else:
 
-        for i in range(num_bins - num_bins_to_delete):
+        for i in range(num_bins - num_bins_to_delete + 1):
 
             compute_deletion(del_args, mlobject, i, silent=False)
 
@@ -421,6 +421,34 @@ def scan(row: pd.Series, args: pd.Series, silent):
 
             plot.get_lmi_change_scan_plot(moran_data_folder, poi=args.create_gif, results_folder = results_folder_path)
 
+def _map_poi_after_deletion(poi: int | None, delete_indices: list[int]) -> int | None:
+    """Map an intact-layout POI to the compact layout after deleting bins.
+    Returns the new POI in the compact layout, or None if the POI is no longer valid.
+    Parameters:
+        poi (int | None): The point of interest in the intact layout.
+        delete_indices (list[int]): The indices of the bins that were deleted.
+    Returns:
+        int | None: The new POI in the compact layout, or None if the POI is no longer valid (i.e., it was deleted).
+    """
+    
+    if poi is None:
+
+        return None
+
+    delete_start = delete_indices[0]
+    delete_end = delete_indices[-1]
+
+    if delete_start <= poi <= delete_end:
+
+        return None
+
+    if poi > delete_end:
+
+        return poi - len(delete_indices)
+
+    return poi
+
+
 def compute_deletion(del_args: pd.Series, mlobject: mlo.MetalociObject, i: int, silent: bool, progress=None):
     """
     Compute the deletion of a specified region in a matrix and update the associated metadata.
@@ -470,15 +498,12 @@ def compute_deletion(del_args: pd.Series, mlobject: mlo.MetalociObject, i: int, 
 
         delete_indices = list(range(i, i + del_args.num_bins_to_delete))
         
-        # Adjust gif_poi if needed
-        if min(delete_indices) < gif_poi:
-
-            gif_poi -= del_args.num_bins_to_delete
+        mapped_poi = _map_poi_after_deletion(gif_poi, delete_indices)
 
         # Determine which point of interest to compare
-        compare = gif_poi if mlobject_del.poi is None else mlobject_del.poi
+        compare = mapped_poi if mlobject_del.poi is None else mlobject_del.poi
 
-        if compare == gif_poi: # check if the previously computed poi is the same as the one in the args
+        if compare == mapped_poi: # check if the previously computed poi is the same as the one in the args
 
             if not silent:
                 print(f"\tFile \"{save_path_i}\" already exists. Skipping to next region...")
@@ -486,7 +511,7 @@ def compute_deletion(del_args: pd.Series, mlobject: mlo.MetalociObject, i: int, 
             if progress is not None:
                 progress['value'] += 1
                 time_spent = time() - progress['timer']
-                total = len_matrix - del_args.num_bins_to_delete
+                total = len_matrix - del_args.num_bins_to_delete + 1
                 time_remaining = int(time_spent / progress['value'] * (total - progress['value']))
 
                 # Clear previous line and print progress
@@ -523,17 +548,7 @@ def compute_deletion(del_args: pd.Series, mlobject: mlo.MetalociObject, i: int, 
             gif_poi = del_args.intact_poi
 
         # Properly set the poi, because after the deletion bins are shifted
-        if gif_poi in delete_indices:
-
-            mlobject_del.poi = None
-
-        elif min(delete_indices) < gif_poi:
-
-            mlobject_del.poi = gif_poi - del_args.num_bins_to_delete
-
-        elif min(delete_indices) > gif_poi:
-
-            mlobject_del.poi = gif_poi
+        mlobject_del.poi = _map_poi_after_deletion(gif_poi, delete_indices)
 
         # Remove those same bins from the signal data, which is a numpy array
         for signal_type in del_args.intact_signals.keys():
@@ -567,10 +582,11 @@ def compute_deletion(del_args: pd.Series, mlobject: mlo.MetalociObject, i: int, 
 
             progress['value'] += 1
             time_spent = time() - progress['timer']
-            time_remaining = int(time_spent / progress['value'] * (len(keep_indices) - progress['value']))
+            total = len_matrix - del_args.num_bins_to_delete + 1
+            time_remaining = int(time_spent / progress['value'] * (total - progress['value']))
 
             print(f"\033[A{'  '*int(sp.Popen(['tput','cols'], stdout=sp.PIPE).communicate()[0].strip())}\033[A")
-            print(f"\t[{progress['value']}/{len(keep_indices)}] | Time spent: {timedelta(seconds=round(time_spent))} | "
+            print(f"\t[{progress['value']}/{total}] | Time spent: {timedelta(seconds=round(time_spent))} | "
                 f"ETR: {timedelta(seconds=round(time_remaining))}", end='\r')
         
 

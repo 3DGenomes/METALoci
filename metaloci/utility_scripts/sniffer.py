@@ -11,14 +11,13 @@ from datetime import timedelta
 from time import time
 
 import pandas as pd
+from metaloci.misc import misc
 from pybedtools import BedTool
 from tqdm import tqdm
 
-from metaloci.misc import misc
-
 HELP = "Converts a .gtf/.bed file to a list of regions for METALoci."
 
-DESCRIPTION = """Takes a .gft file or a .bed file and parses it into a region list, with a
+DESCRIPTION = """Takes a .gtf file or a .bed file and parses it into a region list, with a
 specific resolution and extension. Each gene will be a point of interest and the region will be centered around it. 
 Human/mouse gtf files can be downloaded from the GENCODE website. For other species, please
 refer to the UCSC website. BED files can be used to create a custom region list, using the following format:

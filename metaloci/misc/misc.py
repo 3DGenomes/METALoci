@@ -607,7 +607,7 @@ def bedparser(gene_file_f: Path, name: str, extend: int,
 
         if strand:
 
-            id_tss[row.id] = row.start if row.strand == "+" else row.end
+            id_tss[row.id] = row.start if row.strand == "+" else row.end - 1
 
         else:
 
@@ -859,29 +859,6 @@ def get_poi_data(line: pd.Series, args: pd.Series):
 
             regionfile_h.write(f"{region_line}\n")
 
-
-# def write_bad_region(mlobject, work_dir):
-#     """
-#     Writes the bad regions, after quality checking, to a file.
-
-#     Parameters
-#     ----------
-#     mlobject : mlo.MetalociObject
-#         METALoci object.
-#     work_dir : str
-#         Path to the working directory.
-#     """
-
-#     with open(f"{work_dir}bad_regions.txt", "a+", encoding="utf-8") as handler:
-
-#         log = f"{mlobject.region}\t{mlobject.bad_region}\n"
-
-#         handler.seek(0)
-
-#         if not any(mlobject.region in line.split('\t', 1)[0] for line in handler) and mlobject.bad_region is not None:
-
-#             handler.write(log)
-#             handler.flush()
 
 def write_bad_region(mlobject, work_dir):
     """

@@ -1,0 +1,18 @@
+{
+  "title": "METALoci",
+  "description": "METALoci: Spatially auto-correlated signals in 3D genomes.",
+  "upload_type": "software",
+  "creators": [
+    {
+      "name": "Zuber, Leo"
+    },
+    {
+      "name": "Maceda, Iago"
+    },
+    {
+      "name": "Marti-Renom, Marc A."
+    }
+  ],
+  "version": "v1.4",
+  "license": "GPL-3.0"
+}
